@@ -1,0 +1,28 @@
+{
+    "common": {
+      "appName": "Evergreen Volunteer",
+      "welcome": "Bienvenue à Evergreen",
+      "login": "Connexion",
+      "logout": "Déconnexion",
+      "email": "Adresse e-mail",
+      "password": "Mot de passe",
+      "rememberMe": "Se souvenir de moi",
+      "forgotPassword": "Mot de passe oublié?",
+      "signIn": "Se connecter",
+      "noAccount": "Pas de compte?",
+      "contactAdmin": "Contactez votre administrateur",
+      "requestAccess": "Demander l'accès",
+      "changeLanguage": "Changer la langue",
+      "english": "Anglais",
+      "kinyarwanda": "Kinyarwanda",
+      "french": "Français",
+      "loading": "Chargement...",
+      "error": "Erreur"
+    },
+    "login": {
+      "title": "Bienvenue à Evergreen",
+      "subtitle": "Système de gestion des bénévoles",
+      "signingIn": "Connexion en cours...",
+      "invalidCredentials": "Échec de la connexion. Vérifiez vos identifiants."
+    }
+  }

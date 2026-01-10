@@ -1,0 +1,43 @@
+{
+    "navigation": {
+      "title": "Volunteer Portal",
+      "dashboard": "Dashboard",
+      "activities": "Activities",
+      "submit_report": "Submit Report",
+      "reports": "Reports",
+      "history": "History"
+    },
+    "Dashboard": {
+      "title": "Dashboard",
+      "subtitle": "Welcome back! Here's your volunteer overview.",
+      "stats": {
+        "pending": "Pending",
+        "in_progress": "In Progress",
+        "submitted": "Submitted",
+        "approved": "Approved"
+      },
+      "quick_actions": {
+        "continue": {
+          "title": "Continue Activity",
+          "description": "You have an activity waiting for your report.",
+          "button": "Continue"
+        },
+        "no_activities": {
+          "title": "No pending activities",
+          "description": "You don't have any activities that need attention right now."
+        }
+      },
+      "recent_activities": {
+        "title": "Recent Activities",
+        "view_all": "View All",
+        "no_activities": "No recent activities"
+      }
+    },
+    "status": {
+      "draft": "Draft",
+      "pending": "Pending Review",
+      "in_edit": "Edits Requested",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    }
+  }

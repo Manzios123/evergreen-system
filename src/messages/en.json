@@ -1,0 +1,106 @@
+{
+  "common": {
+    "appName": "Evergreen Volunteer",
+    "email": "Email address",
+    "password": "Password",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot your password?",
+    "signIn": "Sign in",
+    "noAccount": "Don't have an account?",
+    "requestAccess": "Request access",
+    "changeLanguage": "Change language",
+    "english": "English",
+    "kinyarwanda": "Kinyarwanda",
+    "french": "French",
+     "status": {
+      "draft": "Draft",
+      "pending": "Pending Approval",
+      "in_edit": "Edits Requested",
+      "approved": "Approved",
+      "rejected": "Rejected"
+     }
+  },
+  "login": {
+    "title": "Welcome to Evergreen",
+    "subtitle": "Volunteer Management System",
+    "signingIn": "Signing in...",
+    "invalidCredentials": "Login failed. Please check your credentials."
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "activities": "Activities",
+    "surveys": "Surveys",
+    "reports": "Reports",
+    "report": "Report",
+    "profile": "Profile",
+    "admin": "Admin",
+    "coordinators": "Coordinators",
+    "volunteers": "Volunteers",
+    "pilots": "Pilots",
+    "schools": "Schools",
+    "exports": "Exports",
+    "system": "System",
+    "approvals": "Approvals"
+  },
+   "volunteer": {
+    "dashboard": {
+      "title": "Volunteer Dashboard",
+      "subtitle": "Overview of your activities and submissions",
+      "quickActions": "Quick Actions",
+      "startNewReport": "Start New Report",
+      "takeSurvey": "Take Survey",
+      "viewPhotos": "View Photos",
+      "recentActivities": "Recent Activities",
+       "totalActivities": "Total Activities",
+      "pendingApproval": "Pending Approval",
+      "approved": "Approved",
+      "draft": "Draft",
+      "upcomingActivity": "Upcoming Activity",
+      "noUpcomingActivity": "No upcoming activities",
+      "viewDetails": "View Details"
+    },
+    "activities": {
+      "title": "My Activities",
+      "subtitle": "Manage and track your assigned activities",
+      "newReport": "New Report",
+      "all": "All",
+      "draft": "Draft",
+      "pending": "Pending",
+      "approved": "Approved",
+      "noActivities": "No activities found",
+      "noActivitiesDescription": "You don't have any activities assigned yet.",
+      "backToActivities": "Back to Activities"
+    }},
+    
+  "coordinator": {
+    "activities": {
+      "title": "All Activities",
+      "subtitle": "View and manage all activities in your pilot",
+      "searchPlaceholder": "Search activities, volunteers, or schools...",
+      "allStatuses": "All Statuses",
+      "draft": "Draft",
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "activity": "Activity",
+      "volunteer": "Volunteer",
+      "school": "School",
+      "date": "Date",
+      "status": "Status",
+      "noActivitiesFound": "No activities found"
+    },
+    "surveys": {
+      "title": "Student Surveys",
+      "subtitle": "Submit aggregated student survey data"
+    },
+    "exports": {
+      "title": "Data Export",
+      "subtitle": "Export activities and survey data"
+    },
+    "volunteers": {
+      "title": "Volunteer Management",
+      "subtitle": "Manage volunteers and their assignments"
+    }
+  }
+
+}

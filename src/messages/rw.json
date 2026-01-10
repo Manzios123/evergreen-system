@@ -1,0 +1,28 @@
+{
+    "common": {
+      "appName": "Evergreen Volunteer",
+      "welcome": "Murakaza neza muri Evergreen",
+      "login": "Injira",
+      "logout": "Sohoka",
+      "email": "Imeyili",
+      "password": "Ijambobanga",
+      "rememberMe": "Nyibutsa",
+      "forgotPassword": "Wibagiwe ijambobanga?",
+      "signIn": "Injira",
+      "noAccount": "Nta konti ufite?",
+      "contactAdmin": "Vugisha umuyobozi",
+      "requestAccess": "Saba uburenganzira",
+      "changeLanguage": "Hindura ururimi",
+      "english": "Icyongereza",
+      "kinyarwanda": "Kinyarwanda",
+      "french": "Igifaransa",
+      "loading": "Bireba...",
+      "error": "Ikosa"
+    },
+    "login": {
+      "title": "Murakaza neza muri Evergreen",
+      "subtitle": "Sisteme yo gucunga abizera",
+      "signingIn": "Uri kwinjira...",
+      "invalidCredentials": "Kwinjira byanze. Gerageza gusubiramo."
+    }
+  }
