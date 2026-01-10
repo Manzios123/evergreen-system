@@ -45,7 +45,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
   const deletePhoto = useDeletePhoto();
 
-  const photos = photosData?.data || [];
+  const photos = photosData || [];
 
   useEffect(() => {
     if (onSelectionChange) {

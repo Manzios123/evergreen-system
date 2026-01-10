@@ -1,4 +1,4 @@
-import { apiFetch } from '../api';
+import { apiFetch } from '@/lib/utils/api';
 import { Activity } from './types';
 
 // Export the shared Activity type

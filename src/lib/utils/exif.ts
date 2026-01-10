@@ -1,3 +1,4 @@
+
 import exifr from 'exifr';
 
 export interface EXIFData {
@@ -98,9 +99,9 @@ export class EXIFExtractor {
     }
   }
 
-  static formatGPS(gps: EXIFData['gps']): { lat: number; lng: number } | null {
+  static formatGPS(gps: EXIFData['gps']): { lat: number; lng: number } | undefined {
     if (!gps || gps.latitude === undefined || gps.longitude === undefined) {
-      return null;
+      return undefined;
     }
 
     let lat = gps.latitude;
@@ -113,17 +114,17 @@ export class EXIFExtractor {
     return { lat, lng };
   }
 
-  static formatDateTime(dateTime?: string): string | null {
-    if (!dateTime) return null;
+  static formatDateTime(dateTime?: string): string | undefined {
+    if (!dateTime) return undefined;
     
     try {
       // Convert EXIF date format to ISO string
       const date = new Date(dateTime);
-      if (isNaN(date.getTime())) return null;
+      if (isNaN(date.getTime())) return undefined;
       
       return date.toISOString();
     } catch {
-      return null;
+      return undefined;
     }
   }
 

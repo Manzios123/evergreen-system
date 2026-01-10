@@ -62,7 +62,7 @@ export const QueryFileUpload: React.FC<QueryFileUploadProps> = ({
     );
   }
   
-  const photos = photosData?.data || [];
+  const photos = photosData || [];
   
   return (
     <div className={className}>
