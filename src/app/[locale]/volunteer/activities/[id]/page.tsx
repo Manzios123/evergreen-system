@@ -1,383 +1,556 @@
 // app/[locale]/volunteer/activities/[id]/page.tsx
+'use client';
 
-'use client'
-
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import Alert from '@/components/ui/alert';
-import EmptyState from '@/components/ui/empty-state';
 import { useApiQuery } from '@/lib/hooks/use-api';
-import { Activity, Survey } from '@/lib/types';
 import {
   CalendarIcon,
   MapPinIcon,
   UserGroupIcon,
   DocumentTextIcon,
-  PhotoIcon,
+  UserIcon,
+  AcademicCapIcon,
   ClockIcon,
+  PencilIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { api } from '@/lib/api/api';
+import { useRouter, useParams } from 'next/navigation';
+import { activitiesApi } from '@/lib/api/activities';
+import { ActivitySubmissionForm } from '@/components/activities/activity-submission-form';
 
 interface ActivityDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+    locale: string;
+  }>;
+}
+
+// Interface based on the actual API response from the update request
+interface ApiActivity {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  scheduled_date: string;
+  actual_date?: string;
+  volunteer_id: string;
+  volunteer_name?: string;
+  school_id: string;
+  school_name?: string;
+  pilot_id: string;
+  pilot_name?: string;
+  activity_template_id?: string;
+  activity_template_name?: string;
+  number_of_participants?: number;
+  engagement_level?: string | number;
+  volunteer_notes?: string;
+  coordinator_feedback?: string;
+  assigned_by?: string;
+  assigned_by_name?: string;
+  assignment_notes?: string;
+  assigned_at?: string;
+  deleted_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ActivityApiResponse {
+  success: boolean;
+  data: ApiActivity;
+  message?: string;
+}
+
+// Type guard to check if the status is valid
+function isValidActivityStatus(status: string): status is 'draft' | 'pending' | 'in_edit' | 'approved' | 'rejected' | 'completed' | 'cancelled' {
+  return ['draft', 'pending', 'in_edit', 'approved', 'rejected', 'completed', 'cancelled'].includes(status);
 }
 
 export default function ActivityDetailPage({ params }: ActivityDetailPageProps) {
-  const { data: activity, isLoading, error } = useApiQuery<Activity>(
-    ['activity', params.id],
-    () => api.get(`/activities/${params.id}`)
+  const router = useRouter();
+  const [unwrappedParams, setUnwrappedParams] = useState<{ id: string; locale: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSubmissionForm, setShowSubmissionForm] = useState(false);
+
+  // Unwrap params for Next.js 15+
+  useEffect(() => {
+    const unwrapParams = async () => {
+      const resolvedParams = await params;
+      setUnwrappedParams(resolvedParams);
+    };
+    unwrapParams();
+  }, [params]);
+
+  const { 
+    data: apiResponse, 
+    isLoading, 
+    error,
+    refetch 
+  } = useApiQuery<ActivityApiResponse>(
+    ['activity', unwrappedParams?.id],
+    () => {
+      if (!unwrappedParams?.id) {
+        return Promise.reject(new Error('No activity ID'));
+      }
+      return activitiesApi.get(unwrappedParams.id) as Promise<ActivityApiResponse>;
+    },
+    {
+      enabled: !!unwrappedParams?.id,
+    }
   );
 
+  const rawActivity = apiResponse?.data;
+  
+  // Transform the API activity
+  const activity = rawActivity ? {
+    ...rawActivity,
+    // Ensure status is valid, default to 'draft' if not
+    status: isValidActivityStatus(rawActivity.status) ? rawActivity.status : 'draft',
+  } : undefined;
+
+  const handleSubmitReport = async () => {
+    if (!activity || !unwrappedParams) return;
+    
+    if (activity.status === 'draft' && !activity.volunteer_notes) {
+      // Show submission form for draft activities without notes
+      setShowSubmissionForm(true);
+    } else if (activity.status === 'draft') {
+      // Submit directly if already has notes
+      try {
+        setIsSubmitting(true);
+        await activitiesApi.submit(activity.id);
+        refetch();
+      } catch (error) {
+        console.error('Failed to submit activity:', error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const handleSubmissionSuccess = () => {
+    setShowSubmissionForm(false);
+    refetch();
+    router.refresh();
+  };
+
+  if (!unwrappedParams) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <SkeletonLoader type="card" />
+      </div>
+    );
+  }
+
   if (isLoading) {
-    return <SkeletonLoader type="card" />;
+    return (
+      <div className="max-w-4xl mx-auto">
+        <SkeletonLoader type="card" />
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <Alert
-        type="error"
-        title="Activity not found"
-      >
-        <p className="mt-2">The requested activity could not be loaded.</p>
-        <div className="mt-4">
-          <Link href="/volunteer/activities">
-            <Button variant="outline">
-              Back to Activities
-            </Button>
-          </Link>
-        </div>
-      </Alert>
+      <div className="max-w-4xl mx-auto">
+        <Alert
+          type="error"
+          title="Activity not found"
+        >
+          <p className="mt-2">The requested activity could not be loaded.</p>
+          <div className="mt-4">
+            <Link href={`/${unwrappedParams.locale}/volunteer/activities`}>
+              <Button variant="outline">
+                Back to Activities
+              </Button>
+            </Link>
+          </div>
+        </Alert>
+      </div>
     );
   }
 
   if (!activity) {
     return (
-      <EmptyState
-        title="Activity not found"
-        description="The requested activity does not exist or you don't have permission to view it."
-        action={{
-          label: 'Back to Activities',
-          onClick: () => window.location.href = '/volunteer/activities',
-        }}
-      />
+      <div className="max-w-4xl mx-auto">
+        <Alert
+          type="warning"
+          title="Activity not found"
+        >
+          <p className="mt-2">The requested activity does not exist or you don't have permission to view it.</p>
+          <div className="mt-4">
+            <Link href={`/${unwrappedParams.locale}/volunteer/activities`}>
+              <Button variant="outline">
+                Back to Activities
+              </Button>
+            </Link>
+          </div>
+        </Alert>
+      </div>
     );
   }
 
   const canEdit = activity.status === 'draft';
   const canSubmit = activity.status === 'draft';
-  const hasPhotos = activity.photos && activity.photos.length > 0;
-  const hasSurveys = activity.surveys && activity.surveys.length > 0;
 
-  // Get the survey type - using template type since Survey doesn't have a direct type property
-  const getSurveyType = (survey: Survey) => {
-    return survey.template?.type || 'general';
+  // Helper function to get engagement level as string
+  const getEngagementLevel = (level?: string | number): string => {
+    if (!level) return 'Not specified';
+    if (level === 1 || level === 'low' || level === 'Low') return 'Low';
+    if (level === 2 || level === 'medium' || level === 'Medium') return 'Medium';
+    if (level === 3 || level === 'high' || level === 'High') return 'High';
+    return `Level ${level}`;
+  };
+
+  // Helper function to get engagement color
+  const getEngagementColor = (level?: string | number): string => {
+    if (!level) return 'bg-gray-100 text-gray-800';
+    if (level === 1 || level === 'low' || level === 'Low') return 'bg-red-100 text-red-800';
+    if (level === 2 || level === 'medium' || level === 'Medium') return 'bg-yellow-100 text-yellow-800';
+    if (level === 3 || level === 'high' || level === 'High') return 'bg-green-100 text-green-800';
+    return 'bg-blue-100 text-blue-800';
   };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 mb-2">
             <h1 className="text-2xl font-bold text-gray-900">
               {activity.title}
             </h1>
             <StatusBadge status={activity.status} />
           </div>
-          <p className="mt-2 text-gray-600">{activity.description}</p>
+          <p className="text-gray-600">{activity.description}</p>
         </div>
+        
         <div className="flex space-x-3">
+          <Link href={`/${unwrappedParams.locale}/volunteer/activities`}>
+            <Button variant="outline" size="sm">
+              Back to Activities
+            </Button>
+          </Link>
+          
           {canEdit && (
-            <Link href={`/volunteer/activities/${activity.id}/edit`}>
-              <Button variant="outline">
-                Edit Activity
+            <Link href={`/${unwrappedParams.locale}/volunteer/activities/${activity.id}/edit`}>
+              <Button variant="outline" size="sm">
+                <PencilIcon className="h-4 w-4 mr-2" />
+                Edit
               </Button>
             </Link>
           )}
+          
           {canSubmit && (
-            <Button variant="default" onClick={() => {/* Submit logic */}}>
-              Submit for Approval
+            <Button 
+              variant="default" 
+              size="sm"
+              onClick={handleSubmitReport}
+              loading={isSubmitting}
+            >
+              <CheckCircleIcon className="h-4 w-4 mr-2" />
+              {activity.volunteer_notes ? 'Submit for Approval' : 'Complete Report'}
             </Button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Activity Details Card */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Activity Details
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-start">
-                <CalendarIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Date</p>
-                  <p className="text-sm text-gray-900">
-                    {new Date(activity.scheduled_date).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </p>
-                </div>
-              </div>
+      {showSubmissionForm ? (
+        <ActivitySubmissionForm
+          activity={activity}
+          onSubmitSuccess={handleSubmissionSuccess}
+          onCancel={() => setShowSubmissionForm(false)}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Activity Information Card */}
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Activity Information
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-start">
+                    <CalendarIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Scheduled Date</p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(activity.scheduled_date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  </div>
 
-              {/* Duration - This field doesn't exist in your Activity type
-                  You might want to add it or calculate it differently */}
-              <div className="flex items-start">
-                <ClockIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Duration</p>
-                  <p className="text-sm text-gray-900">
-                    {/* If you don't have duration field, you could calculate it or remove this section */}
-                    {/* Using scheduled_date and actual_date to calculate duration? */}
-                    Duration not specified
-                  </p>
-                </div>
-              </div>
+                  {activity.actual_date && (
+                    <div className="flex items-start">
+                      <ClockIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Actual Date</p>
+                        <p className="text-sm text-gray-900">
+                          {new Date(activity.actual_date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
-              <div className="flex items-start">
-                <MapPinIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">School</p>
-                  <p className="text-sm text-gray-900">
-                    {activity.school?.name || 'No school assigned'}
-                  </p>
-                  {activity.school?.address && (
-                    <p className="text-sm text-gray-500">
-                      {activity.school.address}
-                    </p>
+                  {activity.assigned_by_name && (
+                    <div className="flex items-start">
+                      <UserIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Assigned By</p>
+                        <p className="text-sm text-gray-900">
+                          {activity.assigned_by_name}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-start">
+                    <MapPinIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">School</p>
+                      <p className="text-sm text-gray-900">
+                        {activity.school_name || 'Not specified'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start">
+                    <AcademicCapIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Pilot Program</p>
+                      <p className="text-sm text-gray-900">
+                        {activity.pilot_name || 'Not specified'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {activity.number_of_participants !== undefined && (
+                    <div className="flex items-start">
+                      <UserGroupIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Participants</p>
+                        <p className="text-sm text-gray-900">
+                          {activity.number_of_participants} students
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
+            </Card>
 
-              <div className="flex items-start">
-                <UserGroupIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Number of Participants
-                  </p>
-                  <p className="text-sm text-gray-900">
-                    {activity.number_of_participants || 0} participants
-                  </p>
-                </div>
-              </div>
-
-              {/* Volunteer Notes */}
-              {activity.volunteer_notes && (
-                <div className="flex items-start">
-                  <DocumentTextIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">
-                      Volunteer Notes
-                    </p>
-                    <p className="text-sm text-gray-900">
-                      {activity.volunteer_notes}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Photos Section */}
-          <Card>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Photos</h2>
-              <Link href={`/volunteer/photos?activity=${activity.id}`}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  icon={<PhotoIcon className="h-4 w-4" />}
-                >
-                  Manage Photos
-                </Button>
-              </Link>
-            </div>
-            {hasPhotos ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {activity.photos?.slice(0, 6).map((photo) => (
-                  <div key={photo.id} className="aspect-square relative">
-                    <img
-                      src={photo.thumbnailUrl || photo.url}
-                      alt={photo.description || 'Activity photo'}
-                      className="rounded-lg object-cover w-full h-full"
-                    />
-                  </div>
-                ))}
-                {activity.photos && activity.photos.length > 6 && (
-                  <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
-                    <span className="text-gray-500 font-medium">
-                      +{activity.photos.length - 6} more
-                    </span>
+            {/* Volunteer Notes Card */}
+            {(activity.volunteer_notes || activity.assignment_notes) && (
+              <Card>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  Notes & Details
+                </h2>
+                
+                {activity.assignment_notes && (
+                  <div className="mb-4">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Assignment Notes</h3>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <p className="text-sm text-gray-700">{activity.assignment_notes}</p>
+                    </div>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <PhotoIcon className="h-12 w-12 text-gray-300 mx-auto" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">
-                  No photos yet
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Add photos to document your activity
-                </p>
-                <Link href={`/volunteer/photos?activity=${activity.id}`}>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                  >
-                    Upload Photos
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </Card>
-        </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Surveys Card */}
-          <Card>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Surveys</h2>
-              <DocumentTextIcon className="h-5 w-5 text-gray-400" />
-            </div>
-            <div className="space-y-3">
-              {hasSurveys ? (
-                activity.surveys?.map((survey) => (
-                  <div
-                    key={survey.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {getSurveyType(survey) === 'activity'
-                          ? 'Activity Survey'
-                          : getSurveyType(survey) === 'volunteer'
-                          ? 'Volunteer Feedback'
-                          : 'General Survey'}
-                      </p>
-                      {/* Survey status is different from ActivityStatus - we need to handle this */}
-                      <div className="mt-1">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          survey.status === 'completed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : survey.status === 'overdue'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {survey.status.charAt(0).toUpperCase() + survey.status.slice(1)}
-                        </span>
-                      </div>
+                {activity.volunteer_notes && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Your Report</h3>
+                    <div className="bg-green-50 p-3 rounded">
+                      <p className="text-sm text-gray-700">{activity.volunteer_notes}</p>
+                      {activity.engagement_level !== undefined && (
+                        <div className="mt-2 flex items-center">
+                          <span className="text-xs font-medium text-gray-500 mr-2">Engagement:</span>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getEngagementColor(activity.engagement_level)}`}>
+                            {getEngagementLevel(activity.engagement_level)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {survey.status === 'pending' && (
-                      <Link href={`/volunteer/surveys/${survey.id}`}>
-                        <Button size="sm" variant="default">
-                          Complete
-                        </Button>
-                      </Link>
-                    )}
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-gray-500">
-                    No surveys required for this activity
-                  </p>
-                </div>
-              )}
-            </div>
-          </Card>
+                )}
+              </Card>
+            )}
 
-          {/* Status Timeline */}
-          <Card>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Status Timeline
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-start">
-                <div className="shrink-0">
-                  <div className="h-2 w-2 bg-green-500 rounded-full mt-1.5" />
+            {/* Submission Instructions */}
+            {canSubmit && !activity.volunteer_notes && (
+              <Card className="bg-blue-50 border-blue-200">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                  Ready to Submit Your Report?
+                </h2>
+                <p className="text-sm text-gray-700 mb-4">
+                  Please complete the activity report by providing details about:
+                </p>
+                <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                  <li>The actual date the activity took place</li>
+                  <li>Number of participants</li>
+                  <li>Engagement level of students (1=Low, 2=Medium, 3=High)</li>
+                  <li>Detailed notes about what happened</li>
+                  <li>Any observations or challenges</li>
+                </ul>
+                <div className="mt-4">
+                  <Button
+                    variant="default"
+                    onClick={() => setShowSubmissionForm(true)}
+                  >
+                    <CheckCircleIcon className="h-4 w-4 mr-2" />
+                    Complete Activity Report
+                  </Button>
                 </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-900">Created</p>
-                  <p className="text-sm text-gray-500">
+              </Card>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Status Information */}
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Status Information
+              </h2>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Current Status</p>
+                  <div className="mt-1">
+                    <StatusBadge status={activity.status} />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Created</p>
+                  <p className="text-sm text-gray-900">
                     {new Date(activity.created_at).toLocaleDateString()}
                   </p>
                 </div>
-              </div>
 
-              {activity.status === 'pending' && (
-                <div className="flex items-start">
-                  <div className="shrink-0">
-                    <div className="h-2 w-2 bg-yellow-500 rounded-full mt-1.5" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">
-                      Submitted for Approval
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Awaiting coordinator review
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Last Updated</p>
+                  <p className="text-sm text-gray-900">
+                    {new Date(activity.updated_at).toLocaleDateString()}
+                  </p>
                 </div>
-              )}
 
-              {activity.status === 'approved' && (
-                <div className="flex items-start">
-                  <div className="shrink-0">
-                    <div className="h-2 w-2 bg-blue-500 rounded-full mt-1.5" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">
-                      Approved
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(activity.updated_at).toLocaleDateString()}
+                {activity.assigned_at && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Assigned On</p>
+                    <p className="text-sm text-gray-900">
+                      {new Date(activity.assigned_at).toLocaleDateString()}
                     </p>
                   </div>
-                </div>
-              )}
-
-              {activity.status === 'completed' && (
-                <div className="flex items-start">
-                  <div className="shrink-0">
-                    <div className="h-2 w-2 bg-purple-500 rounded-full mt-1.5" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">
-                      Completed
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Activity marked as complete
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Coordinator Feedback */}
-          {activity.coordinator_feedback && (
-            <Card>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Coordinator Feedback
-              </h2>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-700">{activity.coordinator_feedback}</p>
+                )}
               </div>
             </Card>
-          )}
+
+            {/* Coordinator Feedback */}
+            {activity.coordinator_feedback && (
+              <Card className="bg-yellow-50 border-yellow-200">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                  Coordinator Feedback
+                </h2>
+                <div className="p-3 bg-yellow-100 rounded">
+                  <p className="text-sm text-gray-700">{activity.coordinator_feedback}</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  This feedback was provided by your coordinator
+                </p>
+              </Card>
+            )}
+
+            {/* Next Steps */}
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Next Steps
+              </h2>
+              <div className="space-y-3">
+                {activity.status === 'draft' && (
+                  <div className="flex items-start">
+                    <div className="shrink-0">
+                      <div className="h-2 w-2 bg-blue-500 rounded-full mt-1.5" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        Complete your report
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Fill in activity details and submit for approval
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {activity.status === 'pending' && (
+                  <div className="flex items-start">
+                    <div className="shrink-0">
+                      <div className="h-2 w-2 bg-yellow-500 rounded-full mt-1.5" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        Awaiting coordinator review
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Your coordinator will review and approve your report
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {activity.status === 'approved' && (
+                  <div className="flex items-start">
+                    <div className="shrink-0">
+                      <div className="h-2 w-2 bg-green-500 rounded-full mt-1.5" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        Report approved
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Your activity report has been approved
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {activity.status === 'rejected' && (
+                  <div className="flex items-start">
+                    <div className="shrink-0">
+                      <div className="h-2 w-2 bg-red-500 rounded-full mt-1.5" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        Report needs revision
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Check coordinator feedback and update your report
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

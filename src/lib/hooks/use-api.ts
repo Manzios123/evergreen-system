@@ -39,11 +39,13 @@ export const useApiMutation = <TData = any, TVariables = any>(
     invalidateQueries?: QueryKey[];
     onSuccess?: (data: TData, variables: TVariables) => void;
     onError?: (error: Error, variables: TVariables) => void;
+    mutationKey?: QueryKey; // Add this line
   }
 ) => {
   const queryClient = useQueryClient();
 
   return useMutation<TData, Error, TVariables>({
+    mutationKey: options?.mutationKey,
     mutationFn: async (variables) => {
       try {
         return await mutationFn(variables);
@@ -53,21 +55,31 @@ export const useApiMutation = <TData = any, TVariables = any>(
       }
     },
     onSuccess: (data, variables) => {
-      // Invalidate related queries
-      if (options?.invalidateQueries) {
-        options.invalidateQueries.forEach((queryKey) => {
-          queryClient.invalidateQueries({ queryKey });
-        });
-      }
-      
-      // Call custom success handler
-      if (options?.onSuccess) {
-        options.onSuccess(data, variables);
+      try {
+        // Invalidate related queries
+        if (options?.invalidateQueries) {
+          options.invalidateQueries.forEach((queryKey) => {
+            queryClient.invalidateQueries({ queryKey });
+          });
+        }
+        
+        // Call custom success handler
+        if (options?.onSuccess) {
+          options.onSuccess(data, variables);
+        }
+      } catch (error) {
+        console.error('Error in mutation onSuccess handler:', error);
+        // Don't throw error in onSuccess as it will break the mutation flow
       }
     },
     onError: (error, variables) => {
+      console.error('Mutation error:', error);
       if (options?.onError) {
-        options.onError(error, variables);
+        try {
+          options.onError(error, variables);
+        } catch (handlerError) {
+          console.error('Error in mutation onError handler:', handlerError);
+        }
       }
     },
   });

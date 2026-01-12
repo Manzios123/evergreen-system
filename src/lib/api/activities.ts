@@ -17,7 +17,7 @@ export interface Activity {
   activity_template_id?: string;
   activity_template_name?: string;
   number_of_participants?: number;
-  engagement_level?: number;
+  engagement_level?: 'low' | 'medium' | 'high' | number;
   volunteer_notes?: string;
   coordinator_feedback?: string;
   assigned_by?: string;
@@ -56,7 +56,7 @@ export interface UpdateActivityData {
   actual_date?: string;
   status?: Activity['status'];
   number_of_participants?: number;
-  engagement_level?: number;
+  engagement_level?: 'low' | 'medium' | 'high' | number;
   volunteer_notes?: string;
   coordinator_feedback?: string;
   assignment_notes?: string;
@@ -74,14 +74,14 @@ export const activitiesApi = {
       });
     }
     const query = params.toString() ? `?${params.toString()}` : '';
-    return apiRequest<{ data: Activity[]; count: number }>(`/api/activities${query}`);
+    return apiRequest<{ data: Activity[]; count: number }>(`/activities${query}`);
   },
 
   // Get single activity
-  get: (id: string) => apiRequest<{ data: Activity }>(`/api/activities/${id}`),
+  get: (id: string) => apiRequest<{ data: Activity }>(`/activities/${id}`),
 
   // Create a new activity (volunteer creates their own activity)
-  create: (data: CreateActivityData) => apiRequest<{ data: Activity }>('/api/activities', {
+  create: (data: CreateActivityData) => apiRequest<{ data: Activity }>('/activities', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
@@ -94,24 +94,24 @@ export const activitiesApi = {
     scheduled_date: string;
     description?: string;
     assignment_notes?: string;
-  }) => apiRequest<{ data: Activity }>('/api/activities/assign', {
+  }) => apiRequest<{ data: Activity }>('/activities/assign', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
 
   // Update activity
-  update: (id: string, data: UpdateActivityData) => apiRequest<{ data: Activity }>(`/api/activities/${id}`, {
+  update: (id: string, data: UpdateActivityData) => apiRequest<{ data: Activity }>(`/activities/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
 
   // Delete activity (soft delete)
-  delete: (id: string) => apiRequest<{ success: boolean }>(`/api/activities/${id}`, { 
+  delete: (id: string) => apiRequest<{ success: boolean }>(`/activities/${id}`, { 
     method: 'DELETE' 
   }),
 
   // Submit for approval (volunteer)
-  submit: (id: string) => apiRequest<{ data: Activity }>(`/api/activities/${id}/submit`, { 
+  submit: (id: string) => apiRequest<{ data: Activity }>(`/activities/${id}/submit`, { 
     method: 'POST' 
   }),
 };
