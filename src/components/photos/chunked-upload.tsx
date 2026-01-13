@@ -12,6 +12,8 @@ import {
   PauseIcon,
   PlayIcon,
 } from '@heroicons/react/24/outline';
+import { photosApi } from '@/lib/api/photos';
+import { useChunkedUpload } from '@/lib/hooks/use-photos';
 
 interface ChunkedFileUploadProps {
   activityId: string;
@@ -40,6 +42,7 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const uploaderRef = useRef<ChunkedUploader | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { startChunkedUpload, uploadChunk, completeChunkedUpload, isLoading } = useChunkedUpload();
 
   const initUploader = () => {
     if (!uploaderRef.current) {
@@ -52,19 +55,25 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
     return uploaderRef.current;
   };
 
+  const calculateChunks = (file: File): Blob[] => {
+    const uploader = initUploader();
+    return uploader.calculateChunks(file);
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
     Array.from(files).forEach(file => {
-      if (needsChunking(file)) {
+      if (needsChunking(file, chunkSize * 1024 * 1024)) {
+        const chunks = calculateChunks(file);
         const session: UploadSession = {
           fileId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           file,
           progress: 0,
           status: 'pending',
           uploadedChunks: [],
-          totalChunks: Math.ceil(file.size / (chunkSize * 1024 * 1024)),
+          totalChunks: chunks.length,
         };
         setSessions(prev => [...prev, session]);
       }
@@ -86,9 +95,18 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
     setIsUploading(true);
 
     try {
-      // Get upload URL from your API
-      const uploadUrl = `/api/upload/chunked?activityId=${activityId}`;
+      // Start chunked upload session with backend
+      const startResponse = await photosApi.startChunkedUpload({
+        filename: session.file.name,
+        totalSize: session.file.size,
+        totalChunks: session.totalChunks,
+        activityId: activityId,
+        fileType: session.file.type
+      });
+
+      const { sessionId, uploadUrl } = startResponse.data;
       
+      // Upload file using the session
       const fileId = await uploader.uploadFile(
         session.file,
         uploadUrl,
@@ -112,6 +130,9 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
           },
         }
       );
+
+      // Complete the upload
+      await photosApi.completeChunkedUpload(sessionId);
 
       setSessions(prev => prev.map(s => 
         s.fileId === session.fileId 
@@ -155,10 +176,19 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
     setIsUploading(true);
 
     try {
-      const uploadUrl = `/api/upload/chunked?activityId=${activityId}`;
+      // Start new session for resume
+      const startResponse = await photosApi.startChunkedUpload({
+        filename: session.file.name,
+        totalSize: session.file.size,
+        totalChunks: session.totalChunks,
+        activityId: activityId,
+        fileType: session.file.type
+      });
+
+      const { sessionId, uploadUrl } = startResponse.data;
       
       const fileId = await uploader.resumeUpload(
-        session.fileId,
+        sessionId,
         session.uploadedChunks,
         uploadUrl,
         session.file,
@@ -179,6 +209,9 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
           },
         }
       );
+
+      // Complete the upload
+      await photosApi.completeChunkedUpload(sessionId);
 
       setSessions(prev => prev.map(s => 
         s.fileId === session.fileId 
@@ -227,13 +260,13 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
         />
         <Button
           onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
+          disabled={isUploading || isLoading}
         >
           <CloudArrowUpIcon className="w-4 h-4 mr-2" />
           Select Large Files
         </Button>
         <p className="text-sm text-gray-500 mt-2">
-          Supports files larger than 10MB using chunked upload
+          Supports files larger than {chunkSize}MB using chunked upload
         </p>
       </div>
 
@@ -276,7 +309,7 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
                     <Button
                       size="sm"
                       onClick={() => startUpload(session)}
-                      disabled={isUploading}
+                      disabled={isUploading || isLoading}
                     >
                       Start
                     </Button>
@@ -297,6 +330,7 @@ export const ChunkedFileUpload: React.FC<ChunkedFileUploadProps> = ({
                     <Button
                       size="sm"
                       onClick={() => resumeUpload(session)}
+                      disabled={isUploading || isLoading}
                     >
                       <PlayIcon className="w-4 h-4 mr-1" />
                       Resume

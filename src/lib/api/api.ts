@@ -21,19 +21,33 @@ export const apiRequest = async <T>(
     }
   }
 
-  const defaultHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
+  // Handle headers based on request body type
+  const headers: HeadersInit = {};
+  
+  // Only set Content-Type for JSON, not for FormData
+  // Also handle when body is FormData or when we have no body
+  if (options.body && !(options.body instanceof FormData)) {
+    if (typeof options.body === 'string') {
+      headers['Content-Type'] = 'application/json';
+    }
+  } else if (options.body instanceof FormData) {
+    // Don't set Content-Type for FormData - browser will set it with boundary
+  } else {
+    // For requests without body or with other body types
+    headers['Content-Type'] = 'application/json';
+  }
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   try {
     const response = await fetch(url, {
       ...options,
       headers: {
-        ...defaultHeaders,
+        ...headers,
         ...options.headers,
       },
-      // FIXED: Changed from 'include' to 'omit'
       credentials: 'omit',
     });
 
@@ -97,40 +111,45 @@ export const apiRequest = async <T>(
 
 // Helper methods for common HTTP verbs
 export const api = {
-  get: <T>(endpoint: string, params?: Record<string, any>, p0?: { responseType: string; }) =>
+  get: <T>(endpoint: string, params?: Record<string, any>) =>
     apiRequest<T>(endpoint, { method: 'GET' }, params),
 
-  post: <T>(endpoint: string, data?: any, params?: Record<string, any>) =>
-    apiRequest<T>(endpoint, {
+  post: <T>(endpoint: string, data?: any, params?: Record<string, any>) => {
+    const body = data instanceof FormData ? data : JSON.stringify(data);
+    return apiRequest<T>(endpoint, {
       method: 'POST',
-      body: JSON.stringify(data),
-    }, params),
+      body,
+    }, params);
+  },
 
-  put: <T>(endpoint: string, data?: any, params?: Record<string, any>) =>
-    apiRequest<T>(endpoint, {
+  put: <T>(endpoint: string, data?: any, params?: Record<string, any>) => {
+    const body = data instanceof FormData ? data : JSON.stringify(data);
+    return apiRequest<T>(endpoint, {
       method: 'PUT',
-      body: JSON.stringify(data),
-    }, params),
+      body,
+    }, params);
+  },
 
-  patch: <T>(endpoint: string, data?: any, params?: Record<string, any>) =>
-    apiRequest<T>(endpoint, {
+  patch: <T>(endpoint: string, data?: any, params?: Record<string, any>) => {
+    const body = data instanceof FormData ? data : JSON.stringify(data);
+    return apiRequest<T>(endpoint, {
       method: 'PATCH',
-      body: JSON.stringify(data),
-    }, params),
+      body,
+    }, params);
+  },
 
   delete: <T>(endpoint: string, params?: Record<string, any>) =>
     apiRequest<T>(endpoint, { method: 'DELETE' }, params),
 
-  // For file uploads
+  // For file uploads (legacy method - can use post instead)
   upload: <T>(endpoint: string, formData: FormData) =>
     apiRequest<T>(endpoint, {
       method: 'POST',
-      headers: {}, // Let browser set Content-Type with boundary
       body: formData,
     }),
 };
 
-// ADD THIS: Token management helper functions
+// Token management helper functions
 export const auth = {
   // Save token after login
   setToken: (token: string) => {

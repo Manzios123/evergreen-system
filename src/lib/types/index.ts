@@ -274,3 +274,9 @@ export interface ActivityFilters {
   type?: ActivityType[];
   search?: string;
 }
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  offset?: number; // Add this line
+}

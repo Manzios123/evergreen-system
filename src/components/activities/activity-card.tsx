@@ -57,7 +57,7 @@ export default function ActivityCard({ activity, showActions = true, onAction }:
         <div className="px-4 py-4 sm:px-6">
           <div className="flex space-x-3">
             <Link
-              href={`/activities/${activity.id}`}
+              href={`/en/volunteer/activities/${activity.id}`}
               className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
             >
               View Details

@@ -1,261 +1,312 @@
-import { useQueryClient } from '@tanstack/react-query';
+// apps/evergreen-web/src/lib/hooks/use-photos.ts
+'use client';
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { photosApi } from '@/lib/api/photos';
 import { Photo } from '@/lib/types';
-import { 
-  useApiQuery, 
-  useApiMutation, 
-  queryConfigs 
-} from './use-api';
+import { useCallback } from 'react';
 
-// Get photos with filters
+// Hook for getting photos
 export const usePhotos = (params?: {
   activityId?: string;
   volunteerId?: string;
-  status?: string;
-  page?: number;
+  status?: 'approved' | 'pending' | 'rejected';
   limit?: number;
+  offset?: number;
   tags?: string[];
   dateRange?: { start: string; end: string };
 }) => {
-  return useApiQuery(
-    ['photos', params],
-    () => photosApi.getPhotos(params).then(res => res.data),
-    {
-      staleTime: queryConfigs.default.staleTime,
-      gcTime: queryConfigs.default.gcTime,
-    }
-  );
-};
-
-// Get activity photos with caching
-export const useActivityPhotos = (activityId: string, params?: { status?: string }) => {
-  return useApiQuery(
-    ['photos', 'activity', activityId, params],
-    () => photosApi.getActivityPhotos(activityId, params).then(res => res.data),
-    {
-      enabled: !!activityId,
-      staleTime: queryConfigs.default.staleTime,
-      gcTime: queryConfigs.default.gcTime,
-    }
-  );
-};
-
-// Get single photo
-export const usePhoto = (id: string) => {
-  return useApiQuery(
-    ['photo', id],
-    () => photosApi.getPhoto(id).then(res => res.data),
-    {
-      enabled: !!id,
-      staleTime: queryConfigs.static.staleTime,
-      gcTime: queryConfigs.static.gcTime,
-    }
-  );
-};
-
-// Get volunteer photos
-export const useVolunteerPhotos = (volunteerId: string, params?: { 
-  page?: number; 
-  limit?: number;
-  status?: string;
-}) => {
-  return useApiQuery(
-    ['photos', 'volunteer', volunteerId, params],
-    () => photosApi.getVolunteerPhotos(volunteerId, params).then(res => res.data),
-    {
-      enabled: !!volunteerId,
-      staleTime: queryConfigs.default.staleTime,
-      gcTime: queryConfigs.default.gcTime,
-    }
-  );
-};
-
-// Get upload configuration
-export const useUploadConfig = () => {
-  return useApiQuery(
-    ['upload-config'],
-    () => photosApi.getUploadConfig().then(res => res.data),
-    {
-      staleTime: queryConfigs.static.staleTime,
-      gcTime: queryConfigs.static.gcTime,
-    }
-  );
-};
-
-// Upload photo via server
-export const useUploadPhoto = () => {
-  const queryClient = useQueryClient();
-  
-  return useApiMutation(
-    (data: { activityId: string; file: File; description?: string; tags?: string[] }) => {
-      const formData = new FormData();
-      formData.append('photo', data.file);
-      formData.append('activityId', data.activityId);
-      if (data.description) {
-        formData.append('description', data.description);
-      }
-      if (data.tags) {
-        formData.append('tags', JSON.stringify(data.tags));
-      }
-      return photosApi.uploadPhoto(formData).then(res => res.data);
+  return useQuery({
+    queryKey: ['photos', params],
+    queryFn: async () => {
+      const response = await photosApi.getPhotos({
+        activityId: params?.activityId,
+        volunteerId: params?.volunteerId,
+        status: params?.status,
+        limit: params?.limit,
+        offset: params?.offset,
+        tags: params?.tags,
+        dateRange: params?.dateRange,
+      });
+      return response.data?.data || [];
     },
-    {
-      invalidateQueries: [['photos']],
-      onSuccess: (data, variables) => {
-        // Also invalidate activity-specific photos
-        queryClient.invalidateQueries({ 
-          queryKey: ['photos', 'activity', variables.activityId] 
-        });
-      },
-    }
-  );
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+  });
 };
 
-// Delete photo
+// Hook for getting a single photo
+export const usePhoto = (id: string) => {
+  return useQuery({
+    queryKey: ['photo', id],
+    queryFn: async () => {
+      const response = await photosApi.getPhoto(id);
+      return response.data;
+    },
+    enabled: !!id,
+  });
+};
+
+// Hook for deleting a photo
 export const useDeletePhoto = () => {
   const queryClient = useQueryClient();
-  
-  return useApiMutation(
-    (id: string) => photosApi.deletePhoto(id).then(res => res.data),
-    {
-      invalidateQueries: [['photos']],
-    }
-  );
+
+  return useMutation({
+    mutationFn: (photoId: string) => photosApi.deletePhoto(photoId),
+    onMutate: async (photoId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['photos'] });
+      
+      // Snapshot previous value
+      const previousPhotos = queryClient.getQueryData(['photos']);
+      
+      // Optimistically update cache
+      queryClient.setQueryData(['photos'], (old: any) => 
+        old ? old.filter((photo: Photo) => photo.id !== photoId) : []
+      );
+      
+      return { previousPhotos };
+    },
+    onError: (err, photoId, context) => {
+      // Rollback on error
+      if (context?.previousPhotos) {
+        queryClient.setQueryData(['photos'], context.previousPhotos);
+      }
+    },
+    onSuccess: () => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['photos'] });
+    },
+  });
 };
 
-// Update photo metadata
+// Hook for updating photo metadata
 export const useUpdatePhoto = () => {
-  return useApiMutation(
-    ({ id, ...data }: { id: string } & Partial<Photo>) => 
-      photosApi.updatePhoto(id, data).then(res => res.data),
-    {
-      invalidateQueries: [['photos']],
-    }
-  );
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { 
+      id: string; 
+      data: { 
+        description?: string; 
+        tags?: string[]; 
+        metadata?: Photo['metadata']; 
+      } 
+    }) => photosApi.updatePhoto(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['photo', id] });
+      await queryClient.cancelQueries({ queryKey: ['photos'] });
+      
+      const previousPhoto = queryClient.getQueryData(['photo', id]);
+      const previousPhotos = queryClient.getQueryData(['photos']);
+      
+      // Optimistically update single photo
+      queryClient.setQueryData(['photo', id], (old: any) => 
+        old ? { ...old, ...data } : null
+      );
+      
+      // Optimistically update in photos list
+      queryClient.setQueryData(['photos'], (old: any) =>
+        old ? old.map((photo: Photo) => 
+          photo.id === id ? { ...photo, ...data } : photo
+        ) : []
+      );
+      
+      return { previousPhoto, previousPhotos };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousPhoto) {
+        queryClient.setQueryData(['photo', variables.id], context.previousPhoto);
+      }
+      if (context?.previousPhotos) {
+        queryClient.setQueryData(['photos'], context.previousPhotos);
+      }
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['photo', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['photos'] });
+    },
+  });
 };
 
-// Review photo (coordinator/admin)
+// Hook for reviewing photos
 export const useReviewPhoto = () => {
-  return useApiMutation(
-    ({ id, action, rejectionReason }: { 
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ 
+      id, 
+      action, 
+      rejectionReason 
+    }: { 
       id: string; 
       action: 'approve' | 'reject'; 
-      rejectionReason?: string 
-    }) => photosApi.reviewPhoto(id, action, rejectionReason).then(res => res.data),
-    {
-      invalidateQueries: [['photos']],
-    }
-  );
+      rejectionReason?: string;
+    }) => photosApi.reviewPhoto(id, action, rejectionReason),
+    onSuccess: (data, variables) => {
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['photos'] });
+      queryClient.invalidateQueries({ queryKey: ['photo', variables.id] });
+    },
+  });
 };
 
-// Generate thumbnail
-export const useGenerateThumbnail = () => {
-  return useApiMutation(
-    ({ id, size }: { id: string; size?: { width: number; height: number } }) =>
-      photosApi.generateThumbnail(id, size).then(res => res.data),
-    {
-      invalidateQueries: [['photos']],
-    }
-  );
+// Hook for uploading multiple photos
+export const useUploadMultiplePhotos = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ 
+      files, 
+      activityId, 
+      description 
+    }: { 
+      files: File[]; 
+      activityId: string; 
+      description?: string;
+    }) => photosApi.uploadMultiple(files, activityId, description),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['photos'] });
+    },
+  });
 };
 
-// Batch operations
-export const useBatchPhotoOperations = () => {
-  const approvePhotos = useApiMutation(
-    (ids: string[]) => Promise.all(
-      ids.map(id => photosApi.reviewPhoto(id, 'approve').then(res => res.data))
-    ),
-    {
-      invalidateQueries: [['photos']],
-    }
+// Hook for activity photos
+export const useActivityPhotos = (activityId: string, params?: {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) => {
+  return useQuery({
+    queryKey: ['activity-photos', activityId, params],
+    queryFn: async () => {
+      const response = await photosApi.getActivityPhotos(activityId, params);
+      return response.data?.data || [];
+    },
+    enabled: !!activityId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+// Hook for volunteer photos
+export const useVolunteerPhotos = (volunteerId: string, params?: {
+  limit?: number;
+  offset?: number;
+  status?: string;
+}) => {
+  return useQuery({
+    queryKey: ['volunteer-photos', volunteerId, params],
+    queryFn: async () => {
+      const response = await photosApi.getVolunteerPhotos(volunteerId, params);
+      return response.data?.data || [];
+    },
+    enabled: !!volunteerId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+// Hook for chunked upload
+export const useChunkedUpload = () => {
+  const queryClient = useQueryClient();
+
+  const startChunkedUploadMutation = useMutation({
+    mutationFn: photosApi.startChunkedUpload,
+  });
+
+  const uploadChunkMutation = useMutation({
+    mutationFn: ({ sessionId, formData }: { 
+      sessionId: string; 
+      formData: FormData;
+    }) => photosApi.uploadChunk(sessionId, formData),
+  });
+
+  const completeChunkedUploadMutation = useMutation({
+    mutationFn: photosApi.completeChunkedUpload,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['photos'] });
+    },
+  });
+
+  const startChunkedUpload = useCallback(
+    (data: Parameters<typeof photosApi.startChunkedUpload>[0]) =>
+      startChunkedUploadMutation.mutateAsync(data),
+    [startChunkedUploadMutation]
   );
-  
-  const rejectPhotos = useApiMutation(
-    (data: { ids: string[]; reason?: string }) => Promise.all(
-      data.ids.map(id => photosApi.reviewPhoto(id, 'reject', data.reason).then(res => res.data))
-    ),
-    {
-      invalidateQueries: [['photos']],
-    }
+
+  const uploadChunk = useCallback(
+    (sessionId: string, formData: FormData) =>
+      uploadChunkMutation.mutateAsync({ sessionId, formData }),
+    [uploadChunkMutation]
   );
-  
-  const deletePhotos = useApiMutation(
-    (ids: string[]) => Promise.all(
-      ids.map(id => photosApi.deletePhoto(id).then(res => res.data))
-    ),
-    {
-      invalidateQueries: [['photos']],
-    }
+
+  const completeChunkedUpload = useCallback(
+    (sessionId: string) =>
+      completeChunkedUploadMutation.mutateAsync(sessionId),
+    [completeChunkedUploadMutation]
   );
-  
+
+  const isLoading = 
+    startChunkedUploadMutation.isPending || 
+    uploadChunkMutation.isPending || 
+    completeChunkedUploadMutation.isPending;
+
   return {
-    approvePhotos,
-    rejectPhotos,
-    deletePhotos,
+    startChunkedUpload,
+    uploadChunk,
+    completeChunkedUpload,
+    isLoading,
+    error: startChunkedUploadMutation.error || uploadChunkMutation.error || completeChunkedUploadMutation.error,
   };
 };
 
-// Pre-signed URL upload for direct R2 upload
-export const usePresignedUpload = () => {
-  const queryClient = useQueryClient();
-  
-  return useApiMutation(
-    async (data: {
-      file: File;
-      activityId: string;
-      onProgress?: (progress: number) => void;
-    }) => {
-      // Get presigned URL
-      const presignedResponse = await photosApi.getPresignedUrl({
-        filename: data.file.name,
-        contentType: data.file.type,
-        activityId: data.activityId,
-      });
-      
-      const { url, fields, fileId } = presignedResponse.data;
-      
-      // Upload to R2
-      const formData = new FormData();
-      Object.entries(fields).forEach(([key, value]) => {
-        formData.append(key, value as string);
-      });
-      formData.append('file', data.file);
-      
-      return new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable && data.onProgress) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            data.onProgress(progress);
-          }
-        });
-        
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(fileId);
-          } else {
-            reject(new Error(`Upload failed: ${xhr.status}`));
-          }
-        });
-        
-        xhr.addEventListener('error', () => {
-          reject(new Error('Network error during upload'));
-        });
-        
-        xhr.open('POST', url);
-        xhr.send(formData);
-      });
-    },
-    {
-      onSuccess: (fileId) => {
-        // Invalidate photos query to refetch with new photo
-        queryClient.invalidateQueries({ queryKey: ['photos'] });
-        return fileId;
-      },
-    }
-  );
+// Hook for generating thumbnails
+export const useGenerateThumbnail = () => {
+  return useMutation({
+    mutationFn: ({ 
+      id, 
+      size 
+    }: { 
+      id: string; 
+      size?: { width: number; height: number };
+    }) => photosApi.generateThumbnail(id, size),
+  });
 };
 
-// Export types for convenience
-export type { Photo };
+// Hook for getting upload configuration
+export const useUploadConfig = () => {
+  return useQuery({
+    queryKey: ['upload-config'],
+    queryFn: async () => {
+      const response = await photosApi.getUploadConfig();
+      return response.data;
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
+  });
+};
+
+// Hook for presigned URL upload
+export const usePresignedUrlUpload = () => {
+  return useMutation({
+    mutationFn: (data: Parameters<typeof photosApi.getPresignedUrl>[0]) =>
+      photosApi.getPresignedUrl(data),
+  });
+};
+
+// Hook for direct upload
+export const useDirectUpload = () => {
+  return useMutation({
+    mutationFn: ({ 
+      photoId, 
+      file 
+    }: { 
+      photoId: string; 
+      file: File;
+    }) => photosApi.uploadDirect(photoId, file),
+  });
+};

@@ -183,12 +183,12 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions) => {
           activeUploads.current.set(fileId, xhr);
         });
       } else {
-        // Upload via server
+        // Upload via server - FIX: Pass both formData and activityId
         const formData = new FormData();
         formData.append('photo', fileData.file);
-        formData.append('activityId', activityId);
-
-        const response = await photosApi.uploadPhoto(formData);
+        // Note: The API function already includes activityId in the URL, 
+        // so we don't need to append it to formData for this endpoint
+        const response = await photosApi.uploadPhoto(formData, activityId);
         photoId = response.data.id;
       }
 
@@ -248,7 +248,7 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions) => {
               photosApi.getPhoto(file.photoId!)
             )
           );
-          // Fix for Error 2: Add type annotation for res
+          // Add type annotation for res
           onComplete(uploadedPhotos.map((res: { data: Photo }) => res.data));
         } catch (err) {
           console.error('Failed to fetch uploaded photo details:', err);

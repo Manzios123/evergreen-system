@@ -6,15 +6,21 @@ import Button from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { MapPinIcon, CalendarIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { photosApi } from '@/lib/api/photos';
 
 interface EXIFUploadProps {
-  onFilesWithEXIF: (files: Array<{ file: File; exif: any }>) => void;
+  activityId: string;
+  onUploadComplete?: () => void;
 }
 
-export const EXIFUpload: React.FC<EXIFUploadProps> = ({ onFilesWithEXIF }) => {
+export const EXIFUpload: React.FC<EXIFUploadProps> = ({ 
+  activityId,
+  onUploadComplete 
+}) => {
   const [files, setFiles] = useState<File[]>([]);
   const [extractEXIF, setExtractEXIF] = useState(true);
   const [extracting, setExtracting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [exifResults, setExifResults] = useState<any[]>([]);
   const { extractFromFiles } = useEXIFExtraction();
 
@@ -27,12 +33,74 @@ export const EXIFUpload: React.FC<EXIFUploadProps> = ({ onFilesWithEXIF }) => {
       try {
         const results = await extractFromFiles(selectedFiles);
         setExifResults(results);
-        onFilesWithEXIF(results);
+        
+        // Automatically upload files with EXIF data
+        await uploadFilesWithEXIF(selectedFiles, results);
       } catch (error) {
         console.error('EXIF extraction failed:', error);
+        // Upload without EXIF
+        await uploadFilesWithoutEXIF(selectedFiles);
       } finally {
         setExtracting(false);
       }
+    } else if (selectedFiles.length > 0) {
+      // Upload without EXIF extraction
+      await uploadFilesWithoutEXIF(selectedFiles);
+    }
+  };
+
+  const uploadFilesWithEXIF = async (files: File[], exifResults: any[]) => {
+    setUploading(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const exifData = exifResults[i]?.exif;
+        
+        // First upload the file
+        const formData = new FormData();
+        formData.append('photo', file);
+        formData.append('activityId', activityId);
+        
+        const uploadResponse = await photosApi.uploadPhoto(formData, activityId);
+        const photoId = uploadResponse.data.id;
+        
+        // Then process EXIF data if available
+        if (exifData) {
+          await photosApi.processEXIF(photoId, exifData);
+        }
+        
+        console.log(`Uploaded ${file.name} with EXIF data`);
+      }
+      
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
+    } catch (error) {
+      console.error('Failed to upload files with EXIF:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const uploadFilesWithoutEXIF = async (files: File[]) => {
+    setUploading(true);
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('photo', file);
+        formData.append('activityId', activityId);
+        
+        await photosApi.uploadPhoto(formData, activityId);
+        console.log(`Uploaded ${file.name} without EXIF data`);
+      }
+      
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
+    } catch (error) {
+      console.error('Failed to upload files:', error);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -65,7 +133,7 @@ export const EXIFUpload: React.FC<EXIFUploadProps> = ({ onFilesWithEXIF }) => {
           <Switch
             checked={extractEXIF}
             onCheckedChange={setExtractEXIF}
-            disabled={extracting}
+            disabled={extracting || uploading}
           />
           <span className="text-sm">Extract EXIF Data</span>
         </div>
@@ -80,6 +148,7 @@ export const EXIFUpload: React.FC<EXIFUploadProps> = ({ onFilesWithEXIF }) => {
           onChange={handleFileSelect}
           className="hidden"
           id="exif-upload"
+          disabled={extracting || uploading}
         />
         <label htmlFor="exif-upload" className="cursor-pointer">
           <div className="space-y-3">
@@ -90,22 +159,41 @@ export const EXIFUpload: React.FC<EXIFUploadProps> = ({ onFilesWithEXIF }) => {
                 Location and camera information will be extracted automatically
               </p>
             </div>
-            <Button type="button" variant="outline">
+            <Button 
+              type="button" 
+              variant="outline"
+              disabled={extracting || uploading}
+            >
               Browse Photos
             </Button>
           </div>
         </label>
       </div>
 
-      {/* Extracting Indicator */}
-      {extracting && (
-        <div className="text-center py-4">
-          <div className="inline-flex items-center space-x-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
-            <span className="text-sm text-gray-600">
-              Extracting EXIF data...
-            </span>
-          </div>
+      {/* Status Indicators */}
+      {(extracting || uploading) && (
+        <div className="space-y-2">
+          {extracting && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
+                <span className="text-sm text-gray-600">
+                  Extracting EXIF data...
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {uploading && (
+            <div className="text-center py-4">
+              <div className="inline-flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                <span className="text-sm text-gray-600">
+                  Uploading photos...
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -154,6 +242,7 @@ export const EXIFUpload: React.FC<EXIFUploadProps> = ({ onFilesWithEXIF }) => {
                   variant="ghost"
                   size="sm"
                   onClick={() => removeFile(index)}
+                  disabled={extracting || uploading}
                 >
                   Remove
                 </Button>
@@ -179,6 +268,16 @@ export const EXIFUpload: React.FC<EXIFUploadProps> = ({ onFilesWithEXIF }) => {
                   <span className="font-medium ml-2">
                     {exifResults.filter(r => r.exif.takenAt).length}
                   </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Photos with camera info:</span>
+                  <span className="font-medium ml-2">
+                    {exifResults.filter(r => r.exif.metadata?.make || r.exif.metadata?.model).length}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Total photos processed:</span>
+                  <span className="font-medium ml-2">{exifResults.length}</span>
                 </div>
               </div>
             </div>

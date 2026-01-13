@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useImageCompression } from '@/lib/utils/image-compression';
-import  Button  from '@/components/ui/button';
+import Button from '@/components/ui/button';
 import { Progress } from '@/components/ui/proggress';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -11,15 +11,18 @@ import {
   PhotoIcon,
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
+import { photosApi } from '@/lib/api/photos';
 
 interface CompressedUploadProps {
-  onCompressedFiles: (files: File[]) => void;
+  activityId: string;
+  onUploadComplete?: () => void;
   autoCompress?: boolean;
   maxSizeBeforeCompress?: number; // in MB
 }
 
 export const CompressedUpload: React.FC<CompressedUploadProps> = ({
-  onCompressedFiles,
+  activityId,
+  onUploadComplete,
   autoCompress = true,
   maxSizeBeforeCompress = 2,
 }) => {
@@ -34,6 +37,7 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
     }>
   >([]);
   const [compressing, setCompressing] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [enableCompression, setEnableCompression] = useState(autoCompress);
   
@@ -48,14 +52,13 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
     setFiles(selectedFiles);
 
     if (enableCompression) {
-      await compressSelectedFiles(selectedFiles);
+      await compressAndUploadFiles(selectedFiles);
     } else {
-      setCompressedFiles(selectedFiles);
-      onCompressedFiles(selectedFiles);
+      await uploadFiles(selectedFiles);
     }
   };
 
-  const compressSelectedFiles = useCallback(async (filesToCompress: File[]) => {
+  const compressAndUploadFiles = useCallback(async (filesToCompress: File[]) => {
     setCompressing(true);
     setProgress(0);
 
@@ -90,26 +93,84 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
 
       setCompressedFiles(compressed);
       setCompressionStats(stats);
-      onCompressedFiles(compressed);
+      
+      // Upload compressed files
+      await uploadCompressedFiles(compressed);
+      
     } catch (error) {
       console.error('Compression failed:', error);
       // Fallback to original files
       setCompressedFiles(filesToCompress);
-      onCompressedFiles(filesToCompress);
+      await uploadFiles(filesToCompress);
     } finally {
       setCompressing(false);
       setProgress(0);
     }
-  }, [compressImages, onCompressedFiles]);
+  }, [compressImages, activityId]);
+
+  const uploadFiles = async (filesToUpload: File[]) => {
+    setUploading(true);
+    try {
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        const formData = new FormData();
+        formData.append('photo', file);
+        formData.append('activityId', activityId);
+        
+        await photosApi.uploadPhoto(formData, activityId);
+        
+        // Update progress
+        const progress = Math.round(((i + 1) / filesToUpload.length) * 100);
+        setProgress(progress);
+      }
+      
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
+  };
+
+  const uploadCompressedFiles = async (compressedFiles: File[]) => {
+    setUploading(true);
+    setProgress(0);
+    
+    try {
+      for (let i = 0; i < compressedFiles.length; i++) {
+        const file = compressedFiles[i];
+        const formData = new FormData();
+        formData.append('photo', file);
+        formData.append('activityId', activityId);
+        
+        await photosApi.uploadPhoto(formData, activityId);
+        
+        // Update progress
+        const progress = Math.round(((i + 1) / compressedFiles.length) * 100);
+        setProgress(progress);
+      }
+      
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
+  };
 
   const toggleCompression = async (checked: boolean) => {
     setEnableCompression(checked);
     
     if (checked && files.length > 0) {
-      await compressSelectedFiles(files);
+      await compressAndUploadFiles(files);
     } else if (!checked && files.length > 0) {
-      setCompressedFiles(files);
-      onCompressedFiles(files);
+      await uploadFiles(files);
     }
   };
 
@@ -125,8 +186,6 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
     const newStats = [...compressionStats];
     newStats.splice(index, 1);
     setCompressionStats(newStats);
-
-    onCompressedFiles(newCompressed);
   };
 
   const calculateTotalSavings = () => {
@@ -161,7 +220,7 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
           <Switch
             checked={enableCompression}
             onCheckedChange={toggleCompression}
-            disabled={compressing}
+            disabled={compressing || uploading}
           />
           <span className="text-sm">Compress Images</span>
         </div>
@@ -176,6 +235,7 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
           onChange={handleFileSelect}
           className="hidden"
           id="compressed-upload"
+          disabled={compressing || uploading}
         />
         <label htmlFor="compressed-upload" className="cursor-pointer">
           <div className="space-y-3">
@@ -190,7 +250,11 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
                   : 'Upload original quality images'}
               </p>
             </div>
-            <Button type="button" variant="outline">
+            <Button 
+              type="button" 
+              variant="outline"
+              disabled={compressing || uploading}
+            >
               Select Images
             </Button>
           </div>
@@ -202,6 +266,17 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>Compressing images...</span>
+            <span>{progress}%</span>
+          </div>
+          <Progress value={progress} />
+        </div>
+      )}
+
+      {/* Upload Progress */}
+      {uploading && !compressing && (
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Uploading images...</span>
             <span>{progress}%</span>
           </div>
           <Progress value={progress} />
@@ -274,6 +349,7 @@ export const CompressedUpload: React.FC<CompressedUploadProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => removeFile(index)}
+                      disabled={compressing || uploading}
                     >
                       Remove
                     </Button>

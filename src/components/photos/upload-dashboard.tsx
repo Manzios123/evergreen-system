@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Tabs } from '@/components/ui/tabs'; // Changed import
+import { Tabs } from '@/components/ui/tabs';
 import { FileUpload } from './file-upload';
 import { ChunkedFileUpload } from './chunked-upload';
 import { EXIFUpload } from './exif-upload';
@@ -24,18 +24,81 @@ export const UploadDashboard: React.FC<UploadDashboardProps> = ({
     setRecentUploads(prev => [...photos, ...prev].slice(0, 10));
   };
 
-  const handleCompressedFiles = (files: File[]) => {
+  const handleCompressedFiles = async (files: File[]) => {
     console.log('Compressed files ready:', files);
-    // Upload logic here
+    
+    // Upload each compressed file
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('photo', file);
+        formData.append('activityId', activityId);
+        
+        const response = await fetch(`/api/activities/${activityId}/photos`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+        
+        return response.json();
+      });
+      
+      await Promise.all(uploadPromises);
+      console.log('All compressed files uploaded successfully');
+    } catch (error) {
+      console.error('Upload failed:', error);
+    }
   };
 
   const handleEXIFFiles = (filesWithEXIF: Array<{ file: File; exif: any }>) => {
     console.log('Files with EXIF:', filesWithEXIF);
-    // Upload with EXIF metadata
+    
+    // Upload files with EXIF data
+    filesWithEXIF.forEach(async ({ file, exif }) => {
+      try {
+        // First upload the file
+        const formData = new FormData();
+        formData.append('photo', file);
+        formData.append('activityId', activityId);
+        
+        const uploadResponse = await fetch(`/api/activities/${activityId}/photos`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+        
+        const uploadResult = await uploadResponse.json();
+        
+        // Then process EXIF data if available
+        if (exif && uploadResult.id) {
+          await fetch('/api/photos/process-exif', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              photoId: uploadResult.id,
+              exifData: exif
+            }),
+          });
+        }
+        
+        console.log(`Uploaded ${file.name} with EXIF data`);
+      } catch (error) {
+        console.error(`Failed to upload ${file.name}:`, error);
+      }
+    });
   };
 
   const handleResumeComplete = (fileId: string) => {
     console.log('Resume upload complete:', fileId);
+    // Refresh the gallery or show success message
   };
 
   // Create tabs array for the custom Tabs component
@@ -73,7 +136,11 @@ export const UploadDashboard: React.FC<UploadDashboardProps> = ({
       content: (
         <div className="bg-white p-6 rounded-lg border">
           <CompressedUpload
-            onCompressedFiles={handleCompressedFiles}
+            activityId={activityId}
+            onUploadComplete={() => {
+              console.log('Compressed upload complete');
+              // Refresh gallery
+            }}
             autoCompress={true}
             maxSizeBeforeCompress={2}
           />
@@ -85,7 +152,13 @@ export const UploadDashboard: React.FC<UploadDashboardProps> = ({
       label: 'EXIF Data',
       content: (
         <div className="bg-white p-6 rounded-lg border">
-          <EXIFUpload onFilesWithEXIF={handleEXIFFiles} />
+          <EXIFUpload 
+            activityId={activityId}
+            onUploadComplete={() => {
+              console.log('EXIF upload complete');
+              // Refresh gallery
+            }}
+          />
         </div>
       )
     },

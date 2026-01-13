@@ -12,12 +12,23 @@ import { Activity } from '@/lib/types';
 import { PlusIcon, CalendarIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { api } from '@/lib/api/api';
+import { useParams } from 'next/navigation'; // Add this import
 
 export default function VolunteerActivitiesPage() {
-  const { data: activities, isLoading, error } = useApiQuery<Activity[]>(
+  const params = useParams(); // Get params including locale
+  const locale = params.locale as string; // Extract locale
+  
+  const { data: response, isLoading, error } = useApiQuery<{ data: Activity[] }>(
     ['activities'],
     () => api.get('/activities')
   );
+
+  const activities = response?.data || [];
+
+  // Helper function to create localized URLs
+  const createLocalizedUrl = (path: string) => {
+    return `/${locale}${path.startsWith('/') ? '' : '/'}${path}`;
+  };
 
   const columns = [
     {
@@ -26,7 +37,7 @@ export default function VolunteerActivitiesPage() {
       render: (activity: Activity) => (
         <div className="min-w-0 flex-1">
           <Link 
-            href={`/volunteer/activities/${activity.id}`}
+            href={createLocalizedUrl(`/volunteer/activities/${activity.id}`)}
             className="font-medium text-gray-900 hover:text-green-600"
           >
             {activity.title}
@@ -67,13 +78,13 @@ export default function VolunteerActivitiesPage() {
       header: 'Actions',
       render: (activity: Activity) => (
         <div className="flex space-x-2">
-          <Link href={`/volunteer/activities/${activity.id}`}>
+          <Link href={createLocalizedUrl(`/volunteer/activities/${activity.id}`)}>
             <Button size="sm" variant="outline">
               View
             </Button>
           </Link>
           {activity.status === 'draft' && (
-            <Link href="/volunteer/activities/new">
+            <Link href={createLocalizedUrl('/volunteer/activities/new')}>
               <Button
                 variant="default"
                 size="sm"
@@ -115,7 +126,7 @@ export default function VolunteerActivitiesPage() {
     );
   }
 
-  if (!activities || activities.length === 0) {
+  if (activities.length === 0) {
     return (
       <EmptyState
         icon={<CalendarIcon className="h-12 w-12 text-gray-400" />}
@@ -123,7 +134,7 @@ export default function VolunteerActivitiesPage() {
         description="You haven't been assigned any activities. Check back soon!"
         action={{
           label: 'Create New Activity',
-          onClick: () => window.location.href = '/volunteer/activities/new',
+          onClick: () => (window.location.href = createLocalizedUrl('/volunteer/activities/new')),
         }}
       />
     );
@@ -146,7 +157,7 @@ export default function VolunteerActivitiesPage() {
             Track and manage your volunteering activities
           </p>
         </div>
-        <Link href="/volunteer/activities/new">
+        <Link href={createLocalizedUrl('/volunteer/activities/new')}>
           <Button variant="default" icon={<PlusIcon className="h-5 w-5" />}>
             Report New Activity
           </Button>

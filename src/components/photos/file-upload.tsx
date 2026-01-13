@@ -6,7 +6,7 @@ import { XMarkIcon, PhotoIcon, CloudArrowUpIcon, CheckCircleIcon, ExclamationCir
 import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
 import { Progress } from '@/components/ui/proggress';
-import { photosApi, UploadConfig } from '@/lib/api/photos';
+import { photosApi } from '@/lib/api/photos';
 import { Photo } from '@/lib/types';
 
 interface FileUploadProps {
@@ -49,7 +49,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   disabled = false,
 }) => {
   const [files, setFiles] = useState<UploadFile[]>([]);
-  const [uploadConfig, setUploadConfig] = useState<UploadConfig | null>(null);
+  const [uploadConfig, setUploadConfig] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [overallProgress, setOverallProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -61,11 +61,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     const fetchConfig = async () => {
       try {
         const response = await photosApi.getUploadConfig();
-        setUploadConfig({
-          maxSize: response.data.maxSize || maxSize * 1024 * 1024,
-          allowedTypes: response.data.allowedTypes || allowedTypes,
-          maxFiles: response.data.maxFiles || maxFiles,
-        });
+        setUploadConfig(response.data);
       } catch (err) {
         // Use defaults if config fetch fails
         setUploadConfig({
@@ -138,12 +134,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       const completedFiles = files.filter(f => f.status === 'completed');
       if (completedFiles.length > 0 && onUploadComplete) {
         try {
-          const uploadedPhotos = await Promise.all(
-            completedFiles
-              .filter(f => f.photoId)
-              .map(f => photosApi.getPhoto(f.photoId!))
-          );
-          onUploadComplete(uploadedPhotos.map((res: { data: Photo }) => res.data));
+          // Fetch updated photos list for the activity
+          const response = await photosApi.getActivityPhotos(activityId);
+          onUploadComplete(response.data.data || []);
         } catch (err) {
           console.error('Failed to fetch uploaded photo details:', err);
         }
@@ -155,7 +148,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     await uploadFile(file);
     uploadQueue.current = uploadQueue.current.slice(1);
     processQueue();
-  }, [files, onUploadComplete]);
+  }, [files, onUploadComplete, activityId]);
 
   // Upload a single file
   const uploadFile = async (uploadFile: UploadFile) => {
@@ -209,63 +202,68 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const uploadViaPresignedUrl = async (uploadFile: UploadFile): Promise<string> => {
     const { file } = uploadFile;
     
-    // Get presigned URL from server
-    const presignedResponse = await photosApi.getPresignedUrl({
-      filename: file.name,
-      contentType: file.type,
-      activityId,
-      description: '',
-      tags: [],
-    });
+    try {
+      // Get presigned URL from server
+      const presignedResponse = await photosApi.getPresignedUrl({
+        filename: file.name,
+        contentType: file.type,
+        activityId,
+        description: '',
+        tags: [],
+      });
 
-    const { url, fields, fileId } = presignedResponse.data;
-    
-    // Create FormData for R2 upload
-    const formData = new FormData();
-    Object.entries(fields).forEach(([key, value]) => {
-      // Convert the value to string since FormData.append expects string or Blob
-      formData.append(key, String(value));
-    });
-    formData.append('file', file);
-
-    // Upload to R2 with progress tracking
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
+      const { url, fields, fileId } = presignedResponse.data;
       
-      // Track upload progress
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const progress = Math.round((event.loaded / event.total) * 100);
-          setFiles(prev => prev.map(f => 
-            f.id === uploadFile.id ? { ...f, progress } : f
-          ));
-        }
+      // Create FormData for R2 upload
+      const formData = new FormData();
+      Object.entries(fields).forEach(([key, value]) => {
+        // Convert the value to string since FormData.append expects string or Blob
+        formData.append(key, String(value));
       });
+      formData.append('file', file);
 
-      xhr.addEventListener('load', () => {
-        activeUploads.current.delete(uploadFile.id);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(fileId);
-        } else {
-          reject(new Error(`Upload failed with status ${xhr.status}`));
-        }
+      // Upload to R2 with progress tracking
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setFiles(prev => prev.map(f => 
+              f.id === uploadFile.id ? { ...f, progress } : f
+            ));
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          activeUploads.current.delete(uploadFile.id);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(fileId);
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          activeUploads.current.delete(uploadFile.id);
+          reject(new Error('Network error during upload'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          activeUploads.current.delete(uploadFile.id);
+          reject(new Error('Upload cancelled'));
+        });
+
+        xhr.open('POST', url);
+        xhr.send(formData);
+        
+        activeUploads.current.set(uploadFile.id, xhr);
       });
-
-      xhr.addEventListener('error', () => {
-        activeUploads.current.delete(uploadFile.id);
-        reject(new Error('Network error during upload'));
-      });
-
-      xhr.addEventListener('abort', () => {
-        activeUploads.current.delete(uploadFile.id);
-        reject(new Error('Upload cancelled'));
-      });
-
-      xhr.open('POST', url);
-      xhr.send(formData);
-      
-      activeUploads.current.set(uploadFile.id, xhr);
-    });
+    } catch (error) {
+      console.error('Failed to get presigned URL:', error);
+      throw error;
+    }
   };
 
   // Upload via server (for smaller files)
@@ -274,9 +272,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     formData.append('photo', uploadFile.file);
     formData.append('activityId', activityId);
 
-    // Use axios or fetch with progress tracking
-    const response = await photosApi.uploadPhoto(formData);
-    return response.data.id;
+    try {
+      const response = await photosApi.uploadPhoto(formData, activityId);
+      return response.data.id;
+    } catch (error) {
+      console.error('Server upload failed:', error);
+      throw error;
+    }
   };
 
   // Start upload process
@@ -483,7 +485,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
               >
                 {/* Preview */}
                 {showPreview && file.preview && (
-                  <div className="shrink-0"> {/* Changed from flex-shrink-0 */}
+                  <div className="shrink-0">
                     <div className="w-16 h-16 rounded-md overflow-hidden bg-gray-100">
                       <img
                         src={file.preview}

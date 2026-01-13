@@ -89,13 +89,8 @@ export default function Sidebar({ role }: SidebarProps) {
     volunteer: [
       { name: 'Dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
       { name: 'My Activities', href: '/volunteer/activities', icon: CalendarIcon },
-      { name: 'Report Activity', href: '/volunteer/activities/new', icon: PlusCircleIcon },
-      { 
-        name: 'Activity Surveys', 
-        href: '/volunteer/surveys/activity', 
-        icon: DocumentTextIcon, 
-        badge: 'pending' 
-      },
+      
+      
       { 
         name: 'Volunteer Feedback', 
         href: '/volunteer/surveys/volunteer', 

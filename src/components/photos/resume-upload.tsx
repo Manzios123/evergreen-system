@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useUploadResume } from '@/lib/utils/upload-resume';
-import  Button  from '@/components/ui/button';
+import Button from '@/components/ui/button';
 import { Progress } from '@/components/ui/proggress';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,6 +12,7 @@ import {
   TrashIcon,
   CloudArrowUpIcon,
 } from '@heroicons/react/24/outline';
+import { photosApi } from '@/lib/api/photos';
 
 interface ResumeUploadProps {
   activityId: string;
@@ -46,7 +47,7 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({
     cleanupOldSessions();
   }, [activityId, getActivitySessions, cleanupOldSessions]);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
     
     selectedFiles.forEach(file => {
@@ -76,21 +77,32 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({
     setUploading(true);
     
     try {
-      const uploadUrl = `/api/upload/resume?activityId=${activityId}`;
+      // Start chunked upload session with backend
+      const startResponse = await photosApi.startChunkedUpload({
+        filename: session.fileName,
+        totalSize: session.fileSize,
+        totalChunks: session.totalChunks,
+        activityId: activityId,
+        fileType: 'application/octet-stream'
+      });
+
+      const { sessionId, uploadUrl } = startResponse.data;
       
+      // Resume the upload using the existing uploaded chunks
       const fileId = await resumeSession(
-        session.id,
+        sessionId,
         file,
         uploadUrl,
         (progress) => {
-          // Progress callback
           console.log(`Upload progress: ${progress}%`);
         },
         (chunkNumber) => {
-          // Chunk complete callback
           console.log(`Chunk ${chunkNumber} completed`);
         }
       );
+
+      // Complete the upload
+      await photosApi.completeChunkedUpload(sessionId);
 
       if (onUploadComplete) {
         onUploadComplete(fileId);
@@ -115,12 +127,12 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({
   };
 
   const getResumeStats = (session: any) => {
-    const uploadedSize = session.uploadedChunks.length * session.chunkSize;
+    const uploadedSize = (session.uploadedChunks?.length || 0) * session.chunkSize;
     const remainingSize = session.fileSize - uploadedSize;
     const resumePercent = Math.round((uploadedSize / session.fileSize) * 100);
     
     return {
-      uploadedChunks: session.uploadedChunks.length,
+      uploadedChunks: session.uploadedChunks?.length || 0,
       totalChunks: session.totalChunks,
       uploadedSize,
       remainingSize,
@@ -148,7 +160,11 @@ export const ResumeUpload: React.FC<ResumeUploadProps> = ({
                 Uploads can be paused and resumed later
               </p>
             </div>
-            <Button type="button" variant="outline">
+            <Button 
+              type="button" 
+              variant="outline"
+              disabled={uploading}
+            >
               Select Files
             </Button>
           </div>
