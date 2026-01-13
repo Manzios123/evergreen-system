@@ -111,7 +111,7 @@ export const apiRequest = async <T>(
 
 // Helper methods for common HTTP verbs
 export const api = {
-  get: <T>(endpoint: string, params?: Record<string, any>) =>
+  get: <T>(endpoint: string, params?: Record<string, any>, p0?: { responseType: string; }) =>
     apiRequest<T>(endpoint, { method: 'GET' }, params),
 
   post: <T>(endpoint: string, data?: any, params?: Record<string, any>) => {
