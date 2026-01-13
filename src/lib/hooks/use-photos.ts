@@ -310,3 +310,37 @@ export const useDirectUpload = () => {
     }) => photosApi.uploadDirect(photoId, file),
   });
 };
+
+// NEW: Hook for batch photo operations
+export const useBatchPhotoOperations = () => {
+  const queryClient = useQueryClient();
+  
+  const deletePhotos = useMutation({
+    mutationFn: (photoIds: string[]) => {
+      // Delete photos one by one if API doesn't support batch delete
+      return Promise.all(photoIds.map(id => photosApi.deletePhoto(id)));
+    },
+    onMutate: async (photoIds) => {
+      await queryClient.cancelQueries({ queryKey: ['photos'] });
+      const previousPhotos = queryClient.getQueryData(['photos']);
+      
+      queryClient.setQueryData(['photos'], (old: any) => 
+        old ? old.filter((photo: Photo) => !photoIds.includes(photo.id)) : []
+      );
+      
+      return { previousPhotos };
+    },
+    onError: (err, photoIds, context) => {
+      if (context?.previousPhotos) {
+        queryClient.setQueryData(['photos'], context.previousPhotos);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['photos'] });
+    },
+  });
+
+  return {
+    deletePhotos,
+  };
+};

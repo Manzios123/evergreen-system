@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { usePhotos, usePresignedUpload, useBatchPhotoOperations } from '@/lib/hooks/use-photos';
+import { usePhotos, usePresignedUrlUpload, useBatchPhotoOperations } from '@/lib/hooks/use-photos';
 import { FileUpload } from './file-upload';
 import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
@@ -18,28 +18,37 @@ export const QueryFileUpload: React.FC<QueryFileUploadProps> = ({
   onUploadComplete,
   className,
 }) => {
-  const { data: photosData, isLoading, error } = usePhotos({ activityId });
-  const { mutate: uploadFile, isPending: isUploading } = usePresignedUpload();
+  const { data: photosData, isLoading, error, refetch } = usePhotos({ activityId });
+  const { mutate: uploadFile, isPending: isUploading } = usePresignedUrlUpload();
   const { deletePhotos } = useBatchPhotoOperations();
   
   const handleUploadComplete = async (uploadedFiles: { id: string; file: File }[]) => {
     try {
       const uploadPromises = uploadedFiles.map(({ file }) =>
         uploadFile(
-          { file, activityId },
+          { 
+            filename: file.name, 
+            contentType: file.type, 
+            activityId 
+          },
           {
             onSuccess: (fileId) => {
               console.log('Uploaded file ID:', fileId);
             },
+            onError: (uploadError) => {
+              console.error('Upload failed for file:', file.name, uploadError);
+            }
           }
         )
       );
       
       await Promise.all(uploadPromises);
       
-      if (onUploadComplete) {
-        // Fetch updated photos list
-        // This would ideally be handled by React Query automatically
+      // Refetch photos to get updated list
+      refetch();
+      
+      if (onUploadComplete && photosData) {
+        onUploadComplete(photosData);
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -47,7 +56,14 @@ export const QueryFileUpload: React.FC<QueryFileUploadProps> = ({
   };
   
   const handleDeleteSelected = (photoIds: string[]) => {
-    deletePhotos.mutate(photoIds);
+    deletePhotos.mutate(photoIds, {
+      onSuccess: () => {
+        console.log('Successfully deleted', photoIds.length, 'photos');
+      },
+      onError: (error) => {
+        console.error('Failed to delete photos:', error);
+      }
+    });
   };
   
   if (isLoading) {
@@ -71,6 +87,7 @@ export const QueryFileUpload: React.FC<QueryFileUploadProps> = ({
           activityId={activityId}
           onUploadComplete={() => {
             // React Query will automatically refetch
+            refetch();
           }}
           disabled={isUploading}
         />
@@ -92,7 +109,7 @@ export const QueryFileUpload: React.FC<QueryFileUploadProps> = ({
               }}
               disabled={deletePhotos.isPending}
             >
-              Delete All
+              {deletePhotos.isPending ? 'Deleting...' : 'Delete All'}
             </Button>
           )}
         </div>
