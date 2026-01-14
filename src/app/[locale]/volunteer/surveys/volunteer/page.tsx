@@ -3,58 +3,78 @@
 'use client'
 
 import { Card } from '@/components/ui/card';
-import Button from '@/components/ui/button'; // Changed to default import
-import DataTable from '@/components/ui/data-table'; // Changed to default import
-import StatusBadge from '@/components/ui/status-badge'; // Changed to default import
-import EmptyState from '@/components/ui/empty-state'; // Changed to default import
-import SkeletonLoader from '@/components/ui/skeleton-loader'; // Changed to default import
+import Button from '@/components/ui/button';
+import DataTable from '@/components/ui/data-table';
+import StatusBadge from '@/components/ui/status-badge';
+import EmptyState from '@/components/ui/empty-state';
+import SkeletonLoader from '@/components/ui/skeleton-loader';
 import { useApiQuery } from '@/lib/hooks/use-api';
-import { Survey } from '@/lib/types'; // Fixed import path
-import { api } from '@/lib/api/api'; // Added missing api import
+import { api } from '@/lib/api/api';
 import { ChatBubbleLeftIcon, CalendarIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
+interface SurveyAssignment {
+  id: string;
+  survey_template_id: string;
+  due_date: string | null;
+  status: string;
+  created_at: string;
+  survey_name: string;
+  survey_description: string | null;
+  survey_type: string;
+  survey_period: string;
+  pilot_name: string;
+  assigned_by_name: string;
+}
+
 export default function VolunteerFeedbackPage() {
-  const { data: surveys, isLoading, error } = useApiQuery<Survey[]>(
-    ['surveys', 'volunteer'],
-    () => api.get<Survey[]>('/surveys-templaes', { type: 'volunteer' }) // Fixed api call
+  // Fetch survey assignments for the current volunteer
+  const { data: assignments, isLoading, error } = useApiQuery<SurveyAssignment[]>(
+    ['survey-assignments', 'volunteer'],
+    () => api.get<SurveyAssignment[]>('/survey-assignments/volunteer')
   );
 
-  // Note: The DataTable component expects columns with 'header' property, not 'label'
   const columns = [
     {
       key: 'title',
-      header: 'Feedback Survey', // Changed from 'label' to 'header'
-      render: (survey: Survey) => (
+      header: 'Survey',
+      render: (assignment: SurveyAssignment) => (
         <div>
           <p className="font-medium text-gray-900">
-            {survey.title || 'Volunteer Feedback'}
+            {assignment.survey_name || 'Survey'}
           </p>
           <p className="text-sm text-gray-500">
-            {survey.description || 'Share your volunteering experience'}
+            {assignment.survey_description || 'Complete this survey to provide feedback'}
           </p>
+          <div className="flex items-center mt-1 text-xs text-gray-500">
+            <span className="capitalize">{assignment.survey_period.replace('_', ' ')} Survey</span>
+            <span className="mx-2">•</span>
+            <span>{assignment.pilot_name}</span>
+          </div>
         </div>
       ),
     },
     {
       key: 'type',
-      header: 'Type', // Changed from 'label' to 'header'
-      render: (survey: Survey) => (
+      header: 'Type',
+      render: (assignment: SurveyAssignment) => (
         <div className="flex items-center">
           <ChatBubbleLeftIcon className="h-5 w-5 text-gray-400 mr-2" />
-          <span>Volunteer Feedback</span>
+          <span className="capitalize">
+            {assignment.survey_type === 'volunteer' ? 'Volunteer Feedback' : assignment.survey_type}
+          </span>
         </div>
       ),
     },
     {
       key: 'dueDate',
-      header: 'Due Date', // Changed from 'label' to 'header'
-      render: (survey: Survey) => (
+      header: 'Due Date',
+      render: (assignment: SurveyAssignment) => (
         <div className="flex items-center">
           <CalendarIcon className="h-5 w-5 text-gray-400 mr-2" />
           <span>
-            {survey.due_date // Changed from dueDate to due_date (snake_case)
-              ? new Date(survey.due_date).toLocaleDateString()
+            {assignment.due_date
+              ? new Date(assignment.due_date).toLocaleDateString()
               : 'No due date'}
           </span>
         </div>
@@ -62,39 +82,49 @@ export default function VolunteerFeedbackPage() {
     },
     {
       key: 'status',
-      header: 'Status', // Changed from 'label' to 'header'
-      render: (survey: Survey) => <StatusBadge status={survey.status as any} />, // Cast to any since StatusBadge expects ActivityStatus
+      header: 'Status',
+      render: (assignment: SurveyAssignment) => (
+        <StatusBadge 
+          status={assignment.status === 'completed' ? 'completed' : 
+                 assignment.status === 'overdue' ? 'overdue' : 'pending'} 
+        />
+      ),
     },
     {
       key: 'actions',
-      header: 'Actions', // Changed from 'label' to 'header'
-      render: (survey: Survey) => (
-        <div className="flex space-x-2">
-          {survey.status === 'completed' ? (
-            <>
-              <Button size="sm" variant="outline" disabled>
-                <CheckCircleIcon className="h-4 w-4 mr-1" />
-                Completed
-              </Button>
-              <Link href={`/volunteer/surveys-templates/${survey.id}/responses`}> {/* Added /responses */}
-                <Button size="sm" variant="outline">
-                  View Responses
+      header: 'Actions',
+      render: (assignment: SurveyAssignment) => {
+        const isOverdue = new Date(assignment.due_date || '') < new Date() && assignment.status !== 'completed';
+        const currentStatus = isOverdue ? 'overdue' : assignment.status;
+        
+        return (
+          <div className="flex space-x-2">
+            {currentStatus === 'completed' ? (
+              <>
+                <Button size="sm" variant="outline" disabled>
+                  <CheckCircleIcon className="h-4 w-4 mr-1" />
+                  Completed
+                </Button>
+                <Link href={`/volunteer/surveys/assignment/${assignment.id}/responses`}>
+                  <Button size="sm" variant="outline">
+                    View Responses
+                  </Button>
+                </Link>
+              </>
+            ) : currentStatus === 'pending' || currentStatus === 'overdue' ? (
+              <Link href={`/volunteer/surveys/assignment/${assignment.id}`}>
+                <Button size="sm" variant="default">
+                  {currentStatus === 'overdue' ? 'Complete Overdue Survey' : 'Take Survey'}
                 </Button>
               </Link>
-            </>
-          ) : survey.status === 'pending' ? (
-            <Link href={`/volunteer/surveys-templates/${survey.id}`}>
-              <Button size="sm" variant="default">
-                Provide Feedback
+            ) : (
+              <Button size="sm" variant="outline" disabled>
+                {assignment.status === 'locked' ? 'Locked' : 'Not Available'}
               </Button>
-            </Link>
-          ) : (
-            <Button size="sm" variant="outline" disabled>
-              {survey.status === 'overdue' ? 'Overdue' : 'Not Available'}
-            </Button>
-          )}
-        </div>
-      ),
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -110,8 +140,8 @@ export default function VolunteerFeedbackPage() {
   if (error) {
     return (
       <EmptyState
-        title="Unable to load feedback surveys"
-        description="There was an error loading your feedback surveys. Please try again."
+        title="Unable to load surveys"
+        description="There was an error loading your surveys. Please try again."
         action={{
           label: 'Try Again',
           onClick: () => window.location.reload(),
@@ -120,66 +150,87 @@ export default function VolunteerFeedbackPage() {
     );
   }
 
-  const pendingSurveys = surveys?.filter(
-    (survey) => survey.status === 'pending' || survey.status === 'overdue'
+  const pendingAssignments = assignments?.filter(
+    (assignment) => assignment.status === 'pending' || 
+    (assignment.due_date && new Date(assignment.due_date) < new Date())
   );
 
-  const completedSurveys = surveys?.filter(
-    (survey) => survey.status === 'completed'
+  const completedAssignments = assignments?.filter(
+    (assignment) => assignment.status === 'completed'
+  );
+
+  const lockedAssignments = assignments?.filter(
+    (assignment) => assignment.status === 'locked'
   );
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Volunteer Feedback</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Volunteer Surveys</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Share your experience and help us improve the volunteering program
+          Complete pre and post surveys to help us improve the volunteering program
         </p>
       </div>
 
-      {pendingSurveys && pendingSurveys.length > 0 && (
+      {pendingAssignments && pendingAssignments.length > 0 && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">
-              Feedback to Provide ({pendingSurveys.length})
+              Surveys to Complete ({pendingAssignments.length})
             </h2>
-            {pendingSurveys.length > 0 && (
+            {pendingAssignments.length > 0 && (
               <p className="text-sm text-gray-500">
-                {pendingSurveys.filter((s) => s.status === 'overdue').length}{' '}
-                overdue
+                {pendingAssignments.filter(a => 
+                  a.due_date && new Date(a.due_date) < new Date()
+                ).length} overdue
               </p>
             )}
           </div>
           <Card>
             <DataTable
-              data={pendingSurveys}
+              data={pendingAssignments}
               columns={columns}
-              emptyMessage="No pending feedback surveys"
+              emptyMessage="No pending surveys"
             />
           </Card>
         </div>
       )}
 
-      {completedSurveys && completedSurveys.length > 0 && (
+      {completedAssignments && completedAssignments.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            Completed Feedback ({completedSurveys.length})
+            Completed Surveys ({completedAssignments.length})
           </h2>
           <Card>
             <DataTable
-              data={completedSurveys}
+              data={completedAssignments}
               columns={columns}
-              emptyMessage="No completed feedback surveys"
+              emptyMessage="No completed surveys"
             />
           </Card>
         </div>
       )}
 
-      {(!surveys || surveys.length === 0) && (
+      {lockedAssignments && lockedAssignments.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Locked Surveys ({lockedAssignments.length})
+          </h2>
+          <Card>
+            <DataTable
+              data={lockedAssignments}
+              columns={columns}
+              emptyMessage="No locked surveys"
+            />
+          </Card>
+        </div>
+      )}
+
+      {(!assignments || assignments.length === 0) && (
         <EmptyState
           icon={<ChatBubbleLeftIcon className="h-12 w-12 text-gray-400" />}
-          title="No feedback surveys available"
-          description="You don't have any feedback surveys to complete at the moment. Feedback surveys will appear here periodically."
+          title="No surveys available"
+          description="You don't have any surveys to complete at the moment. Surveys will be assigned when you join a pilot or complete activities."
         />
       )}
     </div>

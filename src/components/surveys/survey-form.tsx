@@ -1,254 +1,227 @@
 // components/surveys/survey-form.tsx
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import Button from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import Input from '@/components/ui/form/input';
-import Textarea from '@/components/ui/form/textarea';
-import Select from '@/components/ui/form/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/proggress';
-import Alert from '@/components/ui/alert';
-import { useApiMutation } from '@/lib/hooks/use-api';
-import { Survey, SurveyQuestion, SurveyTemplate } from '@/lib/types';
-import { api } from '@/lib/api/api'; // This should be '@/lib/api/api' or '@/lib/api'
+'use client';
 
-// Note: If @/lib/api doesn't exist, we need to check the correct import path
-// Based on your project structure, it might be '@/lib/api/api'
+import { useState } from 'react';
+import Button from '@/components/ui/button';
+import { api } from '@/lib/api/api';
+import { useRouter } from 'next/navigation';
 
 interface SurveyFormProps {
-  survey: Survey;
-  onComplete?: () => void;
+  survey: any;
+  onComplete: () => void;
+  assignmentId: string;
+  surveyType: string;
 }
 
-// Fixed: z.record() with proper key and value types
-const surveySchema = z.object({
-  responses: z.record(z.string(), z.any()),
-});
-
-type SurveyFormData = z.infer<typeof surveySchema>;
-
-export function SurveyForm({ survey, onComplete }: SurveyFormProps) {
-  const [currentSection, setCurrentSection] = useState(0);
+export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: SurveyFormProps) {
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-    setValue,
-  } = useForm<SurveyFormData>({
-    resolver: zodResolver(surveySchema),
-  });
+  // For student surveys, we need to track aggregated responses
+  const [totalStudents, setTotalStudents] = useState<number>(0);
+  const [responses, setResponses] = useState<Record<string, any>>({});
 
-  // Using api.post directly since there's no api.surveys namespace
-  const submitMutation = useApiMutation(
-    (data: SurveyFormData) => api.post(`/surveys/${survey.id}/responses`, data)
-  );
-
-  // Get questions from survey template
-  const questions = survey.template?.questions || [];
-  
-  // Group questions by section (if available)
-  const sections = questions.reduce((acc: Record<string, SurveyQuestion[]>, question: SurveyQuestion) => {
-    // Note: SurveyQuestion type doesn't have 'section' field
-    // We'll use 'General' as default or add section to SurveyQuestion type
-    const section = 'section' in question ? (question as any).section || 'General' : 'General';
-    if (!acc[section]) {
-      acc[section] = [];
-    }
-    acc[section].push(question);
-    return acc;
-  }, {} as Record<string, SurveyQuestion[]>);
-
-  const sectionKeys = Object.keys(sections);
-  const progress = sectionKeys.length > 0 ? ((currentSection + 1) / sectionKeys.length) * 100 : 0;
-
-  const handleNext = () => {
-    if (currentSection < sectionKeys.length - 1) {
-      setCurrentSection(currentSection + 1);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentSection > 0) {
-      setCurrentSection(currentSection - 1);
-    }
-  };
-
-  const onSubmit = async (data: SurveyFormData) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
+
     try {
-      await submitMutation.mutateAsync(data);
-      if (onComplete) onComplete();
-    } catch (error) {
-      console.error('Failed to submit survey:', error);
+      // Validate responses
+      const requiredQuestions = survey.template.questions.filter((q: any) => q.is_required);
+      const missingRequired = requiredQuestions.filter((q: any) => !responses[q.id]);
+      
+      if (missingRequired.length > 0) {
+        setError(`Please answer all required questions: ${missingRequired.map((q: any) => q.order_index + 1).join(', ')}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Prepare submission data
+      let endpoint = '';
+      let payload: any = {};
+
+      if (surveyType === 'volunteer') {
+        endpoint = `/survey-responses/volunteer`;
+        payload = {
+          assignment_id: assignmentId,
+          survey_template_id: survey.template.id,
+          pilot_id: survey.template.pilot_id,
+          responses: responses
+        };
+      } else if (surveyType === 'student') {
+        endpoint = `/survey-responses/student`;
+        payload = {
+          assignment_id: assignmentId,
+          pilot_id: survey.template.pilot_id,
+          survey_template_id: survey.template.id,
+          total_students: totalStudents,
+          responses: responses,
+          is_aggregated: true // Flag for aggregated responses
+        };
+      }
+
+      const result = await api.post(endpoint, payload);
+
+      if (result) {
+        // Mark assignment as completed
+        await api.put(`/survey-assignments/${assignmentId}`, {
+          status: 'completed'
+        });
+
+        onComplete();
+        router.refresh();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit survey');
+      console.error('Survey submission error:', err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const currentQuestions = sections[sectionKeys[currentSection]] || [];
+  const renderQuestionField = (question: any) => {
+    const value = responses[question.id] || '';
+
+    switch (question.question_type) {
+      case 'agree_disagree_unsure':
+        return (
+          <div className="space-y-2">
+            <label className="inline-flex items-center mr-4">
+              <input
+                type="radio"
+                name={`question-${question.id}`}
+                value="agree"
+                checked={value === 'agree'}
+                onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+                className="h-4 w-4 text-blue-600"
+              />
+              <span className="ml-2">Agree (Ndabyemera)</span>
+            </label>
+            <label className="inline-flex items-center mr-4">
+              <input
+                type="radio"
+                name={`question-${question.id}`}
+                value="disagree"
+                checked={value === 'disagree'}
+                onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+                className="h-4 w-4 text-blue-600"
+              />
+              <span className="ml-2">Disagree (Simbyemera)</span>
+            </label>
+            <label className="inline-flex items-center">
+              <input
+                type="radio"
+                name={`question-${question.id}`}
+                value="unsure"
+                checked={value === 'unsure'}
+                onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+                className="h-4 w-4 text-blue-600"
+              />
+              <span className="ml-2">Unsure (Simbizi neza)</span>
+            </label>
+          </div>
+        );
+
+      case 'scale_1_10':
+        return (
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500">1 (Extremely)</span>
+            <div className="flex-1 flex justify-between">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                <label key={num} className="inline-flex flex-col items-center">
+                  <input
+                    type="radio"
+                    name={`question-${question.id}`}
+                    value={num}
+                    checked={value === num}
+                    onChange={(e) => setResponses({...responses, [question.id]: parseInt(e.target.value)})}
+                    className="h-4 w-4 text-blue-600"
+                  />
+                  <span className="text-xs mt-1">{num}</span>
+                </label>
+              ))}
+            </div>
+            <span className="text-sm text-gray-500">10 (Not at all)</span>
+          </div>
+        );
+
+      case 'text':
+      default:
+        return (
+          <textarea
+            value={value}
+            onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+            className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Enter your response..."
+          />
+        );
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Progress */}
-      <div className="space-y-2">
-        <div className="flex justify-between text-sm text-gray-600">
-          <span>
-            Section {currentSection + 1} of {sectionKeys.length}
-          </span>
-          <span>{Math.round(progress)}%</span>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
         </div>
-        <Progress value={progress} />
-      </div>
+      )}
 
-      {/* Current Section */}
-      <Card>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              {sectionKeys[currentSection] || 'Survey Questions'}
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Please answer all questions in this section
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            {currentQuestions.map((question: SurveyQuestion) => (
-              <div key={question.id} className="space-y-3">
-                <label className="block text-sm font-medium text-gray-900">
-                  {question.question} {/* Changed from question.text to question.question */}
-                  {question.required && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
-                </label>
-                
-                {question.type === 'text' && (
-                  <Input
-                    {...register(`responses.${question.id}`)}
-                    placeholder={question.placeholder || "Type your answer here..."}
-                    error={errors.responses?.[question.id]?.message as string}
-                  />
-                )}
-
-                {question.type === 'textarea' && (
-                  <Textarea
-                    {...register(`responses.${question.id}`)}
-                    rows={4}
-                    placeholder={question.placeholder || "Provide detailed feedback..."}
-                    error={errors.responses?.[question.id]?.message as string}
-                  />
-                )}
-
-                {question.type === 'select' && (
-                  <Select
-                    {...register(`responses.${question.id}`)}
-                    options={question.options?.map((opt: string) => ({
-                      value: opt,
-                      label: opt,
-                    })) || []}
-                    error={errors.responses?.[question.id]?.message as string}
-                  />
-                )}
-
-                {question.type === 'radio' && (
-                  <div className="space-y-2">
-                    {question.options?.map((option: string) => (
-                      <label key={option} className="flex items-center">
-                        <input
-                          type="radio"
-                          {...register(`responses.${question.id}`)}
-                          value={option}
-                          className="h-4 w-4 text-green-600 border-gray-300"
-                        />
-                        <span className="ml-2 text-sm text-gray-900">
-                          {option}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {question.type === 'checkbox' && (
-                  <div className="space-y-2">
-                    {question.options?.map((option: string) => (
-                      <div key={option} className="flex items-center">
-                        <Checkbox
-                          id={`${question.id}-${option}`}
-                          checked={(watch(`responses.${question.id}`) as string[] || []).includes(option)}
-                          onChange={(checked) => {
-                            const current = (watch(`responses.${question.id}`) as string[] || []);
-                            const newValue = checked
-                              ? [...current, option]
-                              : current.filter((v: string) => v !== option);
-                            setValue(`responses.${question.id}`, newValue);
-                          }}
-                        />
-                        <label
-                          htmlFor={`${question.id}-${option}`}
-                          className="ml-2 text-sm text-gray-900"
-                        >
-                          {option}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Note: SurveyQuestion type doesn't have helpText in your types
-                    If you need helpText, add it to the SurveyQuestion type */}
-              </div>
-            ))}
-          </div>
-
-          {submitMutation.error && (
-            <Alert
-              type="error"
-              title="Submission failed"
-              children={submitMutation.error.message}
+      {/* Student survey specific fields */}
+      {surveyType === 'student' && (
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h3 className="font-medium text-blue-900 mb-2">Student Survey Information</h3>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Total Number of Students
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={totalStudents}
+              onChange={(e) => setTotalStudents(parseInt(e.target.value) || 0)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              required
             />
-          )}
-
-          {/* Navigation Buttons */}
-          <div className="flex justify-between pt-6 border-t">
-            <div>
-              {currentSection > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handlePrevious}
-                >
-                  Previous
-                </Button>
-              )}
-            </div>
-            <div className="flex space-x-3">
-              {currentSection < sectionKeys.length - 1 ? (
-                <Button
-                  type="button"
-                  variant="default" // Changed from "primary" to "default"
-                  onClick={handleNext}
-                >
-                  Next Section
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  variant="default" // Changed from "primary" to "default"
-                  loading={isSubmitting}
-                >
-                  Submit Survey
-                </Button>
-              )}
-            </div>
           </div>
-        </form>
-      </Card>
-    </div>
+          <p className="text-sm text-blue-700">
+            <strong>Note:</strong> For each question below, enter the aggregated results from all students.
+            For agree/disagree questions, enter counts (e.g., Agree: 15, Disagree: 5, Unsure: 5).
+          </p>
+        </div>
+      )}
+
+      {/* Survey questions */}
+      {survey.template.questions.map((question: any, index: number) => (
+        <div key={question.id} className="border-t pt-6 first:border-t-0 first:pt-0">
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {index + 1}. {question.question_text}
+              {question.is_required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            {renderQuestionField(question)}
+          </div>
+        </div>
+      ))}
+
+      <div className="flex justify-end space-x-3 pt-6 border-t">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push('/volunteer/surveys/volunteer')}
+          disabled={isSubmitting}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit Survey'}
+        </Button>
+      </div>
+    </form>
   );
 }
