@@ -1,7 +1,9 @@
-// lib/api/users.ts
+// lib/users.ts
 import { apiRequest } from './api';
 
 export interface User {
+  success: any;
+  message: string;
   id: string;
   email: string;
   full_name: string;
@@ -36,7 +38,7 @@ export interface UpdateUserData {
 }
 
 export const usersApi = {
-  getMe: () => apiRequest<{ user: User }>('/api/users/me'),
+  getMe: () => apiRequest<{ user: User }>('/users/me'),
   
   list: (filters?: { role?: string; pilot_id?: string; search?: string }) => {
     const params = new URLSearchParams();
@@ -48,31 +50,31 @@ export const usersApi = {
       });
     }
     const query = params.toString() ? `?${params.toString()}` : '';
-    return apiRequest<{ users: User[]; total: number }>(`/api/users${query}`);
+    return apiRequest<{ users: User[]; total: number }>(`/users${query}`);
   },
   
-  get: (id: string) => apiRequest<{ user: User }>(`/api/users/${id}`),
+  get: (id: string) => apiRequest<{ user: User }>(`/users/${id}`),
   
-  create: (data: CreateUserData) => apiRequest<User>('/api/users', {
+  create: (data: CreateUserData) => apiRequest<User>('/users', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
   
-  update: (id: string, data: UpdateUserData) => apiRequest<User>(`/api/users/${id}`, {
+  update: (id: string, data: UpdateUserData) => apiRequest<User>(`/users/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
   
-  delete: (id: string) => apiRequest(`/api/users/${id}`, { method: 'DELETE' }),
+  delete: (id: string) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
   
   changePassword: (data: { current_password: string; new_password: string }) => 
-    apiRequest('/api/users/me/change-password', {
+    apiRequest('/users/me/change-password', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   
   changeEmail: (data: { new_email: string; password: string }) => 
-    apiRequest('/api/users/me/change-email', {
+    apiRequest('/users/me/change-email', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -55,33 +55,62 @@ export default function CreateUserForm() {
   });
 
   const selectedRole = watch('role');
-  const selectedPilotIds = watch('pilot_ids');
+  const selectedPilotIds = watch('pilot_ids') || [];
+  const selectedSchoolIds = watch('school_ids') || [];
 
-  // Fetch pilots and schools using correct API methods
+  // Fetch pilots and schools
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch pilots using correct API method
+        console.log('Fetching pilots and schools...');
+        
+        // Fetch pilots - now returns normalized ApiResponse
         const pilotsResponse = await pilotsApi.getPilots({ 
           isActive: true,
-          limit: 100 // Get all active pilots
+          limit: 100
         });
         
+        console.log('Pilots response:', pilotsResponse);
+        
+        // Handle normalized response
         if (pilotsResponse.success && pilotsResponse.data) {
+          console.log(`Setting ${pilotsResponse.data.length} pilots`);
           setPilots(pilotsResponse.data);
+        } else {
+          console.warn('Pilots API error:', pilotsResponse.message);
+          setPilots([]);
         }
+        
         setIsLoadingPilots(false);
 
-        // Fetch schools using correct API method
+        // Fetch schools - now returns normalized ApiResponse
         const schoolsResponse = await schoolsApi.getSchools({
           isActive: true,
-          limit: 100 // Get all schools
+          limit: 100
         });
         
+        console.log('Schools response:', schoolsResponse);
+        
+        // Handle normalized response
         if (schoolsResponse.success && schoolsResponse.data) {
+          console.log(`Setting ${schoolsResponse.data.length} schools`);
           setSchools(schoolsResponse.data);
+          
+          // Log school distribution by pilot
+          const pilotCounts: Record<string, number> = {};
+          schoolsResponse.data.forEach(school => {
+            const pilotId = school.pilot_id || 'no-pilot';
+            pilotCounts[pilotId] = (pilotCounts[pilotId] || 0) + 1;
+          });
+          console.log('Schools by pilot:', pilotCounts);
+        } else {
+          console.warn('Schools API error:', schoolsResponse.message);
+          setSchools([]);
         }
+        
         setIsLoadingSchools(false);
+        
+        console.log('Data fetch complete');
         
       } catch (err) {
         console.error('Failed to fetch data:', err);
@@ -95,9 +124,33 @@ export default function CreateUserForm() {
   }, []);
 
   // Filter schools based on selected pilots
-  const filteredSchools = schools.filter(school => 
-    selectedPilotIds?.length === 0 || selectedPilotIds?.includes(school.pilot_id || '')
-  );
+  const filteredSchools = useMemo(() => {
+    console.log('Filtering schools...');
+    console.log('Selected pilot IDs:', selectedPilotIds);
+    console.log('Total schools available:', schools.length);
+    
+    // If no pilots selected, show no schools
+    if (selectedPilotIds.length === 0) {
+      console.log('No pilots selected, showing no schools');
+      return [];
+    }
+    
+    // Filter schools that belong to ANY selected pilot
+    const filtered = schools.filter(school => {
+      const schoolPilotId = school.pilot_id?.toString();
+      const matches = schoolPilotId && selectedPilotIds.includes(schoolPilotId);
+      
+      if (matches) {
+        console.log(`✓ School "${school.name}" matches pilot ${schoolPilotId}`);
+      }
+      
+      return matches;
+    });
+    
+    console.log(`Filtered schools count: ${filtered.length}`);
+    
+    return filtered;
+  }, [schools, selectedPilotIds]);
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
@@ -105,7 +158,6 @@ export default function CreateUserForm() {
     setSuccess(null);
 
     try {
-      // Prepare API data according to your backend schema
       const userData = {
         email: data.email,
         full_name: data.full_name,
@@ -115,16 +167,21 @@ export default function CreateUserForm() {
         school_ids: data.role === 'volunteer' && data.school_ids && data.school_ids.length > 0 ? data.school_ids : undefined,
       };
 
-      // Call your users API
+      console.log('Creating user with data:', userData);
+
       const response = await usersApi.create(userData);
+      console.log('Create user response:', response);
       
-      setSuccess('User created successfully!');
-      reset();
-      
-      // Redirect after 2 seconds
-      setTimeout(() => {
-        router.push('/admin/users');
-      }, 2000);
+      if (response) {
+        setSuccess('User created successfully!');
+        reset();
+        
+        setTimeout(() => {
+          router.push('/admin/users');
+        }, 2000);
+      } else {
+        setError('Failed to create user');
+      }
       
     } catch (err: any) {
       console.error('Error creating user:', err);
@@ -145,13 +202,14 @@ export default function CreateUserForm() {
     } else {
       newPilotIds = currentPilotIds.filter(id => id !== pilotId);
       // Also remove schools from deselected pilot
-      const schoolsToRemove = schools.filter(school => school.pilot_id === pilotId).map(s => s.id);
+      const schoolsToRemove = schools.filter(school => school.pilot_id?.toString() === pilotId).map(s => s.id);
       const currentSchoolIds = watch('school_ids') || [];
       const newSchoolIds = currentSchoolIds.filter(id => !schoolsToRemove.includes(id));
       setValue('school_ids', newSchoolIds);
     }
     
     setValue('pilot_ids', newPilotIds);
+    console.log('Updated pilot IDs:', newPilotIds);
   };
 
   // Handle school checkbox change
@@ -166,6 +224,14 @@ export default function CreateUserForm() {
     }
     
     setValue('school_ids', newSchoolIds);
+  };
+
+  // Get pilot names for display
+  const getSelectedPilotNames = () => {
+    return selectedPilotIds.map(pilotId => {
+      const pilot = pilots.find(p => p.id.toString() === pilotId.toString());
+      return pilot ? pilot.name : `Pilot ID: ${pilotId}`;
+    }).join(', ');
   };
 
   return (
@@ -206,7 +272,7 @@ export default function CreateUserForm() {
               type="email"
               id="email"
               {...register('email')}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-base px-4 py-3 h-12"
               placeholder="user@example.com"
             />
             {errors.email && (
@@ -225,7 +291,7 @@ export default function CreateUserForm() {
               type="text"
               id="full_name"
               {...register('full_name')}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-base px-4 py-3 h-12"
               placeholder="John Doe"
             />
             {errors.full_name && (
@@ -244,7 +310,7 @@ export default function CreateUserForm() {
               type="password"
               id="password"
               {...register('password')}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-base px-4 py-3 h-12"
               placeholder="At least 8 characters"
             />
             {errors.password && (
@@ -263,7 +329,7 @@ export default function CreateUserForm() {
               type="password"
               id="confirmPassword"
               {...register('confirmPassword')}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-base px-4 py-3 h-12"
               placeholder="Re-enter password"
             />
             {errors.confirmPassword && (
@@ -281,7 +347,7 @@ export default function CreateUserForm() {
             <select
               id="role"
               {...register('role')}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-base px-4 py-3 h-12"
             >
               <option value="volunteer">Volunteer</option>
               <option value="coordinator">Coordinator</option>
@@ -315,7 +381,9 @@ export default function CreateUserForm() {
               {pilots
                 .filter(pilot => pilot.status === 'active')
                 .map((pilot) => {
-                  const isChecked = selectedPilotIds?.includes(pilot.id) || false;
+                  const isChecked = selectedPilotIds.includes(pilot.id.toString());
+                  const pilotSchoolsCount = schools.filter(s => s.pilot_id?.toString() === pilot.id.toString()).length;
+                  
                   return (
                     <div key={pilot.id} className="flex items-start p-3 border border-gray-200 rounded-md hover:bg-gray-50">
                       <div className="flex items-center h-5">
@@ -323,7 +391,7 @@ export default function CreateUserForm() {
                           type="checkbox"
                           id={`pilot-${pilot.id}`}
                           checked={isChecked}
-                          onChange={(e) => handlePilotChange(pilot.id, e.target.checked)}
+                          onChange={(e) => handlePilotChange(pilot.id.toString(), e.target.checked)}
                           className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                         />
                       </div>
@@ -331,7 +399,12 @@ export default function CreateUserForm() {
                         htmlFor={`pilot-${pilot.id}`}
                         className="ml-3 flex-1 cursor-pointer"
                       >
-                        <div className="font-medium text-gray-900">{pilot.name}</div>
+                        <div className="font-medium text-gray-900 flex justify-between">
+                          <span>{pilot.name}</span>
+                          <span className="text-xs font-normal text-gray-500">
+                            {pilotSchoolsCount} school{pilotSchoolsCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
                         {pilot.description && (
                           <p className="text-sm text-gray-500 mt-1">{pilot.description}</p>
                         )}
@@ -372,15 +445,23 @@ export default function CreateUserForm() {
               </div>
             ) : filteredSchools.length === 0 ? (
               <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-md">
-                {selectedPilotIds?.length === 0 
+                {selectedPilotIds.length === 0 
                   ? 'Select pilots above to see available schools'
-                  : 'No schools available for the selected pilots'}
+                  : <div>
+                      <p>No schools available for the selected {selectedPilotIds.length} pilot(s).</p>
+                      <p className="mt-1 text-xs">
+                        Selected pilots: {getSelectedPilotNames()}
+                      </p>
+                      <p className="mt-1 text-xs">
+                        Note: Only schools assigned to the selected pilots will appear here.
+                      </p>
+                    </div>}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-2">
                 {filteredSchools.map((school) => {
-                  const pilot = pilots.find(p => p.id === school.pilot_id);
-                  const isChecked = watch('school_ids')?.includes(school.id) || false;
+                  const pilot = pilots.find(p => p.id.toString() === school.pilot_id?.toString());
+                  const isChecked = watch('school_ids')?.includes(school.id.toString()) || false;
                   return (
                     <div key={school.id} className="flex items-start p-3 border border-gray-200 rounded-md hover:bg-gray-50">
                       <div className="flex items-center h-5">
@@ -388,7 +469,7 @@ export default function CreateUserForm() {
                           type="checkbox"
                           id={`school-${school.id}`}
                           checked={isChecked}
-                          onChange={(e) => handleSchoolChange(school.id, e.target.checked)}
+                          onChange={(e) => handleSchoolChange(school.id.toString(), e.target.checked)}
                           className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                         />
                       </div>

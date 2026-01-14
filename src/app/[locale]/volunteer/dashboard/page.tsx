@@ -3,15 +3,19 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useParams } from 'next/navigation'; // Add this import
 import { dashboardApi } from '@/lib/api/dashboard';
 import { useAuth } from '@/components/providers/AuthProvider';
 import StatsCard from '@/components/ui/stats-card';
 import ActivityCard from '@/components/activities/activity-card';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
-import { Activity } from '@/lib/types';
+import { Activity, Pilot } from '@/lib/types'; // Import Pilot type
 
 export default function VolunteerDashboardPage() {
   const { user } = useAuth();
+  const params = useParams(); // Get params including locale
+  const locale = params.locale as string; // Extract locale
+  
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ['volunteer-dashboard'],
     queryFn: () => dashboardApi.getVolunteerDashboard(),
@@ -37,6 +41,11 @@ export default function VolunteerDashboardPage() {
   }
 
   const dashboard = dashboardData;
+
+  // Helper function to create dynamic links
+  const createLink = (path: string): string => {
+    return `/${locale}${path}`;
+  };
 
   // Get the pending count with a safe fallback
   const pendingCount = dashboard?.statistics?.activities?.pending_count ?? 0;
@@ -108,7 +117,7 @@ export default function VolunteerDashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Recent Activities</h2>
           <Link
-            href="/volunteer/activities"
+            href={createLink('/volunteer/activities')} // Use dynamic link
             className="text-sm font-medium text-green-600 hover:text-green-500"
           >
             View all →
@@ -118,6 +127,18 @@ export default function VolunteerDashboardPage() {
         {dashboard?.recentActivities && dashboard.recentActivities.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {dashboard.recentActivities.slice(0, 3).map((activity) => {
+              // Create a properly typed pilot object
+              const pilot: Pilot | undefined = activity.pilot_name ? {
+                id: '',
+                name: activity.pilot_name,
+                start_date: '',
+                status: 'active',
+                created_at: '',
+                updated_at: '',
+                success: true, // Add required property
+                message: 'Pilot data from dashboard' // Add required property
+              } as Pilot : undefined;
+              
               const transformedActivity: Activity = {
                 id: activity.id,
                 title: activity.title,
@@ -136,14 +157,7 @@ export default function VolunteerDashboardPage() {
                   created_at: '',
                   updated_at: ''
                 } : undefined,
-                pilot: activity.pilot_name ? {
-                  id: '',
-                  name: activity.pilot_name,
-                  start_date: '',
-                  status: 'active',
-                  created_at: '',
-                  updated_at: ''
-                } : undefined,
+                pilot: pilot, // Use the typed pilot
                 type: ''
               };
               
@@ -161,7 +175,7 @@ export default function VolunteerDashboardPage() {
             </p>
             <div className="mt-6">
               <Link
-                href="/volunteer/activities"
+                href={createLink('/volunteer/activities')} // Use dynamic link
                 className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-green-600"
               >
                 View Activities
@@ -176,7 +190,7 @@ export default function VolunteerDashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Upcoming Activities</h2>
           <Link
-            href="/volunteer/activities?status=upcoming"
+            href={createLink('/volunteer/activities?status=upcoming')} // Use dynamic link
             className="text-sm font-medium text-green-600 hover:text-green-500"
           >
             View all →
@@ -210,12 +224,7 @@ export default function VolunteerDashboardPage() {
                       </div>
                       <div className="mt-4 shrink-0 sm:mt-0 sm:ml-5">
                         <div className="flex items-center">
-                          <div className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            activity.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            activity.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            activity.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
+                          <div className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${activity.status === 'approved' ? 'bg-green-100 text-green-800' : activity.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : activity.status === 'draft' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800'}`}>
                             {activity.status}
                           </div>
                         </div>
@@ -223,7 +232,7 @@ export default function VolunteerDashboardPage() {
                     </div>
                     <div className="ml-5 shrink-0">
                       <Link
-                        href={`/volunteer/activities/${activity.id}`}
+                        href={createLink(`/volunteer/activities/${activity.id}`)} // Use dynamic link
                         className="text-green-600 hover:text-green-900"
                       >
                         View

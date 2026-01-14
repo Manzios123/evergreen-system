@@ -17,7 +17,7 @@ import Link from 'next/link';
 export default function VolunteerFeedbackPage() {
   const { data: surveys, isLoading, error } = useApiQuery<Survey[]>(
     ['surveys', 'volunteer'],
-    () => api.get<Survey[]>('/surveys', { type: 'volunteer' }) // Fixed api call
+    () => api.get<Survey[]>('/surveys-templaes', { type: 'volunteer' }) // Fixed api call
   );
 
   // Note: The DataTable component expects columns with 'header' property, not 'label'
@@ -76,14 +76,14 @@ export default function VolunteerFeedbackPage() {
                 <CheckCircleIcon className="h-4 w-4 mr-1" />
                 Completed
               </Button>
-              <Link href={`/volunteer/surveys/${survey.id}/responses`}> {/* Added /responses */}
+              <Link href={`/volunteer/surveys-templates/${survey.id}/responses`}> {/* Added /responses */}
                 <Button size="sm" variant="outline">
                   View Responses
                 </Button>
               </Link>
             </>
           ) : survey.status === 'pending' ? (
-            <Link href={`/volunteer/surveys/${survey.id}`}>
+            <Link href={`/volunteer/surveys-templates/${survey.id}`}>
               <Button size="sm" variant="default">
                 Provide Feedback
               </Button>

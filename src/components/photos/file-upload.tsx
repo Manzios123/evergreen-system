@@ -198,73 +198,74 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     }
   };
 
-  // Direct upload to R2 with presigned URL
-  const uploadViaPresignedUrl = async (uploadFile: UploadFile): Promise<string> => {
-    const { file } = uploadFile;
+  // In FileUpload.tsx, update the uploadViaPresignedUrl function:
+const uploadViaPresignedUrl = async (uploadFile: UploadFile): Promise<string> => {
+  const { file } = uploadFile;
+  
+  try {
+    // Get presigned URL from server
+    const presignedResponse = await photosApi.getPresignedUrl({
+      filename: file.name,
+      contentType: file.type,
+      activityId,
+      description: '',
+      tags: [],
+    });
+
+    const { url, fields, fileId } = presignedResponse.data;
     
-    try {
-      // Get presigned URL from server
-      const presignedResponse = await photosApi.getPresignedUrl({
-        filename: file.name,
-        contentType: file.type,
-        activityId,
-        description: '',
-        tags: [],
-      });
+    // Create FormData for R2 upload
+    const formData = new FormData();
+    Object.entries(fields).forEach(([key, value]) => {
+      formData.append(key, String(value));
+    });
+    formData.append('file', file);
 
-      const { url, fields, fileId } = presignedResponse.data;
+    // Upload to R2 with progress tracking
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
       
-      // Create FormData for R2 upload
-      const formData = new FormData();
-      Object.entries(fields).forEach(([key, value]) => {
-        // Convert the value to string since FormData.append expects string or Blob
-        formData.append(key, String(value));
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          setFiles(prev => prev.map(f => 
+            f.id === uploadFile.id ? { ...f, progress } : f
+          ));
+        }
       });
-      formData.append('file', file);
 
-      // Upload to R2 with progress tracking
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        // Track upload progress
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            setFiles(prev => prev.map(f => 
-              f.id === uploadFile.id ? { ...f, progress } : f
-            ));
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          activeUploads.current.delete(uploadFile.id);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(fileId);
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          activeUploads.current.delete(uploadFile.id);
-          reject(new Error('Network error during upload'));
-        });
-
-        xhr.addEventListener('abort', () => {
-          activeUploads.current.delete(uploadFile.id);
-          reject(new Error('Upload cancelled'));
-        });
-
-        xhr.open('POST', url);
-        xhr.send(formData);
-        
-        activeUploads.current.set(uploadFile.id, xhr);
+      xhr.addEventListener('load', () => {
+        activeUploads.current.delete(uploadFile.id);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          // The backend should handle the file and return success
+          resolve(fileId);
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
       });
-    } catch (error) {
-      console.error('Failed to get presigned URL:', error);
-      throw error;
-    }
-  };
+
+      xhr.addEventListener('error', () => {
+        activeUploads.current.delete(uploadFile.id);
+        reject(new Error('Network error during upload'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        activeUploads.current.delete(uploadFile.id);
+        reject(new Error('Upload cancelled'));
+      });
+
+      // Important: Use PUT method for the direct upload endpoint
+      xhr.open('PUT', url); // Changed from POST to PUT
+      xhr.send(formData);
+      
+      activeUploads.current.set(uploadFile.id, xhr);
+    });
+  } catch (error) {
+    console.error('Failed to get presigned URL:', error);
+    throw error;
+  }
+};
 
   // Upload via server (for smaller files)
   const uploadViaServer = async (uploadFile: UploadFile): Promise<string> => {

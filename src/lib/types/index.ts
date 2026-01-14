@@ -66,6 +66,8 @@ export type ActivityType =
   }
   
   export interface Pilot {
+    success: any;
+    message: string;
     id: string;
     name: string;
     description?: string;
@@ -138,6 +140,7 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+  count?: number;
   meta?: {
     total: number;
     page: number;
