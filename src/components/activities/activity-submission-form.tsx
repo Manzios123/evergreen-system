@@ -18,9 +18,11 @@ import {
   UserGroupIcon, 
   ChartBarIcon,
   DocumentTextIcon,
-  PaperAirplaneIcon 
+  PaperAirplaneIcon,
+  PhotoIcon // Added PhotoIcon
 } from '@heroicons/react/24/outline';
 import { SaveIcon } from 'lucide-react';
+import { PhotoUpload } from '@/components/activities/photo-upload'; // Added PhotoUpload import
 
 // Helper function to map numeric values to string values for database
 const mapEngagementLevel = (value: string | number | undefined): string => {
@@ -76,6 +78,18 @@ type SubmissionFormData = {
   volunteer_notes: string;
 };
 
+// Add this interface near the top:
+interface Photo {
+  id: string;
+  url: string;
+  thumbnailUrl: string;
+  filename: string;
+  caption?: string;
+  uploadedAt: string;
+  size: number;
+  displayOrder: number;
+}
+
 interface ActivitySubmissionFormProps {
   activity: {
     id: string;
@@ -111,6 +125,9 @@ export function ActivitySubmissionForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionType, setSubmissionType] = useState<'save' | 'submit'>('save');
   const [isOwner, setIsOwner] = useState(true);
+  
+  // Add this state variable inside the component (after the existing states):
+  const [uploadedPhotos, setUploadedPhotos] = useState<Photo[]>([]);
 
   // Check if current user is the owner of the activity
   useEffect(() => {
@@ -411,6 +428,30 @@ export function ActivitySubmissionForm({
               <p className="mt-1 text-xs text-gray-500">
                 Provide detailed notes about the activity for your coordinator
               </p>
+            </div>
+
+            {/* Add this to the form, right after the "Activity Notes & Observations" section: */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Activity Photos
+              </label>
+              <div className="relative">
+                <div className="absolute top-3 left-3">
+                  <PhotoIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <div className="pl-10">
+                  <PhotoUpload
+                    activityId={activity.id}
+                    maxPhotos={10}
+                    maxSizeMB={5}
+                    onPhotosChange={setUploadedPhotos}
+                    disabled={!isOwner && submissionType === 'save'}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Upload photos to document your activity (optional, max 10 photos, 5MB each)
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -16,8 +16,13 @@ import { ApiError } from '@/lib/types';
 export const useApiQuery = <T>(
   queryKey: QueryKey,
   queryFn: () => Promise<T>,
-  options?: Omit<UseQueryOptions<T, ApiError>, 'queryKey' | 'queryFn'>
+  options?: Omit<UseQueryOptions<T, ApiError>, 'queryKey' | 'queryFn'> & {
+    onSuccess?: (data: T) => void;
+    onError?: (error: ApiError) => void;
+  }
 ) => {
+  const { onSuccess, onError, ...restOptions } = options || {};
+  
   return useQuery<T, ApiError>({
     queryKey,
     queryFn: async () => {
@@ -28,7 +33,9 @@ export const useApiQuery = <T>(
         throw new Error(message);
       }
     },
-    ...options,
+    ...(onSuccess ? { onSuccess } : {}),
+    ...(onError ? { onError } : {}),
+    ...restOptions,
   });
 };
 
@@ -39,12 +46,12 @@ export const useApiMutation = <TData = any, TVariables = any>(
     invalidateQueries?: QueryKey[];
     onSuccess?: (data: TData, variables: TVariables) => void;
     onError?: (error: Error, variables: TVariables) => void;
-    mutationKey?: QueryKey; // Add this line
+    mutationKey?: QueryKey;
   }
 ) => {
   const queryClient = useQueryClient();
 
-  return useMutation<TData, Error, TVariables>({
+  const mutation = useMutation<TData, Error, TVariables>({
     mutationKey: options?.mutationKey,
     mutationFn: async (variables) => {
       try {
@@ -69,7 +76,6 @@ export const useApiMutation = <TData = any, TVariables = any>(
         }
       } catch (error) {
         console.error('Error in mutation onSuccess handler:', error);
-        // Don't throw error in onSuccess as it will break the mutation flow
       }
     },
     onError: (error, variables) => {
@@ -83,6 +89,12 @@ export const useApiMutation = <TData = any, TVariables = any>(
       }
     },
   });
+
+  // Add React Query v5 compatibility
+  return {
+    ...mutation,
+    isLoading: mutation.isPending, // Map v5 isPending to v4 isLoading for compatibility
+  } as typeof mutation & { isLoading: boolean };
 };
 
 // Simple paginated query helper

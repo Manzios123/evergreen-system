@@ -237,7 +237,7 @@ export default function SurveyCompletionPage({ params }: SurveyCompletionPagePro
             </Alert>
           )}
 
-          <SurveyForm survey={survey} onComplete={handleComplete} />
+          <SurveyForm survey={survey} onComplete={handleComplete} assignmentId={''} surveyType={''} />
         </div>
       </Card>
     </div>

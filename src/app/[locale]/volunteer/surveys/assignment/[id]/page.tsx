@@ -54,6 +54,7 @@ interface SurveyAssignmentPageProps {
 
 export default function SurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
   const router = useRouter();
+  
 
   const { data: assignmentData, isLoading, error } = useApiQuery<SurveyAssignment>(
     ['survey-assignment', params.id],
@@ -62,6 +63,8 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
       enabled: !!params.id,
     }
   );
+   
+   
 
   const handleComplete = () => {
     router.push('/volunteer/surveys/volunteer');

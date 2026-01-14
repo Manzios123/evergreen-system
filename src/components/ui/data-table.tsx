@@ -16,7 +16,7 @@ interface DataTableProps<T> {
   data: T[];
   loading?: boolean;
   onRowClick?: (item: T) => void;
-  emptyMessage?: string;
+  emptyMessage?: string | ReactNode;
   pagination?: {
     page: number;
     total: number;
@@ -84,7 +84,7 @@ export default function DataTable<T extends Record<string, any>>({
           />
         </svg>
         <h3 className="mt-2 text-sm font-medium text-gray-900">No data</h3>
-        <p className="mt-1 text-sm text-gray-500">{emptyMessage}</p>
+        <div className="mt-1 text-sm text-gray-500">{emptyMessage}</div>
       </div>
     );
   }
