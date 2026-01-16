@@ -52,19 +52,37 @@ interface SurveyAssignmentPageProps {
   };
 }
 
+// Update your survey loading logic
+const loadSurvey = async (assignmentId: string): Promise<SurveyAssignment> => {
+  try {
+    const response = await api.get<SurveyAssignment>(`/survey-assignments/${assignmentId}`);
+    
+    // Transform the data to match what SurveyForm expects
+    const transformedData = {
+      ...response,
+      questions: response.questions?.map((q: any) => ({
+        ...q,
+        is_required: q.is_required === 1 // Convert 1/0 to boolean
+      })) || []
+    };
+    
+    return transformedData;
+  } catch (error) {
+    console.error('Failed to load survey:', error);
+    throw error;
+  }
+};
+
 export default function SurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
   const router = useRouter();
   
-
   const { data: assignmentData, isLoading, error } = useApiQuery<SurveyAssignment>(
     ['survey-assignment', params.id],
-    () => api.get<SurveyAssignment>(`/survey-assignments/a70461d7-fcc9-4446-825d-8fc53ea17caf`),
+    () => loadSurvey(params.id),
     {
       enabled: !!params.id,
     }
   );
-   
-   
 
   const handleComplete = () => {
     router.push('/volunteer/surveys/volunteer');

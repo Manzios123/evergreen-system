@@ -22,6 +22,33 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   const [totalStudents, setTotalStudents] = useState<number>(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
 
+  // FIX: Handle different survey data structures
+  const getQuestions = () => {
+    // If survey has a template property
+    if (survey?.template?.questions) {
+      return survey.template.questions;
+    }
+    // If questions are at the root level
+    else if (survey?.questions) {
+      return survey.questions;
+    }
+    // If survey itself is the questions array (rare)
+    else if (Array.isArray(survey)) {
+      return survey;
+    }
+    // Default to empty array
+    return [];
+  };
+
+  const questions = getQuestions();
+
+  // Also handle is_required conversion
+  const normalizedQuestions = questions.map((q: any) => ({
+    ...q,
+    // Convert 1/0 to boolean if needed
+    is_required: q.is_required === 1 || q.is_required === true
+  }));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -29,7 +56,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
 
     try {
       // Validate responses
-      const requiredQuestions = survey.template.questions.filter((q: any) => q.is_required);
+      const requiredQuestions = normalizedQuestions.filter((q: any) => q.is_required);
       const missingRequired = requiredQuestions.filter((q: any) => {
         const response = responses[q.id];
         return response === undefined || response === null || response === '';
@@ -57,7 +84,6 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
 
       if (result) {
         onComplete();
-        // Let the parent component handle navigation
       }
     } catch (err: any) {
       setError(err.message || 'Failed to submit survey');
@@ -151,6 +177,22 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
     }
   };
 
+  // FIX: Check if we have questions before rendering
+  if (normalizedQuestions.length === 0) {
+    return (
+      <div className="text-center p-8">
+        <p className="text-red-600">No questions found for this survey.</p>
+        <Button
+          onClick={() => router.back()}
+          variant="outline"
+          className="mt-4"
+        >
+          Go Back
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
@@ -185,7 +227,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       )}
 
       {/* Survey questions */}
-      {survey.template.questions.map((question: any, index: number) => (
+      {normalizedQuestions.map((question: any, index: number) => (
         <div key={question.id} className="border-t pt-6 first:border-t-0 first:pt-0">
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
