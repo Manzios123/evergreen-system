@@ -17,13 +17,14 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react'; // Added
 
 interface SurveyQuestion {
   id: string;
   question_text: string;
   question_type: string;
   order_index: number;
-  is_required: boolean;
+  is_required: number; // Changed from boolean to number (1/0)
   options?: string;
   validation_rules?: string;
 }
@@ -46,43 +47,60 @@ interface SurveyAssignment {
   questions: SurveyQuestion[];
 }
 
+interface AssignmentResponse {
+  assignment: SurveyAssignment;
+  questions: SurveyQuestion[];
+  completed: boolean;
+  completed_at: string | null;
+  response_id: string | null;
+  can_edit: boolean;
+}
+
 interface SurveyAssignmentPageProps {
   params: {
     id: string;
   };
 }
 
-// Update your survey loading logic
-const loadSurvey = async (assignmentId: string): Promise<SurveyAssignment> => {
-  try {
-    const response = await api.get<SurveyAssignment>(`/survey-assignments/${assignmentId}`);
-    
-    // Transform the data to match what SurveyForm expects
-    const transformedData = {
-      ...response,
-      questions: response.questions?.map((q: any) => ({
-        ...q,
-        is_required: q.is_required === 1 // Convert 1/0 to boolean
-      })) || []
-    };
-    
-    return transformedData;
-  } catch (error) {
-    console.error('Failed to load survey:', error);
-    throw error;
-  }
-};
-
 export default function SurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
   const router = useRouter();
-  
-  const { data: assignmentData, isLoading, error } = useApiQuery<SurveyAssignment>(
+  const [surveyData, setSurveyData] = useState<any>(null);
+
+  // FIX: Use the dynamic params.id instead of hardcoded ID
+  const { data: apiResponse, isLoading, error } = useApiQuery<AssignmentResponse>(
     ['survey-assignment', params.id],
-    () => loadSurvey(params.id),
+    () => api.get<AssignmentResponse>(`/survey-assignments/${params.id}`), // Changed from hardcoded ID
     {
       enabled: !!params.id,
     }
   );
+
+  useEffect(() => {
+    // Transform the API response to match SurveyForm expectations
+    if (apiResponse) {
+      const transformedData = {
+        id: apiResponse.assignment?.id || params.id,
+        title: apiResponse.assignment?.survey_name || 'Survey',
+        description: apiResponse.assignment?.survey_description || '',
+        due_date: apiResponse.assignment?.due_date || null,
+        status: apiResponse.assignment?.status || 'assigned',
+        type: apiResponse.assignment?.survey_type || 'volunteer',
+        completed: apiResponse.completed || false,
+        completed_at: apiResponse.completed_at || null,
+        template: {
+          id: apiResponse.assignment?.survey_template_id || '',
+          type: apiResponse.assignment?.survey_type || 'volunteer',
+          description: apiResponse.assignment?.survey_description || '',
+          // Convert is_required from number (1/0) to boolean
+          questions: (apiResponse.questions || []).map((q: SurveyQuestion) => ({
+            ...q,
+            is_required: q.is_required === 1, // Convert to boolean
+          })),
+        }
+      };
+      setSurveyData(transformedData);
+    }
+  }, [apiResponse, params.id]);
 
   const handleComplete = () => {
     router.push('/volunteer/surveys/volunteer');
@@ -97,7 +115,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  if (error || !assignmentData) {
+  if (error || !apiResponse) {
     return (
       <div className="max-w-3xl mx-auto">
         <Alert
@@ -116,18 +134,22 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  if (assignmentData.completed) {
+  // Check if survey is completed
+  if (apiResponse.completed) {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <Alert
           type="success"
           title="Survey already completed"
         >
-          <p className="mt-2">You have already completed this survey on {new Date(assignmentData.completed_at!).toLocaleDateString()}.</p>
+          <p className="mt-2">You have already completed this survey on {new Date(apiResponse.completed_at!).toLocaleDateString()}.</p>
           <div className="mt-4">
-            <Link href={`/volunteer/surveys/assignment/${params.id}/responses`}>
-              <Button variant="outline">View Responses</Button>
-            </Link>
+            <Button 
+              variant="outline"
+              onClick={() => router.push(`/volunteer/surveys/assignment/${params.id}/responses`)}
+            >
+              View Responses
+            </Button>
           </div>
         </Alert>
         <Card>
@@ -141,9 +163,12 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
               volunteering program.
             </p>
             <div className="mt-6">
-              <Link href="/volunteer/surveys/volunteer">
-                <Button variant="outline">Back to Surveys</Button>
-              </Link>
+              <Button 
+                variant="outline"
+                onClick={() => router.push('/volunteer/surveys/volunteer')}
+              >
+                Back to Surveys
+              </Button>
             </div>
           </div>
         </Card>
@@ -151,25 +176,30 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  const isOverdue = assignmentData.due_date && new Date(assignmentData.due_date) < new Date();
-  const isVolunteerSurvey = assignmentData.survey_type === 'volunteer';
-  const isStudentSurvey = assignmentData.survey_type === 'student';
+  // Check if user can edit
+  if (!apiResponse.can_edit) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <Alert
+          type="warning"
+          title="Survey not available for editing"
+        >
+          <p className="mt-2">This survey cannot be edited. It may have been submitted or is no longer active.</p>
+          <div className="mt-4">
+            <Link href="/volunteer/surveys/volunteer" className="inline-flex items-center text-sm">
+              <ArrowLeftIcon className="h-4 w-4 mr-2" />
+              Back to Surveys
+            </Link>
+          </div>
+        </Alert>
+      </div>
+    );
+  }
 
-  // Create survey object for SurveyForm component
-  const survey = {
-    id: assignmentData.id,
-    title: assignmentData.survey_name,
-    description: assignmentData.survey_description,
-    due_date: assignmentData.due_date,
-    status: isOverdue ? 'overdue' : assignmentData.status,
-    type: assignmentData.survey_type,
-    template: {
-      id: assignmentData.survey_template_id,
-      type: assignmentData.survey_type,
-      description: assignmentData.survey_description,
-      questions: assignmentData.questions,
-    }
-  };
+  const assignment = apiResponse.assignment;
+  const isOverdue = assignment.due_date && new Date(assignment.due_date) < new Date();
+  const isVolunteerSurvey = assignment.survey_type === 'volunteer';
+  const isStudentSurvey = assignment.survey_type === 'student';
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -192,11 +222,11 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
                 <DocumentTextIcon className="h-8 w-8 text-gray-400" />
               )}
               <h1 className="text-2xl font-bold text-gray-900">
-                {assignmentData.survey_name}
+                {assignment.survey_name}
               </h1>
             </div>
             <p className="mt-2 text-gray-600">
-              {assignmentData.survey_description || `Please complete this ${assignmentData.survey_period.replace('_', ' ')} survey`}
+              {assignment.survey_description || `Please complete this ${assignment.survey_period.replace('_', ' ')} survey`}
             </p>
           </div>
           {isOverdue && (
@@ -211,18 +241,18 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
           <div className="bg-gray-50 rounded-lg p-4">
             <p className="text-sm font-medium text-gray-500">Pilot</p>
             <p className="mt-1 text-sm text-gray-900">
-              {assignmentData.pilot_name}
+              {assignment.pilot_name}
             </p>
           </div>
 
-          {assignmentData.due_date && (
+          {assignment.due_date && (
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center">
                 <CalendarIcon className="h-4 w-4 text-gray-400 mr-2" />
                 <p className="text-sm font-medium text-gray-500">Due Date</p>
               </div>
               <p className="mt-1 text-sm text-gray-900">
-                {new Date(assignmentData.due_date).toLocaleDateString()}
+                {new Date(assignment.due_date).toLocaleDateString()}
               </p>
               {isOverdue && (
                 <p className="text-xs text-red-600">Past due</p>
@@ -238,8 +268,8 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
               </p>
             </div>
             <p className="mt-1 text-sm text-gray-900">
-              {assignmentData.questions?.length 
-                ? `${Math.ceil(assignmentData.questions.length * 0.5)} minutes`
+              {apiResponse.questions?.length 
+                ? `${Math.ceil(apiResponse.questions.length * 0.5)} minutes`
                 : '5-10 minutes'}
             </p>
           </div>
@@ -279,12 +309,21 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
             </Alert>
           )}
 
-          <SurveyForm 
-            survey={survey} 
-            onComplete={handleComplete}
-            assignmentId={params.id}
-            surveyType={assignmentData.survey_type}
-          />
+          {surveyData && apiResponse.questions && apiResponse.questions.length > 0 ? (
+            <SurveyForm 
+              survey={surveyData} 
+              onComplete={handleComplete}
+              assignmentId={params.id}
+              surveyType={assignment.survey_type}
+            />
+          ) : (
+            <Alert
+              type="error"
+              title="No questions found"
+            >
+              <p className="mt-2">This survey doesn't have any questions configured. Please contact the administrator.</p>
+            </Alert>
+          )}
         </div>
       </Card>
     </div>

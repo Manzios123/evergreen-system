@@ -1,7 +1,7 @@
 // components/surveys/survey-form.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Button from '@/components/ui/button';
 import { api } from '@/lib/api/api';
 import { useRouter } from 'next/navigation';
@@ -22,32 +22,28 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   const [totalStudents, setTotalStudents] = useState<number>(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
 
-  // FIX: Handle different survey data structures
+  // Debug log to check survey structure
+  useEffect(() => {
+    console.log('SurveyForm received survey:', survey);
+    console.log('Survey questions:', survey?.template?.questions);
+  }, [survey]);
+
+  // Get questions from the survey object
   const getQuestions = () => {
-    // If survey has a template property
-    if (survey?.template?.questions) {
+    if (!survey) return [];
+    
+    // Check different possible structures
+    if (survey.template?.questions) {
       return survey.template.questions;
-    }
-    // If questions are at the root level
-    else if (survey?.questions) {
+    } else if (survey.questions) {
       return survey.questions;
-    }
-    // If survey itself is the questions array (rare)
-    else if (Array.isArray(survey)) {
+    } else if (Array.isArray(survey)) {
       return survey;
     }
-    // Default to empty array
     return [];
   };
 
   const questions = getQuestions();
-
-  // Also handle is_required conversion
-  const normalizedQuestions = questions.map((q: any) => ({
-    ...q,
-    // Convert 1/0 to boolean if needed
-    is_required: q.is_required === 1 || q.is_required === true
-  }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,21 +52,21 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
 
     try {
       // Validate responses
-      const requiredQuestions = normalizedQuestions.filter((q: any) => q.is_required);
+      const requiredQuestions = questions.filter((q: any) => q.is_required);
       const missingRequired = requiredQuestions.filter((q: any) => {
         const response = responses[q.id];
-        return response === undefined || response === null || response === '';
+        return response === undefined || response === null || response === '' || (Array.isArray(response) && response.length === 0);
       });
       
       if (missingRequired.length > 0) {
-        setError(`Please answer all required questions: ${missingRequired.map((q: any, i: number) => i + 1).join(', ')}`);
+        setError(`Please answer all required questions: ${missingRequired.map((q: any, index: number) => questions.indexOf(q) + 1).join(', ')}`);
         setIsSubmitting(false);
         return;
       }
 
       // Prepare submission data for student surveys
       let finalResponses = { ...responses };
-      if (surveyType === 'student_survey' && totalStudents > 0) {
+      if (surveyType === 'student' && totalStudents > 0) { // Changed from 'student_survey' to 'student'
         finalResponses.total_students = totalStudents;
       }
 
@@ -80,70 +76,81 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
         responses: finalResponses
       };
 
+      console.log('Submitting survey:', payload);
+
       const result = await api.post('/survey-assignments/submit-response', payload);
 
       if (result) {
+        console.log('Survey submitted successfully:', result);
         onComplete();
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to submit survey');
       console.error('Survey submission error:', err);
+      setError(err.message || 'Failed to submit survey. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const renderQuestionField = (question: any) => {
+  const renderQuestionField = (question: any, index: number) => {
     const value = responses[question.id] || '';
 
     switch (question.question_type) {
       case 'agree_disagree_unsure':
         return (
-          <div className="space-y-2">
-            <label className="inline-flex items-center mr-4">
-              <input
-                type="radio"
-                name={`question-${question.id}`}
-                value="agree"
-                checked={value === 'agree'}
-                onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
-                className="h-4 w-4 text-blue-600"
-                disabled={isSubmitting}
-              />
-              <span className="ml-2">Agree (Ndabyemera)</span>
-            </label>
-            <label className="inline-flex items-center mr-4">
-              <input
-                type="radio"
-                name={`question-${question.id}`}
-                value="disagree"
-                checked={value === 'disagree'}
-                onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
-                className="h-4 w-4 text-blue-600"
-                disabled={isSubmitting}
-              />
-              <span className="ml-2">Disagree (Simbyemera)</span>
-            </label>
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                name={`question-${question.id}`}
-                value="unsure"
-                checked={value === 'unsure'}
-                onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
-                className="h-4 w-4 text-blue-600"
-                disabled={isSubmitting}
-              />
-              <span className="ml-2">Unsure (Simbizi neza)</span>
-            </label>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name={`question-${question.id}`}
+                  value="agree"
+                  checked={value === 'agree'}
+                  onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+                  className="h-4 w-4 text-blue-600"
+                  disabled={isSubmitting}
+                  required={question.is_required}
+                />
+                <span className="ml-2">Agree (Ndabyemera)</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name={`question-${question.id}`}
+                  value="disagree"
+                  checked={value === 'disagree'}
+                  onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+                  className="h-4 w-4 text-blue-600"
+                  disabled={isSubmitting}
+                  required={question.is_required}
+                />
+                <span className="ml-2">Disagree (Simbyemera)</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name={`question-${question.id}`}
+                  value="unsure"
+                  checked={value === 'unsure'}
+                  onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+                  className="h-4 w-4 text-blue-600"
+                  disabled={isSubmitting}
+                  required={question.is_required}
+                />
+                <span className="ml-2">Unsure (Simbizi neza)</span>
+              </label>
+            </div>
           </div>
         );
 
       case 'scale_1_10':
         return (
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500">1 (Extremely)</span>
-            <div className="flex-1 flex justify-between px-2">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
+              <span>1 (Extremely)</span>
+              <span>10 (Not at all)</span>
+            </div>
+            <div className="flex justify-between px-4">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
                 <label key={num} className="inline-flex flex-col items-center">
                   <input
@@ -154,56 +161,66 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                     onChange={(e) => setResponses({...responses, [question.id]: parseInt(e.target.value)})}
                     className="h-4 w-4 text-blue-600"
                     disabled={isSubmitting}
+                    required={question.is_required}
                   />
                   <span className="text-xs mt-1">{num}</span>
                 </label>
               ))}
             </div>
-            <span className="text-sm text-gray-500">10 (Not at all)</span>
           </div>
         );
 
       case 'text':
       default:
         return (
-          <textarea
-            value={value}
-            onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
-            className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Enter your response..."
-            disabled={isSubmitting}
-          />
+          <div>
+            <textarea
+              value={value}
+              onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter your response here..."
+              disabled={isSubmitting}
+              required={question.is_required}
+              rows={4}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Please provide a detailed response.
+            </p>
+          </div>
         );
     }
   };
 
-  // FIX: Check if we have questions before rendering
-  if (normalizedQuestions.length === 0) {
+  // Check if we have questions
+  if (!questions || questions.length === 0) {
     return (
       <div className="text-center p-8">
-        <p className="text-red-600">No questions found for this survey.</p>
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
+          <h3 className="font-medium mb-2">No questions available</h3>
+          <p>This survey doesn't have any questions configured.</p>
+        </div>
         <Button
-          onClick={() => router.back()}
+          onClick={() => router.push('/volunteer/surveys/volunteer')}
           variant="outline"
           className="mt-4"
         >
-          Go Back
+          Back to Surveys
         </Button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-8">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
+          <strong className="font-medium">Error:</strong> {error}
         </div>
       )}
 
       {/* Student survey specific fields */}
-      {surveyType === 'student_survey' && (
-        <div className="bg-blue-50 p-4 rounded-lg">
+      {surveyType === 'student' && ( // Changed from 'student_survey' to 'student'
+        <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
           <h3 className="font-medium text-blue-900 mb-2">Student Survey Information</h3>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -215,47 +232,74 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
               value={totalStudents}
               onChange={(e) => setTotalStudents(parseInt(e.target.value) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              required
+              required={surveyType === 'student'}
               disabled={isSubmitting}
             />
           </div>
-          <p className="text-sm text-blue-700">
-            <strong>Note:</strong> For each question below, enter the aggregated results from all students.
-            For agree/disagree questions, enter counts (e.g., Agree: 15, Disagree: 5, Unsure: 5).
-          </p>
+          <div className="text-sm text-blue-700 bg-blue-100 p-3 rounded">
+            <p className="font-medium mb-1">Instructions:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>For each question below, enter the aggregated results from all students.</li>
+              <li>For agree/disagree questions, enter the counts for each option.</li>
+              <li>For text questions, summarize the common responses from students.</li>
+            </ul>
+          </div>
         </div>
       )}
 
       {/* Survey questions */}
-      {normalizedQuestions.map((question: any, index: number) => (
-        <div key={question.id} className="border-t pt-6 first:border-t-0 first:pt-0">
+      {questions.map((question: any, index: number) => (
+        <div key={question.id || index} className="border border-gray-200 rounded-lg p-6">
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {index + 1}. {question.question_text}
-              {question.is_required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {renderQuestionField(question)}
+            <div className="flex items-start mb-2">
+              <span className="bg-gray-100 text-gray-800 text-sm font-medium px-2.5 py-0.5 rounded mr-2">
+                {index + 1}
+              </span>
+              <label className="block text-base font-medium text-gray-900">
+                {question.question_text}
+                {question.is_required && <span className="text-red-500 ml-1">*</span>}
+              </label>
+            </div>
+            {question.is_required && (
+              <p className="text-sm text-gray-500 mb-3">This question is required</p>
+            )}
+            {renderQuestionField(question, index)}
           </div>
         </div>
       ))}
 
-      <div className="flex justify-end space-x-3 pt-6 border-t">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.push('/volunteer/surveys/volunteer')}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="default"
-          disabled={isSubmitting}
-          className="min-w-30"
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit Survey'}
-        </Button>
+      <div className="flex flex-col sm:flex-row justify-between items-center pt-8 border-t">
+        <div className="mb-4 sm:mb-0">
+          <p className="text-sm text-gray-500">
+            {questions.filter((q: any) => q.is_required).length} required questions
+          </p>
+        </div>
+        <div className="flex space-x-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push('/volunteer/surveys/volunteer')}
+            disabled={isSubmitting}
+            className="px-6"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="default"
+            disabled={isSubmitting}
+            className="px-8 min-w-32"
+          >
+            {isSubmitting ? (
+              <>
+                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                Submitting...
+              </>
+            ) : (
+              'Submit Survey'
+            )}
+          </Button>
+        </div>
       </div>
     </form>
   );
