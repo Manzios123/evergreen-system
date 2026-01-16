@@ -1,16 +1,18 @@
 // app/[locale]/volunteer/surveys/volunteer/page.tsx
-
 'use client'
 
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
-import DataTable from '@/components/ui/data-table';
-import StatusBadge from '@/components/ui/status-badge';
 import EmptyState from '@/components/ui/empty-state';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
+import SurveyCard from '@/components/surveys/survey-card';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api/api';
-import { ChatBubbleLeftIcon, CalendarIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { 
+  ChatBubbleLeftIcon, 
+  DocumentTextIcon,
+  ArrowRightIcon 
+} from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 interface SurveyAssignment {
@@ -25,114 +27,53 @@ interface SurveyAssignment {
   survey_period: string;
   pilot_name: string;
   assigned_by_name: string;
+  assignment_type: string;
+  completed_at?: string;
 }
 
 export default function VolunteerFeedbackPage() {
   // Fetch survey assignments for the current volunteer
-  const { data: assignments, isLoading, error } = useApiQuery<SurveyAssignment[]>(
+  const { data: assignments, isLoading, error, refetch } = useApiQuery<SurveyAssignment[]>(
     ['survey-assignments', 'volunteer'],
     () => api.get<SurveyAssignment[]>('/survey-assignments/volunteer')
   );
 
-  const columns = [
-    {
-      key: 'title',
-      header: 'Survey',
-      render: (assignment: SurveyAssignment) => (
-        <div>
-          <p className="font-medium text-gray-900">
-            {assignment.survey_name || 'Survey'}
-          </p>
-          <p className="text-sm text-gray-500">
-            {assignment.survey_description || 'Complete this survey to provide feedback'}
-          </p>
-          <div className="flex items-center mt-1 text-xs text-gray-500">
-            <span className="capitalize">{assignment.survey_period.replace('_', ' ')} Survey</span>
-            <span className="mx-2">•</span>
-            <span>{assignment.pilot_name}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'type',
-      header: 'Type',
-      render: (assignment: SurveyAssignment) => (
-        <div className="flex items-center">
-          <ChatBubbleLeftIcon className="h-5 w-5 text-gray-400 mr-2" />
-          <span className="capitalize">
-            {assignment.survey_type === 'volunteer' ? 'Volunteer Feedback' : assignment.survey_type}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'dueDate',
-      header: 'Due Date',
-      render: (assignment: SurveyAssignment) => (
-        <div className="flex items-center">
-          <CalendarIcon className="h-5 w-5 text-gray-400 mr-2" />
-          <span>
-            {assignment.due_date
-              ? new Date(assignment.due_date).toLocaleDateString()
-              : 'No due date'}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (assignment: SurveyAssignment) => (
-        <StatusBadge 
-          status={assignment.status === 'completed' ? 'completed' : 
-                 assignment.status === 'overdue' ? 'overdue' : 'pending'} 
-        />
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (assignment: SurveyAssignment) => {
-        const isOverdue = new Date(assignment.due_date || '') < new Date() && assignment.status !== 'completed';
-        const currentStatus = isOverdue ? 'overdue' : assignment.status;
-        
-        return (
-          <div className="flex space-x-2">
-            {currentStatus === 'completed' ? (
-              <>
-                <Button size="sm" variant="outline" disabled>
-                  <CheckCircleIcon className="h-4 w-4 mr-1" />
-                  Completed
-                </Button>
-                <Link href={`/volunteer/surveys/assignment/${assignment.id}/responses`}>
-                  <Button size="sm" variant="outline">
-                    View Responses
-                  </Button>
-                </Link>
-              </>
-            ) : currentStatus === 'pending' || currentStatus === 'overdue' ? (
-              <Link href={`/volunteer/surveys/assignment/${assignment.id}`}>
-                <Button size="sm" variant="default">
-                  {currentStatus === 'overdue' ? 'Complete Overdue Survey' : 'Take Survey'}
-                </Button>
-              </Link>
-            ) : (
-              <Button size="sm" variant="outline" disabled>
-                {assignment.status === 'locked' ? 'Locked' : 'Not Available'}
-              </Button>
-            )}
-          </div>
-        );
-      },
-    },
-  ];
+  // Filter assignments by type
+  const personalSurveys = assignments?.filter(
+    a => a.assignment_type === 'volunteer_personal'
+  ) || [];
+
+  const studentSurveys = assignments?.filter(
+    a => a.assignment_type === 'student_survey'
+  ) || [];
+
+  // Counts for display
+  const pendingPersonal = personalSurveys.filter(a => 
+    a.status !== 'completed' && (!a.due_date || new Date(a.due_date) > new Date())
+  ).length;
+
+  const pendingStudent = studentSurveys.filter(a => 
+    a.status !== 'completed' && (!a.due_date || new Date(a.due_date) > new Date())
+  ).length;
+
+  const overduePersonal = personalSurveys.filter(a => 
+    a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed'
+  ).length;
+
+  const overdueStudent = studentSurveys.filter(a => 
+    a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed'
+  ).length;
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <SkeletonLoader type="card" />
+          <SkeletonLoader type="card" />
+          <SkeletonLoader type="card" />
+        </div>
         <SkeletonLoader type="card" />
-        <SkeletonLoader type="table" />
+        <SkeletonLoader type="card" />
       </div>
     );
   }
@@ -144,93 +85,180 @@ export default function VolunteerFeedbackPage() {
         description="There was an error loading your surveys. Please try again."
         action={{
           label: 'Try Again',
-          onClick: () => window.location.reload(),
+          onClick: () => refetch(),
         }}
       />
     );
   }
 
-  const pendingAssignments = assignments?.filter(
-    (assignment) => assignment.status === 'pending' || 
-    (assignment.due_date && new Date(assignment.due_date) < new Date())
-  );
-
-  const completedAssignments = assignments?.filter(
-    (assignment) => assignment.status === 'completed'
-  );
-
-  const lockedAssignments = assignments?.filter(
-    (assignment) => assignment.status === 'locked'
-  );
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Volunteer Surveys</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Complete pre and post surveys to help us improve the volunteering program
-        </p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Volunteer Surveys</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Complete surveys to help us improve the volunteering program
+          </p>
+        </div>
+        
+        <div className="flex gap-3">
+          <Link href="/volunteer/surveys/submissions">
+            <Button variant="outline">
+              <DocumentTextIcon className="h-4 w-4 mr-2" />
+              My Submissions
+            </Button>
+          </Link>
+          
+          {(assignments?.length || 0) > 0 && (
+            <Button 
+              variant="default"
+              onClick={() => {
+                // Start the first pending survey
+                const firstPending = assignments?.find(a => a.status === 'assigned');
+                if (firstPending) {
+                  window.location.href = `/volunteer/surveys/assignment/${firstPending.id}`;
+                }
+              }}
+            >
+              Start Next Survey
+              <ArrowRightIcon className="h-4 w-4 ml-2" />
+            </Button>
+          )}
+        </div>
       </div>
 
-      {pendingAssignments && pendingAssignments.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Surveys to Complete ({pendingAssignments.length})
-            </h2>
-            {pendingAssignments.length > 0 && (
-              <p className="text-sm text-gray-500">
-                {pendingAssignments.filter(a => 
-                  a.due_date && new Date(a.due_date) < new Date()
-                ).length} overdue
-              </p>
-            )}
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Total Surveys</p>
+              <p className="text-2xl font-semibold text-gray-900">{assignments?.length || 0}</p>
+            </div>
+            <ChatBubbleLeftIcon className="h-8 w-8 text-blue-500" />
           </div>
-          <Card>
-            <DataTable
-              data={pendingAssignments}
-              columns={columns}
-              emptyMessage="No pending surveys"
-            />
-          </Card>
-        </div>
-      )}
+        </Card>
+        
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">To Complete</p>
+              <p className="text-2xl font-semibold text-gray-900">{pendingPersonal + pendingStudent}</p>
+            </div>
+            <div className="text-orange-500">
+              <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center">
+                <span className="text-sm font-semibold">{pendingPersonal + pendingStudent}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Overdue</p>
+              <p className="text-2xl font-semibold text-gray-900">{overduePersonal + overdueStudent}</p>
+            </div>
+            <div className="text-red-500">
+              <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                <span className="text-sm font-semibold">{overduePersonal + overdueStudent}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
 
-      {completedAssignments && completedAssignments.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Completed Surveys ({completedAssignments.length})
-          </h2>
-          <Card>
-            <DataTable
-              data={completedAssignments}
-              columns={columns}
-              emptyMessage="No completed surveys"
-            />
-          </Card>
+      {/* Personal Surveys Section */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Your Personal Surveys
+            </h2>
+            <p className="text-sm text-gray-500">
+              Surveys about your volunteer experience
+            </p>
+          </div>
+          {personalSurveys.length > 0 && (
+            <div className="text-sm text-gray-500">
+              {pendingPersonal} to do • {overduePersonal} overdue
+            </div>
+          )}
         </div>
-      )}
 
-      {lockedAssignments && lockedAssignments.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Locked Surveys ({lockedAssignments.length})
-          </h2>
-          <Card>
-            <DataTable
-              data={lockedAssignments}
-              columns={columns}
-              emptyMessage="No locked surveys"
-            />
-          </Card>
+        {personalSurveys.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {personalSurveys.map((assignment) => (
+              <SurveyCard
+                key={assignment.id}
+                assignment={assignment}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 bg-gray-50 rounded-lg">
+            <ChatBubbleLeftIcon className="h-12 w-12 text-gray-400 mx-auto" />
+            <h3 className="mt-4 text-sm font-medium text-gray-900">
+              No personal surveys
+            </h3>
+            <p className="mt-2 text-sm text-gray-500">
+              You don't have any personal surveys assigned at the moment.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Student Activity Surveys Section */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Student Activity Surveys
+            </h2>
+            <p className="text-sm text-gray-500">
+              Surveys about student activities in your assigned pilot
+            </p>
+          </div>
+          {studentSurveys.length > 0 && (
+            <div className="text-sm text-gray-500">
+              {pendingStudent} to do • {overdueStudent} overdue
+            </div>
+          )}
         </div>
-      )}
 
+        {studentSurveys.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {studentSurveys.map((assignment) => (
+              <SurveyCard
+                key={assignment.id}
+                assignment={assignment}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 bg-gray-50 rounded-lg">
+            <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto" />
+            <h3 className="mt-4 text-sm font-medium text-gray-900">
+              No student surveys
+            </h3>
+            <p className="mt-2 text-sm text-gray-500">
+              You don't have any student activity surveys assigned at the moment.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* No Surveys State */}
       {(!assignments || assignments.length === 0) && (
         <EmptyState
           icon={<ChatBubbleLeftIcon className="h-12 w-12 text-gray-400" />}
           title="No surveys available"
           description="You don't have any surveys to complete at the moment. Surveys will be assigned when you join a pilot or complete activities."
+          action={{
+            label: 'Join a Pilot',
+            onClick: () => window.location.href = '/volunteer/pilots',
+          }}
         />
       )}
     </div>

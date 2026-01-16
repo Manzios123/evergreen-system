@@ -58,7 +58,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
 
   const { data: assignmentData, isLoading, error } = useApiQuery<SurveyAssignment>(
     ['survey-assignment', params.id],
-    () => api.get<SurveyAssignment>(`/survey-assignments/${params.id}`),
+    () => api.get<SurveyAssignment>(`/survey-assignments/a70461d7-fcc9-4446-825d-8fc53ea17caf`),
     {
       enabled: !!params.id,
     }

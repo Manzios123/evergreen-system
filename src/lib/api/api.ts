@@ -25,7 +25,6 @@ export const apiRequest = async <T>(
   const headers: HeadersInit = {};
   
   // Only set Content-Type for JSON, not for FormData
-  // Also handle when body is FormData or when we have no body
   if (options.body && !(options.body instanceof FormData)) {
     if (typeof options.body === 'string') {
       headers['Content-Type'] = 'application/json';
@@ -68,7 +67,7 @@ export const apiRequest = async <T>(
         // Clear invalid token
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
-          // Optional: Redirect to login page
+          // Optional: Trigger auth refresh or redirect
           // window.location.href = '/login';
         }
       }
@@ -141,12 +140,12 @@ export const api = {
   delete: <T>(endpoint: string, params?: Record<string, any>) =>
     apiRequest<T>(endpoint, { method: 'DELETE' }, params),
 
-  // For file uploads (legacy method - can use post instead)
-  upload: <T>(endpoint: string, formData: FormData) =>
+  // For file uploads
+  upload: <T>(endpoint: string, formData: FormData, params?: Record<string, any>) =>
     apiRequest<T>(endpoint, {
       method: 'POST',
       body: formData,
-    }),
+    }, params),
 };
 
 // Token management helper functions

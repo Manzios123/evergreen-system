@@ -30,48 +30,34 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
     try {
       // Validate responses
       const requiredQuestions = survey.template.questions.filter((q: any) => q.is_required);
-      const missingRequired = requiredQuestions.filter((q: any) => !responses[q.id]);
+      const missingRequired = requiredQuestions.filter((q: any) => {
+        const response = responses[q.id];
+        return response === undefined || response === null || response === '';
+      });
       
       if (missingRequired.length > 0) {
-        setError(`Please answer all required questions: ${missingRequired.map((q: any) => q.order_index + 1).join(', ')}`);
+        setError(`Please answer all required questions: ${missingRequired.map((q: any, i: number) => i + 1).join(', ')}`);
         setIsSubmitting(false);
         return;
       }
 
-      // Prepare submission data
-      let endpoint = '';
-      let payload: any = {};
-
-      if (surveyType === 'volunteer') {
-        endpoint = `/survey-responses/volunteer`;
-        payload = {
-          assignment_id: assignmentId,
-          survey_template_id: survey.template.id,
-          pilot_id: survey.template.pilot_id,
-          responses: responses
-        };
-      } else if (surveyType === 'student') {
-        endpoint = `/survey-responses/student`;
-        payload = {
-          assignment_id: assignmentId,
-          pilot_id: survey.template.pilot_id,
-          survey_template_id: survey.template.id,
-          total_students: totalStudents,
-          responses: responses,
-          is_aggregated: true // Flag for aggregated responses
-        };
+      // Prepare submission data for student surveys
+      let finalResponses = { ...responses };
+      if (surveyType === 'student_survey' && totalStudents > 0) {
+        finalResponses.total_students = totalStudents;
       }
 
-      const result = await api.post(endpoint, payload);
+      // Submit response using the new endpoint
+      const payload = {
+        assignment_id: assignmentId,
+        responses: finalResponses
+      };
+
+      const result = await api.post('/survey-assignments/submit-response', payload);
 
       if (result) {
-        // Mark assignment as completed
-        await api.put(`/survey-assignments/${assignmentId}`, {
-          status: 'completed'
-        });
-
         onComplete();
-        router.refresh();
+        // Let the parent component handle navigation
       }
     } catch (err: any) {
       setError(err.message || 'Failed to submit survey');
@@ -96,6 +82,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                 checked={value === 'agree'}
                 onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
                 className="h-4 w-4 text-blue-600"
+                disabled={isSubmitting}
               />
               <span className="ml-2">Agree (Ndabyemera)</span>
             </label>
@@ -107,6 +94,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                 checked={value === 'disagree'}
                 onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
                 className="h-4 w-4 text-blue-600"
+                disabled={isSubmitting}
               />
               <span className="ml-2">Disagree (Simbyemera)</span>
             </label>
@@ -118,6 +106,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                 checked={value === 'unsure'}
                 onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
                 className="h-4 w-4 text-blue-600"
+                disabled={isSubmitting}
               />
               <span className="ml-2">Unsure (Simbizi neza)</span>
             </label>
@@ -128,7 +117,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
         return (
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-500">1 (Extremely)</span>
-            <div className="flex-1 flex justify-between">
+            <div className="flex-1 flex justify-between px-2">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
                 <label key={num} className="inline-flex flex-col items-center">
                   <input
@@ -138,6 +127,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                     checked={value === num}
                     onChange={(e) => setResponses({...responses, [question.id]: parseInt(e.target.value)})}
                     className="h-4 w-4 text-blue-600"
+                    disabled={isSubmitting}
                   />
                   <span className="text-xs mt-1">{num}</span>
                 </label>
@@ -155,6 +145,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
             onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
             className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Enter your response..."
+            disabled={isSubmitting}
           />
         );
     }
@@ -169,7 +160,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       )}
 
       {/* Student survey specific fields */}
-      {surveyType === 'student' && (
+      {surveyType === 'student_survey' && (
         <div className="bg-blue-50 p-4 rounded-lg">
           <h3 className="font-medium text-blue-900 mb-2">Student Survey Information</h3>
           <div className="mb-4">
@@ -183,6 +174,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
               onChange={(e) => setTotalStudents(parseInt(e.target.value) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               required
+              disabled={isSubmitting}
             />
           </div>
           <p className="text-sm text-blue-700">
@@ -218,6 +210,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
           type="submit"
           variant="default"
           disabled={isSubmitting}
+          className="min-w-30"
         >
           {isSubmitting ? 'Submitting...' : 'Submit Survey'}
         </Button>
