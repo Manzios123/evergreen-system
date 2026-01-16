@@ -16,8 +16,8 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react'; // Added
+import { useRouter, useParams } from 'next/navigation'; // Added useParams
+import { useEffect, useState } from 'react';
 
 interface SurveyQuestion {
   id: string;
@@ -64,14 +64,25 @@ interface SurveyAssignmentPageProps {
 
 export default function SurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
   const router = useRouter();
+  // Get params from hook for client-side rendering
+  const urlParams = useParams();
   const [surveyData, setSurveyData] = useState<any>(null);
+  
+  // Use params from props or from useParams hook (client-side)
+  const assignmentId = params?.id || (urlParams?.id as string);
 
-  // FIX: Use the dynamic params.id instead of hardcoded ID
+  // FIX: Use the dynamic assignmentId with proper null checking
   const { data: apiResponse, isLoading, error } = useApiQuery<AssignmentResponse>(
-    ['survey-assignment', params.id],
-    () => api.get<AssignmentResponse>(`/survey-assignments/${params.id}`), // Changed from hardcoded ID
+    ['survey-assignment', assignmentId],
+    () => {
+      if (!assignmentId) {
+        // Return a rejected promise to prevent the API call
+        return Promise.reject(new Error('Missing assignment ID'));
+      }
+      return api.get<AssignmentResponse>(`/survey-assignments/${assignmentId}`);
+    },
     {
-      enabled: !!params.id,
+      enabled: !!assignmentId, // Only enable when assignmentId exists
     }
   );
 
@@ -79,7 +90,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     // Transform the API response to match SurveyForm expectations
     if (apiResponse) {
       const transformedData = {
-        id: apiResponse.assignment?.id || params.id,
+        id: apiResponse.assignment?.id || assignmentId,
         title: apiResponse.assignment?.survey_name || 'Survey',
         description: apiResponse.assignment?.survey_description || '',
         due_date: apiResponse.assignment?.due_date || null,
@@ -100,14 +111,15 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
       };
       setSurveyData(transformedData);
     }
-  }, [apiResponse, params.id]);
+  }, [apiResponse, assignmentId]);
 
   const handleComplete = () => {
     router.push('/volunteer/surveys/volunteer');
     router.refresh();
   };
 
-  if (isLoading) {
+  // Show loading state if still getting the ID or fetching data
+  if (!assignmentId || isLoading) {
     return (
       <div className="max-w-3xl mx-auto">
         <SkeletonLoader type="card" />
@@ -146,7 +158,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
           <div className="mt-4">
             <Button 
               variant="outline"
-              onClick={() => router.push(`/volunteer/surveys/assignment/${params.id}/responses`)}
+              onClick={() => router.push(`/volunteer/surveys/assignment/${assignmentId}/responses`)}
             >
               View Responses
             </Button>
@@ -313,7 +325,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
             <SurveyForm 
               survey={surveyData} 
               onComplete={handleComplete}
-              assignmentId={params.id}
+              assignmentId={assignmentId}
               surveyType={assignment.survey_type}
             />
           ) : (

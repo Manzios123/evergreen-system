@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Button from '@/components/ui/button';
+import Alert from '@/components/ui/alert'; // Added Alert import
 import { api } from '@/lib/api/api';
 import { useRouter } from 'next/navigation';
 
@@ -16,6 +17,7 @@ interface SurveyFormProps {
 export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: SurveyFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // For student surveys, we need to track aggregated responses
@@ -26,7 +28,18 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   useEffect(() => {
     console.log('SurveyForm received survey:', survey);
     console.log('Survey questions:', survey?.template?.questions);
-  }, [survey]);
+    
+    // Initialize responses state with empty values for all questions
+    const questions = getQuestions();
+    if (questions.length > 0 && !isInitialized) {
+      const initialResponses: Record<string, any> = {};
+      questions.forEach((question: any) => {
+        initialResponses[question.id] = '';
+      });
+      setResponses(initialResponses);
+      setIsInitialized(true);
+    }
+  }, [survey, isInitialized]);
 
   // Get questions from the survey object
   const getQuestions = () => {
@@ -51,6 +64,15 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
     setError(null);
 
     try {
+      // Additional validation for student surveys
+      if (surveyType === 'student') {
+        if (totalStudents <= 0) {
+          setError('Please enter a valid number of students (at least 1).');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Validate responses
       const requiredQuestions = questions.filter((q: any) => q.is_required);
       const missingRequired = requiredQuestions.filter((q: any) => {
@@ -66,7 +88,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
 
       // Prepare submission data for student surveys
       let finalResponses = { ...responses };
-      if (surveyType === 'student' && totalStudents > 0) { // Changed from 'student_survey' to 'student'
+      if (surveyType === 'student' && totalStudents > 0) {
         finalResponses.total_students = totalStudents;
       }
 
@@ -195,10 +217,12 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   if (!questions || questions.length === 0) {
     return (
       <div className="text-center p-8">
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
-          <h3 className="font-medium mb-2">No questions available</h3>
+        <Alert
+          type="warning"
+          title="No questions available"
+        >
           <p>This survey doesn't have any questions configured.</p>
-        </div>
+        </Alert>
         <Button
           onClick={() => router.push('/volunteer/surveys/volunteer')}
           variant="outline"
@@ -213,13 +237,16 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          <strong className="font-medium">Error:</strong> {error}
-        </div>
+        <Alert
+          type="error"
+          title="Submission Error"
+        >
+          {error}
+        </Alert>
       )}
 
       {/* Student survey specific fields */}
-      {surveyType === 'student' && ( // Changed from 'student_survey' to 'student'
+      {surveyType === 'student' && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
           <h3 className="font-medium text-blue-900 mb-2">Student Survey Information</h3>
           <div className="mb-4">
@@ -229,6 +256,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
             <input
               type="number"
               min="1"
+              max="100"
               value={totalStudents}
               onChange={(e) => setTotalStudents(parseInt(e.target.value) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
