@@ -12,16 +12,9 @@ interface SurveyFormProps {
   onComplete: () => void;
   assignmentId: string;
   surveyType: string;
-  submissionCount?: number;
 }
 
-export function SurveyForm({ 
-  survey, 
-  onComplete, 
-  assignmentId, 
-  surveyType, 
-  submissionCount = 0 
-}: SurveyFormProps) {
+export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: SurveyFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -36,7 +29,6 @@ export function SurveyForm({
       survey, 
       assignmentId, 
       surveyType,
-      submissionCount,
       hasQuestions: survey?.template?.questions?.length || survey?.questions?.length 
     });
     
@@ -44,23 +36,7 @@ export function SurveyForm({
     if (questions.length > 0 && !isInitialized) {
       const initialResponses: Record<string, any> = {};
       questions.forEach((question: any) => {
-        // Initialize based on question type
-        switch (question.question_type) {
-          case 'agree_disagree_unsure':
-            initialResponses[question.id] = '';
-            break;
-          case 'scale_1_10':
-            initialResponses[question.id] = '';
-            break;
-          case 'multiple_choice':
-            initialResponses[question.id] = '';
-            break;
-          case 'multiple_select':
-            initialResponses[question.id] = [];
-            break;
-          default:
-            initialResponses[question.id] = '';
-        }
+        initialResponses[question.id] = '';
       });
       setResponses(initialResponses);
       setIsInitialized(true);
@@ -90,8 +66,8 @@ export function SurveyForm({
     try {
       // Additional validation for student surveys
       if (surveyType === 'student') {
-        if (totalStudents <= 0 || totalStudents > 1000) {
-          setError('Please enter a valid number of students (1-1000).');
+        if (totalStudents <= 0 || totalStudents > 100) {
+          setError('Please enter a valid number of students (1-100).');
           setIsSubmitting(false);
           return;
         }
@@ -101,53 +77,48 @@ export function SurveyForm({
       const requiredQuestions = questions.filter((q: any) => q.is_required);
       const missingRequired = requiredQuestions.filter((q: any) => {
         const response = responses[q.id];
-        return response === undefined || 
-               response === null || 
-               response === '' || 
-               (Array.isArray(response) && response.length === 0);
+        return response === undefined || response === null || response === '' || (Array.isArray(response) && response.length === 0);
       });
       
       if (missingRequired.length > 0) {
-        setError(`Please answer all required questions: ${missingRequired.map((q: any) => 
-          questions.findIndex((question: any) => question.id === q.id) + 1
-        ).join(', ')}`);
+        setError(`Please answer all required questions: ${missingRequired.map((q: any, index: number) => questions.indexOf(q) + 1).join(', ')}`);
         setIsSubmitting(false);
         return;
       }
 
       // Prepare final responses
       let finalResponses = { ...responses };
-      
-      // For student surveys, add total_students
-      if (surveyType === 'student') {
+      if (surveyType === 'student' && totalStudents > 0) {
         finalResponses.total_students = totalStudents;
       }
 
-      console.log('Submitting survey payload:', {
-        assignment_id: assignmentId,
-        responses: finalResponses
-      });
-
       // Submit response
-      const result = await api.post('/survey-assignments/submit-response', {
+      const payload = {
         assignment_id: assignmentId,
         responses: finalResponses
-      });
+      };
+
+      console.log('Submitting survey payload:', payload);
+
+      const result = await api.post('/survey-assignments/submit-response', payload);
       
       console.log('Survey submitted successfully:', result);
       
-      // Show success message
-      setTimeout(() => {
-        onComplete();
-      }, 1000);
+      // Call onComplete which will refresh the page and redirect
+      onComplete();
       
     } catch (err: any) {
       console.error('Survey submission error:', err);
       
       let errorMessage = 'Failed to submit survey. Please try again.';
       
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
+      if (err.response) {
+        try {
+          const errorData = await err.response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (parseError) {
+          errorMessage = err.message || errorMessage;
+        }
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -236,67 +207,6 @@ export function SurveyForm({
           </div>
         );
 
-      case 'multiple_choice':
-        let options: string[] = [];
-        try {
-          options = question.options ? JSON.parse(question.options) : [];
-        } catch (e) {
-          console.error('Error parsing options:', e);
-          options = [];
-        }
-        
-        return (
-          <div className="space-y-2">
-            {options.map((option: string, idx: number) => (
-              <label key={idx} className="inline-flex items-center mr-4">
-                <input
-                  type="radio"
-                  name={`question-${question.id}`}
-                  value={option}
-                  checked={value === option}
-                  onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
-                  className="h-4 w-4 text-blue-600"
-                  disabled={isSubmitting}
-                  required={question.is_required}
-                />
-                <span className="ml-2">{option}</span>
-              </label>
-            ))}
-          </div>
-        );
-
-      case 'multiple_select':
-        let selectOptions: string[] = [];
-        try {
-          selectOptions = question.options ? JSON.parse(question.options) : [];
-        } catch (e) {
-          console.error('Error parsing options:', e);
-          selectOptions = [];
-        }
-        
-        return (
-          <div className="space-y-2">
-            {selectOptions.map((option: string, idx: number) => (
-              <label key={idx} className="flex items-center">
-                <input
-                  type="checkbox"
-                  value={option}
-                  checked={Array.isArray(value) && value.includes(option)}
-                  onChange={(e) => {
-                    const newValue = e.target.checked
-                      ? [...(Array.isArray(value) ? value : []), option]
-                      : (Array.isArray(value) ? value.filter(v => v !== option) : []);
-                    setResponses({...responses, [question.id]: newValue});
-                  }}
-                  className="h-4 w-4 text-blue-600 rounded"
-                  disabled={isSubmitting}
-                />
-                <span className="ml-2">{option}</span>
-              </label>
-            ))}
-          </div>
-        );
-
       case 'text':
       default:
         return (
@@ -311,7 +221,7 @@ export function SurveyForm({
               rows={4}
             />
             <p className="text-xs text-gray-500 mt-1">
-              {question.question_type === 'text' ? 'Please provide a detailed response.' : ''}
+              Please provide a detailed response.
             </p>
           </div>
         );
@@ -350,49 +260,34 @@ export function SurveyForm({
         </Alert>
       )}
 
-      {/* Submission info for student surveys */}
-      {surveyType === 'student' && submissionCount > 0 && (
-        <Alert
-          type="info"
-          title="Additional Submission"
-        >
-          <p className="mt-2">
-            This will be submission #{submissionCount + 1} for this student survey.
-            Enter data from your latest student session.
-          </p>
-        </Alert>
-      )}
-
       {/* Student survey specific fields */}
       {surveyType === 'student' && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
           <h3 className="font-medium text-blue-900 mb-2">Student Survey Information</h3>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Total Number of Students in This Session
+              Total Number of Students
             </label>
             <input
               type="number"
               min="1"
-              max="1000"
-              value={totalStudents || ''}
+              max="100"
+              value={totalStudents}
               onChange={(e) => setTotalStudents(parseInt(e.target.value) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               required={surveyType === 'student'}
               disabled={isSubmitting}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Enter the number of students who participated in this specific session.
+              Enter the total number of students who participated in this activity.
             </p>
           </div>
           <div className="text-sm text-blue-700 bg-blue-100 p-3 rounded">
-            <p className="font-medium mb-1">Instructions for Student Surveys:</p>
+            <p className="font-medium mb-1">Instructions:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Collect responses from all students in this session</li>
-              <li>For each question, enter the aggregated results</li>
-              <li>Example: If 15 out of 20 students agree, select "Agree"</li>
-              <li>For text questions, summarize common student responses</li>
-              <li>You can submit multiple times for different sessions</li>
+              <li>For each question below, enter the aggregated results from all students.</li>
+              <li>For agree/disagree questions, enter the counts for each option.</li>
+              <li>For text questions, summarize the common responses from students.</li>
             </ul>
           </div>
         </div>
@@ -412,7 +307,7 @@ export function SurveyForm({
               </label>
             </div>
             {question.is_required && (
-              <p className="text-sm text-gray-500 mb-3">Required</p>
+              <p className="text-sm text-gray-500 mb-3">This question is required</p>
             )}
             {renderQuestionField(question, index)}
           </div>
@@ -424,11 +319,6 @@ export function SurveyForm({
           <p className="text-sm text-gray-500">
             {questions.filter((q: any) => q.is_required).length} required questions
           </p>
-          {surveyType === 'student' && submissionCount > 0 && (
-            <p className="text-sm text-blue-600 mt-1">
-              Previous submissions: {submissionCount}
-            </p>
-          )}
         </div>
         <div className="flex space-x-3">
           <Button
@@ -451,8 +341,6 @@ export function SurveyForm({
                 <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
                 Submitting...
               </>
-            ) : surveyType === 'student' && submissionCount > 0 ? (
-              'Submit Additional Data'
             ) : (
               'Submit Survey'
             )}

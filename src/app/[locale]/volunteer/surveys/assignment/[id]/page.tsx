@@ -14,7 +14,6 @@ import {
   ChatBubbleLeftIcon,
   CalendarIcon,
   ClockIcon,
-  DocumentDuplicateIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
@@ -25,7 +24,7 @@ interface SurveyQuestion {
   question_text: string;
   question_type: string;
   order_index: number;
-  is_required: number;
+  is_required: number; // Changed from boolean to number (1/0)
   options?: string;
   validation_rules?: string;
 }
@@ -45,7 +44,6 @@ interface SurveyAssignment {
   volunteer_name: string;
   completed: boolean;
   completed_at: string | null;
-  submission_count?: number;
   questions: SurveyQuestion[];
 }
 
@@ -56,7 +54,6 @@ interface AssignmentResponse {
   completed_at: string | null;
   response_id: string | null;
   can_edit: boolean;
-  submission_count: number;
 }
 
 interface SurveyAssignmentPageProps {
@@ -69,26 +66,27 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
   const router = useRouter();
   const urlParams = useParams();
   const [surveyData, setSurveyData] = useState<any>(null);
-  const [isResubmitting, setIsResubmitting] = useState(false);
-  const [showForm, setShowForm] = useState(true);
   
+  // Use params from props or from useParams hook (client-side)
   const assignmentId = params?.id || (urlParams?.id as string);
 
+  // FIX: Use the dynamic assignmentId with proper null checking
   const { data: apiResponse, isLoading, error, refetch } = useApiQuery<AssignmentResponse>(
     ['survey-assignment', assignmentId],
     () => {
       if (!assignmentId) {
+        // Return a rejected promise to prevent the API call
         return Promise.reject(new Error('Missing assignment ID'));
       }
       return api.get<AssignmentResponse>(`/survey-assignments/${assignmentId}`);
     },
     {
-      enabled: !!assignmentId,
-      refetchOnMount: true,
+      enabled: !!assignmentId, // Only enable when assignmentId exists
     }
   );
 
   useEffect(() => {
+    // Transform the API response to match SurveyForm expectations
     if (apiResponse) {
       console.log('API Response received:', apiResponse);
       
@@ -99,48 +97,30 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
         due_date: apiResponse.assignment?.due_date || null,
         status: apiResponse.assignment?.status || 'assigned',
         type: apiResponse.assignment?.survey_type || 'volunteer',
-        completed: Boolean(apiResponse.completed),
+        completed: apiResponse.completed || false,
         completed_at: apiResponse.completed_at || null,
-        submission_count: apiResponse.submission_count || 0,
         template: {
           id: apiResponse.assignment?.survey_template_id || '',
           type: apiResponse.assignment?.survey_type || 'volunteer',
           description: apiResponse.assignment?.survey_description || '',
+          // Convert is_required from number (1/0) to boolean
           questions: (apiResponse.questions || []).map((q: SurveyQuestion) => ({
             ...q,
-            is_required: q.is_required === 1,
+            is_required: q.is_required === 1, // Convert to boolean
           })),
         }
       };
       setSurveyData(transformedData);
-      
-      // Auto-show form for student surveys even if completed
-      const isStudentSurvey = apiResponse.assignment?.survey_type === 'student';
-      const isCompleted = Boolean(apiResponse.completed);
-      
-      if (isStudentSurvey && isCompleted) {
-        setShowForm(true); // Always show form for student surveys
-      } else if (isCompleted) {
-        setShowForm(false); // Hide form for completed volunteer surveys
-      } else {
-        setShowForm(true); // Show form for incomplete surveys
-      }
     }
   }, [apiResponse, assignmentId]);
 
   const handleComplete = () => {
-    // Refresh the data to show updated submission count
+    // Refresh the data to show completion status
     refetch();
-    // Show success message
+    // Redirect after a short delay to show success message
     setTimeout(() => {
-      const isStudentSurvey = apiResponse?.assignment?.survey_type === 'student';
-      if (isStudentSurvey) {
-        setIsResubmitting(false);
-        alert(`Survey submitted successfully! Total submissions: ${(apiResponse?.submission_count || 0) + 1}`);
-      } else {
-        router.push('/volunteer/surveys/volunteer');
-        router.refresh();
-      }
+      router.push('/volunteer/surveys/volunteer');
+      router.refresh();
     }, 1500);
   };
 
@@ -193,15 +173,8 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  const assignment = apiResponse.assignment;
-  const isOverdue = assignment.due_date && new Date(assignment.due_date) < new Date();
-  const isVolunteerSurvey = assignment.survey_type === 'volunteer';
-  const isStudentSurvey = assignment.survey_type === 'student';
-  const isCompleted = Boolean(apiResponse.completed);
-  const submissionCount = apiResponse.submission_count || 0;
-
-  // For completed volunteer surveys, show completed message
-  if (isVolunteerSurvey && isCompleted && !showForm) {
+  // Check if survey is completed
+  if (apiResponse.completed) {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <Alert
@@ -242,53 +215,8 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  // For completed student surveys, show info message but allow form access
-  if (isStudentSurvey && isCompleted && !isResubmitting) {
-    return (
-      <div className="max-w-3xl mx-auto space-y-6">
-        <Alert
-          type="info"
-          title="Student Survey - Additional Submission Available"
-        >
-          <p className="mt-2">
-            You have already submitted this student survey {submissionCount} time(s).
-            Student surveys can be submitted multiple times for different student groups or sessions.
-          </p>
-          <div className="mt-4 flex gap-3">
-            <Button 
-              variant="outline"
-              onClick={() => router.push(`/volunteer/surveys/submissions`)}
-            >
-              View My Submissions
-            </Button>
-            <Button 
-              variant="default"
-              onClick={() => setIsResubmitting(true)}
-            >
-              <DocumentDuplicateIcon className="h-4 w-4 mr-2" />
-              Submit Additional Data
-            </Button>
-          </div>
-        </Alert>
-        
-        {isResubmitting && (
-          <Card>
-            <div className="p-6">
-              <SurveyForm 
-                survey={surveyData} 
-                onComplete={handleComplete}
-                assignmentId={assignmentId}
-                surveyType={assignment.survey_type}
-              />
-            </div>
-          </Card>
-        )}
-      </div>
-    );
-  }
-
   // Check if user can edit
-  if (!apiResponse.can_edit && !isStudentSurvey) {
+  if (!apiResponse.can_edit) {
     return (
       <div className="max-w-3xl mx-auto">
         <Alert
@@ -306,6 +234,11 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
       </div>
     );
   }
+
+  const assignment = apiResponse.assignment;
+  const isOverdue = assignment.due_date && new Date(assignment.due_date) < new Date();
+  const isVolunteerSurvey = assignment.survey_type === 'volunteer';
+  const isStudentSurvey = assignment.survey_type === 'student';
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -335,18 +268,11 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
               {assignment.survey_description || `Please complete this ${assignment.survey_period.replace('_', ' ')} survey`}
             </p>
           </div>
-          <div className="flex flex-col items-end space-y-2">
-            {isOverdue && (
-              <span className="inline-flex items-center rounded-md bg-red-50 px-3 py-1 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
-                Overdue
-              </span>
-            )}
-            {isStudentSurvey && submissionCount > 0 && (
-              <span className="inline-flex items-center rounded-md bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
-                Submission #{submissionCount + 1}
-              </span>
-            )}
-          </div>
+          {isOverdue && (
+            <span className="inline-flex items-center rounded-md bg-red-50 px-3 py-1 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+              Overdue
+            </span>
+          )}
         </div>
 
         {/* Survey Info */}
@@ -377,7 +303,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
             <div className="flex items-center">
               <ClockIcon className="h-4 w-4 text-gray-400 mr-2" />
               <p className="text-sm font-medium text-gray-500">
-                {isStudentSurvey ? 'Time per Session' : 'Estimated Time'}
+                Estimated Time
               </p>
             </div>
             <p className="mt-1 text-sm text-gray-900">
@@ -390,60 +316,55 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
       </div>
 
       {/* Survey Form */}
-      {showForm && (
-        <Card>
-          <div className="p-6">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {isStudentSurvey && submissionCount > 0 ? 'Additional Survey Submission' : 'Complete Survey'}
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                {isStudentSurvey && submissionCount > 0
-                  ? `This will be submission #${submissionCount + 1}. Enter data from your latest student session.`
-                  : 'Please answer all questions honestly. Your feedback is valuable!'}
-              </p>
-            </div>
-
-            {isOverdue && (
-              <Alert
-                type="warning"
-                title="This survey is overdue"
-              >
-                <p className="mt-2">Please complete this survey as soon as possible. Your feedback is still important to us.</p>
-              </Alert>
-            )}
-
-            {isStudentSurvey && submissionCount > 0 && (
-              <Alert
-                type="info"
-                title="Multiple Submissions Allowed"
-              >
-                <p className="mt-2">
-                  This is a student survey. You have already submitted {submissionCount} time(s). 
-                  You can submit additional data for different student groups or sessions.
-                </p>
-              </Alert>
-            )}
-
-            {surveyData && apiResponse.questions && apiResponse.questions.length > 0 ? (
-              <SurveyForm 
-                survey={surveyData} 
-                onComplete={handleComplete}
-                assignmentId={assignmentId}
-                surveyType={assignment.survey_type}
-                submissionCount={submissionCount}
-              />
-            ) : (
-              <Alert
-                type="error"
-                title="No questions found"
-              >
-                <p className="mt-2">This survey doesn't have any questions configured. Please contact the administrator.</p>
-              </Alert>
-            )}
+      <Card>
+        <div className="p-6">
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Complete Survey
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Please answer all questions honestly. Your feedback is valuable!
+            </p>
           </div>
-        </Card>
-      )}
+
+          {isOverdue && (
+            <Alert
+              type="warning"
+              title="This survey is overdue"
+            >
+              <p className="mt-2">Please complete this survey as soon as possible. Your feedback is still important to us.</p>
+            </Alert>
+          )}
+
+          {isStudentSurvey && (
+            <Alert
+              type="info"
+              title="Student Survey Instructions"
+            >
+              <p className="mt-2">
+                This is a student survey. Please collect responses from students and enter the aggregated results below.
+                You can write questions on the board and record votes, or collect individual student responses.
+              </p>
+            </Alert>
+          )}
+
+          {surveyData && apiResponse.questions && apiResponse.questions.length > 0 ? (
+            <SurveyForm 
+              survey={surveyData} 
+              onComplete={handleComplete}
+              assignmentId={assignmentId}
+              surveyType={assignment.survey_type}
+            />
+          ) : (
+            <Alert
+              type="error"
+              title="No questions found"
+            >
+              <p className="mt-2">This survey doesn't have any questions configured. Please contact the administrator.</p>
+            </Alert>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

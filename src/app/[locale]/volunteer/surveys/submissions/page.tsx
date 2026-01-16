@@ -1,7 +1,7 @@
 // app/[locale]/volunteer/surveys/submissions/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import EmptyState from '@/components/ui/empty-state';
@@ -14,9 +14,7 @@ import {
   ArrowLeftIcon,
   EyeIcon,
   CalendarIcon,
-  ClipboardDocumentCheckIcon,
-  DocumentDuplicateIcon,
-  UsersIcon
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -25,7 +23,7 @@ interface Submission {
   id: string;
   assignment_id: string;
   submitted_at: string;
-  total_students: number;
+  responses: Record<string, any>;
   assignment?: {
     survey_name: string;
     survey_description: string;
@@ -39,7 +37,6 @@ interface Submission {
 export default function MySubmissionsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'all' | 'personal' | 'student'>('all');
-  const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
 
   // Fetch assignments to get completed ones
   const { data: assignments, isLoading: assignmentsLoading } = useApiQuery<any[]>(
@@ -53,53 +50,46 @@ export default function MySubmissionsPage() {
     () => api.get<any[]>('/survey-assignments/student-responses')
   );
 
-  useEffect(() => {
-    if (assignments && studentResponses) {
-      // Get completed assignments
-      const completedAssignments = assignments.filter(a => 
-        a.completed === 1 || a.completed === true || a.status === 'completed'
-      ) || [];
-      
-      // Transform student responses to match Submission interface
-      const transformedStudentResponses = (studentResponses || []).map(r => ({
-        id: r.id,
-        assignment_id: r.assignment_id,
-        submitted_at: r.submitted_at,
-        total_students: r.total_students || 0,
-        assignment: {
-          survey_name: r.survey_name,
-          survey_description: r.survey_description,
-          survey_type: 'student',
-          survey_period: r.survey_period,
-          pilot_name: '', // Will be populated from assignment data
-          assignment_type: 'student_survey'
-        }
-      }));
-
-      // Combine all submissions
-      const combined = [
-        ...completedAssignments.map(a => ({
-          id: a.id,
-          assignment_id: a.id,
-          submitted_at: a.completed_at || a.updated_at,
-          total_students: 0,
-          assignment: {
-            survey_name: a.survey_name,
-            survey_description: a.survey_description,
-            survey_type: a.survey_type,
-            survey_period: a.survey_period,
-            pilot_name: a.pilot_name,
-            assignment_type: a.assignment_type
-          }
-        })),
-        ...transformedStudentResponses
-      ].sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
-
-      setAllSubmissions(combined);
-    }
-  }, [assignments, studentResponses]);
-
   const isLoading = assignmentsLoading || studentResponsesLoading;
+
+  // Get completed assignments
+  const completedAssignments = assignments?.filter(a => a.status === 'completed') || [];
+  
+  // Group completed assignments
+  const completedPersonal = completedAssignments.filter(a => a.assignment_type === 'volunteer_personal');
+  const completedStudent = completedAssignments.filter(a => a.assignment_type === 'student_survey');
+
+  // Combine with student responses for display
+  const allSubmissions = [
+    ...completedPersonal.map(a => ({
+      id: a.id,
+      assignment_id: a.id,
+      submitted_at: a.completed_at || a.updated_at,
+      responses: {},
+      assignment: {
+        survey_name: a.survey_name,
+        survey_description: a.survey_description,
+        survey_type: a.survey_type,
+        survey_period: a.survey_period,
+        pilot_name: a.pilot_name,
+        assignment_type: a.assignment_type
+      }
+    })),
+    ...(studentResponses || []).map(r => ({
+      id: r.id,
+      assignment_id: r.assignment_id,
+      submitted_at: r.submitted_at,
+      responses: r.responses,
+      assignment: {
+        survey_name: r.survey_name,
+        survey_description: r.survey_description,
+        survey_type: 'student',
+        survey_period: r.survey_period,
+        pilot_name: '',
+        assignment_type: 'student_survey'
+      }
+    }))
+  ].sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
 
   // Filter submissions based on active tab
   const filteredSubmissions = allSubmissions.filter(submission => {
@@ -125,9 +115,6 @@ export default function MySubmissionsPage() {
   const totalSubmissions = allSubmissions.length;
   const personalCount = allSubmissions.filter(s => s.assignment?.assignment_type === 'volunteer_personal').length;
   const studentCount = allSubmissions.filter(s => s.assignment?.assignment_type === 'student_survey').length;
-  const totalStudentEntries = allSubmissions
-    .filter(s => s.assignment?.assignment_type === 'student_survey')
-    .reduce((total, s) => total + (s.total_students || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -159,7 +146,7 @@ export default function MySubmissionsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center">
             <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
@@ -192,18 +179,6 @@ export default function MySubmissionsPage() {
             <div>
               <p className="text-sm font-medium text-gray-500">Student Surveys</p>
               <p className="text-2xl font-semibold text-gray-900">{studentCount}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center">
-            <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center mr-3">
-              <DocumentDuplicateIcon className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Student Entries</p>
-              <p className="text-2xl font-semibold text-gray-900">{totalStudentEntries}</p>
             </div>
           </div>
         </Card>
@@ -254,23 +229,12 @@ export default function MySubmissionsPage() {
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        submission.assignment?.survey_period === 'pre_pilot' 
-                          ? 'bg-green-100 text-green-800'
-                          : submission.assignment?.survey_period === 'post_pilot'
-                          ? 'bg-purple-100 text-purple-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         {submission.assignment?.survey_period?.replace('_', ' ') || 'Survey'}
                       </span>
                       {submission.assignment?.assignment_type === 'student_survey' && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                           Student Activity
-                        </span>
-                      )}
-                      {submission.assignment?.assignment_type === 'volunteer_personal' && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                          Personal
                         </span>
                       )}
                     </div>
@@ -287,7 +251,7 @@ export default function MySubmissionsPage() {
                   <div className="flex items-center">
                     <CalendarIcon className="h-4 w-4 mr-1" />
                     <span>
-                      Submitted: {new Date(submission.submitted_at).toLocaleDateString()} at {new Date(submission.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      Submitted: {new Date(submission.submitted_at).toLocaleDateString()}
                     </span>
                   </div>
                   
@@ -295,13 +259,6 @@ export default function MySubmissionsPage() {
                     <span className="bg-gray-100 px-2 py-1 rounded text-xs">
                       {submission.assignment.pilot_name}
                     </span>
-                  )}
-
-                  {submission.assignment?.assignment_type === 'student_survey' && submission.total_students > 0 && (
-                    <div className="flex items-center">
-                      <UsersIcon className="h-4 w-4 mr-1" />
-                      <span>{submission.total_students} students</span>
-                    </div>
                   )}
                 </div>
 
@@ -317,12 +274,10 @@ export default function MySubmissionsPage() {
                       </Button>
                     </Link>
                     {submission.assignment?.assignment_type === 'student_survey' && (
-                      <Link href={`/volunteer/surveys/assignment/${submission.assignment_id}`}>
-                        <Button variant="outline" size="sm">
-                          <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-                          Submit Again
-                        </Button>
-                      </Link>
+                      <Button variant="outline" size="sm">
+                        <ChartBarIcon className="h-4 w-4 mr-1" />
+                        View Aggregated
+                      </Button>
                     )}
                   </div>
                 </div>
