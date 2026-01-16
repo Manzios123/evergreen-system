@@ -16,7 +16,7 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter, useParams } from 'next/navigation'; // Added useParams
+import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 interface SurveyQuestion {
@@ -64,7 +64,6 @@ interface SurveyAssignmentPageProps {
 
 export default function SurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
   const router = useRouter();
-  // Get params from hook for client-side rendering
   const urlParams = useParams();
   const [surveyData, setSurveyData] = useState<any>(null);
   
@@ -72,7 +71,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
   const assignmentId = params?.id || (urlParams?.id as string);
 
   // FIX: Use the dynamic assignmentId with proper null checking
-  const { data: apiResponse, isLoading, error } = useApiQuery<AssignmentResponse>(
+  const { data: apiResponse, isLoading, error, refetch } = useApiQuery<AssignmentResponse>(
     ['survey-assignment', assignmentId],
     () => {
       if (!assignmentId) {
@@ -89,6 +88,8 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
   useEffect(() => {
     // Transform the API response to match SurveyForm expectations
     if (apiResponse) {
+      console.log('API Response received:', apiResponse);
+      
       const transformedData = {
         id: apiResponse.assignment?.id || assignmentId,
         title: apiResponse.assignment?.survey_name || 'Survey',
@@ -114,8 +115,13 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
   }, [apiResponse, assignmentId]);
 
   const handleComplete = () => {
-    router.push('/volunteer/surveys/volunteer');
-    router.refresh();
+    // Refresh the data to show completion status
+    refetch();
+    // Redirect after a short delay to show success message
+    setTimeout(() => {
+      router.push('/volunteer/surveys/volunteer');
+      router.refresh();
+    }, 1500);
   };
 
   // Show loading state if still getting the ID or fetching data
@@ -127,7 +133,8 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  if (error || !apiResponse) {
+  if (error) {
+    console.error('Error loading assignment:', error);
     return (
       <div className="max-w-3xl mx-auto">
         <Alert
@@ -135,6 +142,26 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
           title="Unable to load survey"
         >
           <p className="mt-2">The survey could not be loaded. It may have been completed or is no longer available.</p>
+          <div className="mt-4">
+            <Link href="/volunteer/surveys/volunteer" className="inline-flex items-center text-sm">
+              <ArrowLeftIcon className="h-4 w-4 mr-2" />
+              Back to Surveys
+            </Link>
+          </div>
+        </Alert>
+      </div>
+    );
+  }
+
+  // Check if apiResponse is null
+  if (!apiResponse) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <Alert
+          type="error"
+          title="Survey not found"
+        >
+          <p className="mt-2">This survey assignment could not be found. It may have been deleted or you may not have access.</p>
           <div className="mt-4">
             <Link href="/volunteer/surveys/volunteer" className="inline-flex items-center text-sm">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
@@ -154,13 +181,13 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
           type="success"
           title="Survey already completed"
         >
-          <p className="mt-2">You have already completed this survey on {new Date(apiResponse.completed_at!).toLocaleDateString()}.</p>
+          <p className="mt-2">You have already completed this survey on {apiResponse.completed_at ? new Date(apiResponse.completed_at).toLocaleDateString() : 'an unknown date'}.</p>
           <div className="mt-4">
             <Button 
               variant="outline"
-              onClick={() => router.push(`/volunteer/surveys/assignment/${assignmentId}/responses`)}
+              onClick={() => router.push(`/volunteer/surveys/submissions`)}
             >
-              View Responses
+              View My Submissions
             </Button>
           </div>
         </Alert>

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Button from '@/components/ui/button';
-import Alert from '@/components/ui/alert'; // Added Alert import
+import Alert from '@/components/ui/alert';
 import { api } from '@/lib/api/api';
 import { useRouter } from 'next/navigation';
 
@@ -20,16 +20,18 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // For student surveys, we need to track aggregated responses
+  // For student surveys, track aggregated responses
   const [totalStudents, setTotalStudents] = useState<number>(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
 
-  // Debug log to check survey structure
   useEffect(() => {
-    console.log('SurveyForm received survey:', survey);
-    console.log('Survey questions:', survey?.template?.questions);
+    console.log('SurveyForm received:', { 
+      survey, 
+      assignmentId, 
+      surveyType,
+      hasQuestions: survey?.template?.questions?.length || survey?.questions?.length 
+    });
     
-    // Initialize responses state with empty values for all questions
     const questions = getQuestions();
     if (questions.length > 0 && !isInitialized) {
       const initialResponses: Record<string, any> = {};
@@ -39,13 +41,11 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       setResponses(initialResponses);
       setIsInitialized(true);
     }
-  }, [survey, isInitialized]);
+  }, [survey, isInitialized, assignmentId, surveyType]);
 
-  // Get questions from the survey object
   const getQuestions = () => {
     if (!survey) return [];
     
-    // Check different possible structures
     if (survey.template?.questions) {
       return survey.template.questions;
     } else if (survey.questions) {
@@ -66,14 +66,14 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
     try {
       // Additional validation for student surveys
       if (surveyType === 'student') {
-        if (totalStudents <= 0) {
-          setError('Please enter a valid number of students (at least 1).');
+        if (totalStudents <= 0 || totalStudents > 100) {
+          setError('Please enter a valid number of students (1-100).');
           setIsSubmitting(false);
           return;
         }
       }
 
-      // Validate responses
+      // Validate required questions
       const requiredQuestions = questions.filter((q: any) => q.is_required);
       const missingRequired = requiredQuestions.filter((q: any) => {
         const response = responses[q.id];
@@ -86,29 +86,44 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
         return;
       }
 
-      // Prepare submission data for student surveys
+      // Prepare final responses
       let finalResponses = { ...responses };
       if (surveyType === 'student' && totalStudents > 0) {
         finalResponses.total_students = totalStudents;
       }
 
-      // Submit response using the new endpoint
+      // Submit response
       const payload = {
         assignment_id: assignmentId,
         responses: finalResponses
       };
 
-      console.log('Submitting survey:', payload);
+      console.log('Submitting survey payload:', payload);
 
       const result = await api.post('/survey-assignments/submit-response', payload);
-
-      if (result) {
-        console.log('Survey submitted successfully:', result);
-        onComplete();
-      }
+      
+      console.log('Survey submitted successfully:', result);
+      
+      // Call onComplete which will refresh the page and redirect
+      onComplete();
+      
     } catch (err: any) {
       console.error('Survey submission error:', err);
-      setError(err.message || 'Failed to submit survey. Please try again.');
+      
+      let errorMessage = 'Failed to submit survey. Please try again.';
+      
+      if (err.response) {
+        try {
+          const errorData = await err.response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (parseError) {
+          errorMessage = err.message || errorMessage;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -263,6 +278,9 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
               required={surveyType === 'student'}
               disabled={isSubmitting}
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Enter the total number of students who participated in this activity.
+            </p>
           </div>
           <div className="text-sm text-blue-700 bg-blue-100 p-3 rounded">
             <p className="font-medium mb-1">Instructions:</p>
