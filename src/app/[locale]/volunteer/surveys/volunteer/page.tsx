@@ -11,7 +11,8 @@ import { api } from '@/lib/api/api';
 import { 
   ChatBubbleLeftIcon, 
   DocumentTextIcon,
-  ArrowRightIcon 
+  ArrowRightIcon,
+  DocumentDuplicateIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
@@ -29,13 +30,26 @@ interface SurveyAssignment {
   assigned_by_name: string;
   assignment_type: string;
   completed_at?: string;
+  completed?: boolean | number;
+  submission_count?: number;
 }
 
 export default function VolunteerFeedbackPage() {
   // Fetch survey assignments for the current volunteer
   const { data: assignments, isLoading, error, refetch } = useApiQuery<SurveyAssignment[]>(
     ['survey-assignments', 'volunteer'],
-    () => api.get<SurveyAssignment[]>('/survey-assignments/volunteer')
+    () => api.get<any[]>('/survey-assignments/volunteer').then(res => {
+      // Transform the response to match frontend expectations
+      return res.map(assignment => ({
+        ...assignment,
+        // Backend returns 1/0 for booleans, convert to boolean
+        completed: assignment.completed === 1 || assignment.completed === true,
+        // Ensure due_date is properly formatted
+        due_date: assignment.due_date ? new Date(assignment.due_date).toISOString().split('T')[0] : null,
+        // Add survey_type from assignment_type for consistency
+        survey_type: assignment.assignment_type === 'volunteer_personal' ? 'volunteer' : 'student',
+      }));
+    })
   );
 
   // Filter assignments by type
@@ -49,20 +63,25 @@ export default function VolunteerFeedbackPage() {
 
   // Counts for display
   const pendingPersonal = personalSurveys.filter(a => 
-    a.status !== 'completed' && (!a.due_date || new Date(a.due_date) > new Date())
+    !a.completed && (!a.due_date || new Date(a.due_date) > new Date())
   ).length;
 
   const pendingStudent = studentSurveys.filter(a => 
-    a.status !== 'completed' && (!a.due_date || new Date(a.due_date) > new Date())
+    !a.completed && (!a.due_date || new Date(a.due_date) > new Date())
   ).length;
 
   const overduePersonal = personalSurveys.filter(a => 
-    a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed'
+    a.due_date && new Date(a.due_date) < new Date() && !a.completed
   ).length;
 
   const overdueStudent = studentSurveys.filter(a => 
-    a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed'
+    a.due_date && new Date(a.due_date) < new Date() && !a.completed
   ).length;
+
+  // Calculate total student submissions
+  const totalStudentSubmissions = studentSurveys.reduce((total, survey) => {
+    return total + (survey.submission_count || 0);
+  }, 0);
 
   if (isLoading) {
     return (
@@ -115,7 +134,7 @@ export default function VolunteerFeedbackPage() {
               variant="default"
               onClick={() => {
                 // Start the first pending survey
-                const firstPending = assignments?.find(a => a.status === 'assigned');
+                const firstPending = assignments?.find(a => !a.completed);
                 if (firstPending) {
                   window.location.href = `/volunteer/surveys/assignment/${firstPending.id}`;
                 }
@@ -129,7 +148,7 @@ export default function VolunteerFeedbackPage() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -167,6 +186,16 @@ export default function VolunteerFeedbackPage() {
             </div>
           </div>
         </Card>
+        
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Student Submissions</p>
+              <p className="text-2xl font-semibold text-gray-900">{totalStudentSubmissions}</p>
+            </div>
+            <DocumentDuplicateIcon className="h-8 w-8 text-green-500" />
+          </div>
+        </Card>
       </div>
 
       {/* Personal Surveys Section */}
@@ -177,7 +206,7 @@ export default function VolunteerFeedbackPage() {
               Your Personal Surveys
             </h2>
             <p className="text-sm text-gray-500">
-              Surveys about your volunteer experience
+              Surveys about your volunteer experience (one-time submission)
             </p>
           </div>
           {personalSurveys.length > 0 && (
@@ -217,12 +246,12 @@ export default function VolunteerFeedbackPage() {
               Student Activity Surveys
             </h2>
             <p className="text-sm text-gray-500">
-              Surveys about student activities in your assigned pilot
+              Surveys about student activities (multiple submissions allowed)
             </p>
           </div>
           {studentSurveys.length > 0 && (
             <div className="text-sm text-gray-500">
-              {pendingStudent} to do • {overdueStudent} overdue
+              {pendingStudent} to do • {overdueStudent} overdue • {totalStudentSubmissions} total submissions
             </div>
           )}
         </div>
