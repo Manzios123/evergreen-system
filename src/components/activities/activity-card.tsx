@@ -72,7 +72,7 @@ export default function ActivityCard({ activity, showActions = true, onAction }:
               </button>
             )}
             
-            {activity.status === 'in_edit' && (
+            {activity.status === 'pending' && (
               <button
                 onClick={() => onAction?.('edit')}
                 className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"

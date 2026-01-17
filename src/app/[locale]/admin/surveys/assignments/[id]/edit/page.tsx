@@ -242,16 +242,16 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
                 type="button"
                 variant="outline"
                 onClick={() => router.push(`/admin/surveys/assignments/${params.id}`)}
-                disabled={updateMutation.isLoading}
+                disabled={updateMutation.isPending}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="default"
-                disabled={updateMutation.isLoading}
+                disabled={updateMutation.isPending}
               >
-                {updateMutation.isLoading ? 'Updating...' : 'Update Assignment'}
+                {updateMutation.isPending ? 'Updating...' : 'Update Assignment'}
               </Button>
             </div>
           </form>

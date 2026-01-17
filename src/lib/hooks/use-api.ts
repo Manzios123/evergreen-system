@@ -90,7 +90,7 @@ export const useApiMutation = <TData = any, TVariables = any>(
     },
   });
 
-  return mutation; // REMOVED: React Query v5 compatibility hack
+  return mutation;
 };
 
 // Simple paginated query helper

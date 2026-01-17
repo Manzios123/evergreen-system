@@ -85,7 +85,6 @@ export default function CoordinatorActivitiesPage() {
   const statusOptions = [
     { value: 'draft', label: 'Draft' },
     { value: 'pending', label: 'Pending' },
-    { value: 'in_edit', label: 'In Edit' },
     { value: 'approved', label: 'Approved' },
     { value: 'rejected', label: 'Rejected' },
     { value: 'completed', label: 'Completed' },
@@ -284,7 +283,7 @@ export default function CoordinatorActivitiesPage() {
             <div>
               <p className="text-sm font-medium text-gray-500">Pending Review</p>
               <p className="text-2xl font-bold text-yellow-600 mt-1">
-                {filteredActivities.filter(a => a.status === 'pending' || a.status === 'in_edit').length}
+                {filteredActivities.filter(a => a.status === 'pending').length}
               </p>
             </div>
             <StatusBadge status="pending" />
@@ -390,7 +389,7 @@ export default function CoordinatorActivitiesPage() {
         confirmText="Delete Activity"
         cancelText="Cancel"
         type="danger"
-        loading={deleteMutation.isPending} // Changed from isLoading to isPending
+        loading={deleteMutation.isPending}
       />
 
       {/* Submit for Approval Dialog */}
@@ -406,7 +405,7 @@ export default function CoordinatorActivitiesPage() {
         confirmText="Submit for Approval"
         cancelText="Cancel"
         type="warning"
-        loading={submitMutation.isPending} // Changed from isLoading to isPending
+        loading={submitMutation.isPending}
       />
     </div>
   );

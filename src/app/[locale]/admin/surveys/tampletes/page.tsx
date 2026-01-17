@@ -162,7 +162,7 @@ export default function SurveyTemplatesPage() {
             size="sm"
             variant="destructive"
             onClick={() => handleDelete(template.id, template.name)}
-            disabled={deleteMutation.isLoading}
+            disabled={deleteMutation.isPending}
           >
             <TrashIcon className="h-4 w-4" />
           </Button>

@@ -10,17 +10,13 @@ import SkeletonLoader from '@/components/ui/skeleton-loader';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { PlusIcon, CalendarIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { activitiesApi, type Activity as ApiActivity } from '@/lib/api/activities'; // Import from activities API
+import { activitiesApi } from '@/lib/api/activities'; // Only import activitiesApi
+import { Activity } from '@/lib/types'; // Import Activity from types
 
-// Create a unified type that works for both
-type Activity = ApiActivity & {
-  type?: string; // Make type optional since API doesn't provide it
-  school?: { name: string }; // Add school object for compatibility
-};
-
+// Use the Activity type from lib/types instead
 export default function VolunteerActivitiesPage() {
   // Use activitiesApi.list() which returns the properly typed response
-  const { data: response, isLoading, error } = useApiQuery<{ data: ApiActivity[]; count: number }>(
+  const { data: response, isLoading, error } = useApiQuery<{ data: Activity[]; count: number }>(
     ['activities'],
     () => activitiesApi.list()
   );

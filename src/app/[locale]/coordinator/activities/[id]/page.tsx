@@ -118,8 +118,8 @@ export default function CoordinatorActivityDetailPage({ params }: ActivityDetail
   }
 
   // Fix status checks based on actual ActivityStatus type
-  const canApprove = activity.status === 'pending' || activity.status === 'in_edit';
-  const canEdit = ['draft', 'pending', 'in_edit'].includes(activity.status);
+  const canApprove = activity.status === 'pending';
+  const canEdit = ['draft', 'pending'].includes(activity.status);
 
   const tabs = [
     {
@@ -406,7 +406,7 @@ export default function CoordinatorActivityDetailPage({ params }: ActivityDetail
                 variant="default"
                 icon={<CheckCircleIcon className="h-4 w-4" />}
                 onClick={() => setShowApproveDialog(true)}
-                loading={approveMutation.isPending} // Changed from isLoading to isPending
+                loading={approveMutation.isPending}
               >
                 Approve
               </Button>
@@ -414,7 +414,7 @@ export default function CoordinatorActivityDetailPage({ params }: ActivityDetail
                 variant="default"
                 icon={<XCircleIcon className="h-4 w-4" />}
                 onClick={() => setShowRejectDialog(true)}
-                loading={rejectMutation.isPending} // Changed from isLoading to isPending
+                loading={rejectMutation.isPending}
               >
                 Reject
               </Button>
@@ -427,7 +427,7 @@ export default function CoordinatorActivityDetailPage({ params }: ActivityDetail
       <Tabs
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={handleTabChange} // Fixed: using wrapper function
+        onTabChange={handleTabChange}
         variant="underline"
       />
 
@@ -441,7 +441,7 @@ export default function CoordinatorActivityDetailPage({ params }: ActivityDetail
         confirmText="Approve Activity"
         cancelText="Cancel"
         type="info"
-        loading={approveMutation.isPending} // Changed from isLoading to isPending
+        loading={approveMutation.isPending}
       />
 
       {/* Reject Dialog - Custom implementation */}

@@ -1,4 +1,4 @@
-// app/[locale]/admin/activities/page.tsx
+// app/[locale]/admin/activities/page.tsx - UPDATED VERSION
 'use client';
 
 import { Card } from '@/components/ui/card';
@@ -21,7 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api/api';
+import { api } from '@/lib/api';
 
 export default function AdminActivitiesPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -138,12 +138,11 @@ export default function AdminActivitiesPage() {
     return activitiesData?.data || [];
   }, [activitiesData]);
 
-  // Status options
+  // Status options - UPDATED: removed 'in_edit'
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'draft', label: 'Draft' },
     { value: 'pending', label: 'Pending' },
-    { value: 'in_edit', label: 'In Edit' },
     { value: 'approved', label: 'Approved' },
     { value: 'rejected', label: 'Rejected' },
     { value: 'completed', label: 'Completed' },
@@ -159,17 +158,15 @@ export default function AdminActivitiesPage() {
     })) || [])),
   ];
 
-  // Stats
+  // Stats - UPDATED: removed inEditActivities, added approvedActivities
   const stats = useMemo(() => {
     if (!filteredActivities) return null;
 
     const totalActivities = filteredActivities.length;
     const completedActivities = filteredActivities.filter(a => a.status === 'completed').length;
     const pendingActivities = filteredActivities.filter(a => a.status === 'pending').length;
-    const inEditActivities = filteredActivities.filter(a => a.status === 'in_edit').length;
+    const approvedActivities = filteredActivities.filter(a => a.status === 'approved').length;
     
-    // Since there's no duration property, we'll calculate something else
-    // For example, total number of activities by month
     const currentMonth = new Date().getMonth();
     const currentMonthActivities = filteredActivities.filter(a => 
       new Date(a.scheduled_date).getMonth() === currentMonth
@@ -179,7 +176,7 @@ export default function AdminActivitiesPage() {
       totalActivities,
       completedActivities,
       pendingActivities,
-      inEditActivities,
+      approvedActivities,
       currentMonthActivities,
     };
   }, [filteredActivities]);
@@ -241,7 +238,7 @@ export default function AdminActivitiesPage() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - UPDATED: Changed "In Edit" to "Approved" */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card className="p-4">
@@ -283,12 +280,12 @@ export default function AdminActivitiesPage() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">In Edit</p>
+                <p className="text-sm font-medium text-gray-500">Approved</p> {/* CHANGED */}
                 <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {stats.inEditActivities}
+                  {stats.approvedActivities} {/* CHANGED */}
                 </p>
               </div>
-              <StatusBadge status="in_edit" />
+              <StatusBadge status="approved" /> {/* CHANGED */}
             </div>
           </Card>
           
@@ -306,6 +303,7 @@ export default function AdminActivitiesPage() {
         </div>
       )}
 
+      {/* Rest of the code remains the same */}
       {/* Search and Filters */}
       <Card>
         <div className="p-4">
