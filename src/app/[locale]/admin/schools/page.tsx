@@ -59,13 +59,13 @@ export default function AdminSchoolsPage() {
     })
   );
 
-  // Delete school mutation
+  // Delete school mutation - FIXED: Ensure we only pass string, not undefined
   const deleteMutation = useApiMutation(
     (id: string) => api.delete(`/schools/${id}`)
   );
 
   const handleDelete = async () => {
-    if (!selectedSchool) return;
+    if (!selectedSchool || !selectedSchool.id) return;
     
     try {
       await deleteMutation.mutateAsync(selectedSchool.id);
@@ -473,7 +473,7 @@ export default function AdminSchoolsPage() {
         confirmText="Delete School"
         cancelText="Cancel"
         type="danger"
-        loading={deleteMutation.isPending} // Changed from isLoading to isPending
+        loading={deleteMutation.isPending}
       />
     </div>
   );

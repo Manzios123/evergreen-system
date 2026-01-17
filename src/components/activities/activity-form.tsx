@@ -162,10 +162,12 @@ export function ActivityForm({ activity, onSubmitSuccess }: ActivityFormProps) {
                 options={
                   schoolsLoading 
                     ? [] 
-                    : schools?.map((school) => ({
-                        value: school.id,
-                        label: school.name,
-                      })) || []
+                    : (schools || [])
+                        .filter((school): school is School & { id: string } => !!school.id)
+                        .map((school) => ({
+                          value: school.id,
+                          label: school.name,
+                        })) || []
                 }
                 error={errors.school_id?.message}
                 required

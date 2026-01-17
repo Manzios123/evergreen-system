@@ -167,10 +167,15 @@ export default function CreateSchoolForm() {
       // First create the school with type assertion
       const response = await schoolsApi.createSchool(schoolData as any);
       
+      // Check if we have a valid response with an ID
+      if (!response.success || !response.data || !response.data.id) {
+        throw new Error('Failed to create school: No valid ID returned');
+      }
+
+      const schoolId = response.data.id;
+      
       // If we have valid contacts, add them
-      if (validContacts.length > 0 && response.success && response.data) {
-        const schoolId = response.data.id;
-        
+      if (validContacts.length > 0) {
         for (const contact of validContacts) {
           try {
             await schoolsApi.addContact(schoolId, {

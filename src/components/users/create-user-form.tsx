@@ -123,7 +123,7 @@ export default function CreateUserForm() {
     fetchData();
   }, []);
 
-  // Filter schools based on selected pilots
+  // Filter schools based on selected pilots and ensure they have an ID
   const filteredSchools = useMemo(() => {
     console.log('Filtering schools...');
     console.log('Selected pilot IDs:', selectedPilotIds);
@@ -135,16 +135,13 @@ export default function CreateUserForm() {
       return [];
     }
     
-    // Filter schools that belong to ANY selected pilot
-    const filtered = schools.filter(school => {
+    // Filter schools that belong to ANY selected pilot AND have an ID
+    const filtered = schools.filter((school): school is School & { id: string } => {
       const schoolPilotId = school.pilot_id?.toString();
+      const hasId = !!school.id;
       const matches = schoolPilotId && selectedPilotIds.includes(schoolPilotId);
       
-      if (matches) {
-        console.log(`✓ School "${school.name}" matches pilot ${schoolPilotId}`);
-      }
-      
-      return matches;
+      return hasId && !!matches;
     });
     
     console.log(`Filtered schools count: ${filtered.length}`);
@@ -202,7 +199,7 @@ export default function CreateUserForm() {
     } else {
       newPilotIds = currentPilotIds.filter(id => id !== pilotId);
       // Also remove schools from deselected pilot
-      const schoolsToRemove = schools.filter(school => school.pilot_id?.toString() === pilotId).map(s => s.id);
+      const schoolsToRemove = schools.filter(school => school.pilot_id?.toString() === pilotId && school.id).map(s => s.id!);
       const currentSchoolIds = watch('school_ids') || [];
       const newSchoolIds = currentSchoolIds.filter(id => !schoolsToRemove.includes(id));
       setValue('school_ids', newSchoolIds);
@@ -382,7 +379,7 @@ export default function CreateUserForm() {
                 .filter(pilot => pilot.status === 'active')
                 .map((pilot) => {
                   const isChecked = selectedPilotIds.includes(pilot.id.toString());
-                  const pilotSchoolsCount = schools.filter(s => s.pilot_id?.toString() === pilot.id.toString()).length;
+                  const pilotSchoolsCount = schools.filter(s => s.pilot_id?.toString() === pilot.id.toString() && s.id).length;
                   
                   return (
                     <div key={pilot.id} className="flex items-start p-3 border border-gray-200 rounded-md hover:bg-gray-50">
@@ -461,7 +458,7 @@ export default function CreateUserForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-2">
                 {filteredSchools.map((school) => {
                   const pilot = pilots.find(p => p.id.toString() === school.pilot_id?.toString());
-                  const isChecked = watch('school_ids')?.includes(school.id.toString()) || false;
+                  const isChecked = watch('school_ids')?.includes(school.id) || false;
                   return (
                     <div key={school.id} className="flex items-start p-3 border border-gray-200 rounded-md hover:bg-gray-50">
                       <div className="flex items-center h-5">
@@ -469,7 +466,7 @@ export default function CreateUserForm() {
                           type="checkbox"
                           id={`school-${school.id}`}
                           checked={isChecked}
-                          onChange={(e) => handleSchoolChange(school.id.toString(), e.target.checked)}
+                          onChange={(e) => handleSchoolChange(school.id, e.target.checked)}
                           className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                         />
                       </div>
