@@ -84,7 +84,7 @@ export default function VolunteerActivitiesPage() {
             </Button>
           </Link>
           {activity.status === 'draft' && (
-            <Link href={createLocalizedUrl('/volunteer/activities/new')}>
+            <Link href={createLocalizedUrl('/volunteer/dashboard')}>
               <Button
                 variant="default"
                 size="sm"
@@ -157,7 +157,7 @@ export default function VolunteerActivitiesPage() {
             Track and manage your volunteering activities
           </p>
         </div>
-        <Link href={createLocalizedUrl('/volunteer/activities/new')}>
+        <Link href={createLocalizedUrl('/volunteer/dashboard')}>
           <Button variant="default" icon={<PlusIcon className="h-5 w-5" />}>
             Report New Activity
           </Button>

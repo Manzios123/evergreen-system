@@ -54,7 +54,7 @@ export default function VolunteerDashboardPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-          Welcome back, {user?.full_name || 'Volunteer'}
+          Welcome back, {user?.full_name || ''}
         </h1>
         <p className="mt-2 text-gray-600">
           {dashboard?.summary?.message || 'Manage your volunteering activities'}

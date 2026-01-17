@@ -92,12 +92,12 @@ export default function Sidebar({ role }: SidebarProps) {
       
       
       { 
-        name: 'Volunteer Feedback', 
+        name: 'Feedback', 
         href: '/volunteer/surveys/volunteer', 
         icon: ChatBubbleLeftIcon, 
         badge: 'pending' 
       },
-      { name: 'Photos', href: '/volunteer/photos', icon: PhotoIcon },
+      //{ name: 'Photos', href: '/volunteer/photos', icon: PhotoIcon },
     ],
   };
 

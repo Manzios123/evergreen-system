@@ -34,8 +34,8 @@ const navigation = {
     { name: 'Dashboard', href: '/volunteer/dashboard' },
     { name: 'My Activities', href: '/volunteer/activities' },
     
-    { name: 'Volunteer Surveys', href: '/volunteer/surveys/volunteer' },
-    { name: 'Photos', href: '/volunteer/photos' },
+    { name: 'Feedback', href: '/volunteer/surveys/volunteer' },
+    //{ name: 'Photos', href: '/volunteer/photos' },
   ],
 };
 
