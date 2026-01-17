@@ -90,11 +90,7 @@ export const useApiMutation = <TData = any, TVariables = any>(
     },
   });
 
-  // Add React Query v5 compatibility
-  return {
-    ...mutation,
-    isLoading: mutation.isPending, // Map v5 isPending to v4 isLoading for compatibility
-  } as typeof mutation & { isLoading: boolean };
+  return mutation; // REMOVED: React Query v5 compatibility hack
 };
 
 // Simple paginated query helper

@@ -11,6 +11,7 @@ export { pilotsApi } from './pilots';
 export { schoolsApi } from './schools';
 export { surveysApi } from './surveys';
 export { usersApi } from './users';
+export { mediaApi } from './media'; // ADDED: was missing
 
 // Helper function to handle API errors in components
 export const handleApiError = (error: any): string => {

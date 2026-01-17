@@ -18,11 +18,15 @@ import {
   ClockIcon,
   PencilIcon,
   CheckCircleIcon,
+  PhotoIcon,
+  VideoCameraIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { activitiesApi } from '@/lib/api/activities';
-import { ActivitySubmissionForm } from '@/components/activities/activity-submission-form';
+import { ActivitySubmissionFormV2 } from '@/components/activities/activity-submission-form-v2';
+import { Activity, ActivityStatus } from '@/lib/types'; // ADDED: Import types
 
 interface ActivityDetailPageProps {
   params: Promise<{
@@ -31,33 +35,14 @@ interface ActivityDetailPageProps {
   }>;
 }
 
-// Interface based on the actual API response from the update request
-interface ApiActivity {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  scheduled_date: string;
-  actual_date?: string;
-  volunteer_id: string;
+interface ApiActivity extends Activity { // CHANGED: Extend base Activity type
   volunteer_name?: string;
-  school_id: string;
   school_name?: string;
-  pilot_id: string;
   pilot_name?: string;
-  activity_template_id?: string;
   activity_template_name?: string;
-  number_of_participants?: number;
-  engagement_level?: string | number;
-  volunteer_notes?: string;
-  coordinator_feedback?: string;
-  assigned_by?: string;
   assigned_by_name?: string;
-  assignment_notes?: string;
   assigned_at?: string;
   deleted_at?: string;
-  created_at: string;
-  updated_at: string;
 }
 
 interface ActivityApiResponse {
@@ -66,9 +51,8 @@ interface ActivityApiResponse {
   message?: string;
 }
 
-// Type guard to check if the status is valid
-function isValidActivityStatus(status: string): status is 'draft' | 'pending' | 'in_edit' | 'approved' | 'rejected' | 'completed' | 'cancelled' {
-  return ['draft', 'pending', 'in_edit', 'approved', 'rejected', 'completed', 'cancelled'].includes(status);
+function isValidActivityStatus(status: string): status is ActivityStatus {
+  return ['draft', 'pending', 'approved', 'rejected', 'completed', 'cancelled'].includes(status);
 }
 
 export default function ActivityDetailPage({ params }: ActivityDetailPageProps) {
@@ -76,6 +60,16 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
   const [unwrappedParams, setUnwrappedParams] = useState<{ id: string; locale: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
+  
+  // In a real app, you would get this from your authentication context
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+
+  // Mock current user ID - replace with actual auth logic
+  useEffect(() => {
+    // This is a placeholder - in reality, get from auth context/session
+    const mockCurrentUserId = 'user-123'; // Replace with actual user ID
+    setCurrentUserId(mockCurrentUserId);
+  }, []);
 
   // Unwrap params for Next.js 15+
   useEffect(() => {
@@ -106,30 +100,21 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
 
   const rawActivity = apiResponse?.data;
   
-  // Transform the API activity
+  // Transform the API activity to match the beautified form's interface
   const activity = rawActivity ? {
     ...rawActivity,
-    // Ensure status is valid, default to 'draft' if not
     status: isValidActivityStatus(rawActivity.status) ? rawActivity.status : 'draft',
   } : undefined;
 
   const handleSubmitReport = async () => {
     if (!activity || !unwrappedParams) return;
     
-    if (activity.status === 'draft' && !activity.volunteer_notes) {
-      // Show submission form for draft activities without notes
+    if (activity.status === 'draft') {
+      // Always show the beautified submission form for draft activities
       setShowSubmissionForm(true);
-    } else if (activity.status === 'draft') {
-      // Submit directly if already has notes
-      try {
-        setIsSubmitting(true);
-        await activitiesApi.submit(activity.id);
-        refetch();
-      } catch (error) {
-        console.error('Failed to submit activity:', error);
-      } finally {
-        setIsSubmitting(false);
-      }
+    } else if (activity.status === 'pending' || activity.status === 'rejected') {
+      // For pending or rejected activities, allow editing via the form
+      setShowSubmissionForm(true);
     }
   };
 
@@ -195,8 +180,8 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
     );
   }
 
-  const canEdit = activity.status === 'draft';
-  const canSubmit = activity.status === 'draft';
+  const canEdit = activity.status === 'draft' || activity.status === 'rejected' || activity.status === 'pending';
+  const canSubmit = activity.status === 'draft' || activity.status === 'rejected';
 
   // Helper function to get engagement level as string
   const getEngagementLevel = (level?: string | number): string => {
@@ -214,6 +199,17 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
     if (level === 2 || level === 'medium' || level === 'Medium') return 'bg-yellow-100 text-yellow-800';
     if (level === 3 || level === 'high' || level === 'High') return 'bg-green-100 text-green-800';
     return 'bg-blue-100 text-blue-800';
+  };
+
+  // Format date for display
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Not set';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
   };
 
   return (
@@ -241,7 +237,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
             <Link href={`/${unwrappedParams.locale}/volunteer/activities/${activity.id}/edit`}>
               <Button variant="outline" size="sm">
                 <PencilIcon className="h-4 w-4 mr-2" />
-                Edit
+                Edit Details
               </Button>
             </Link>
           )}
@@ -254,15 +250,47 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
               loading={isSubmitting}
             >
               <CheckCircleIcon className="h-4 w-4 mr-2" />
-              {activity.volunteer_notes ? 'Submit for Approval' : 'Complete Report'}
+              Complete Activity Report
+            </Button>
+          )}
+          
+          {(activity.status === 'pending' || activity.status === 'rejected') && (
+            <Button 
+              variant="secondary" 
+              size="sm"
+              onClick={() => setShowSubmissionForm(true)}
+            >
+              <PencilIcon className="h-4 w-4 mr-2" />
+              Update Report
             </Button>
           )}
         </div>
       </div>
 
       {showSubmissionForm ? (
-        <ActivitySubmissionForm
-          activity={activity}
+        <ActivitySubmissionFormV2
+          activity={{
+            id: activity.id,
+            title: activity.title,
+            description: activity.description,
+            status: activity.status,
+            scheduled_date: activity.scheduled_date,
+            actual_date: activity.actual_date,
+            volunteer_notes: activity.volunteer_notes,
+            student_quotes: activity.student_quotes,
+            number_of_participants: activity.number_of_participants,
+            engagement_level: activity.engagement_level as string,
+            school_name: activity.school_name,
+            pilot_name: activity.pilot_name,
+            assigned_by_name: activity.assigned_by_name,
+            assigned_at: activity.assigned_at,
+            assignment_notes: activity.assignment_notes,
+            coordinator_feedback: activity.coordinator_feedback,
+            created_at: activity.created_at,
+            updated_at: activity.updated_at,
+            volunteer_id: activity.volunteer_id,
+          }}
+          currentUserId={currentUserId}
           onSubmitSuccess={handleSubmissionSuccess}
           onCancel={() => setShowSubmissionForm(false)}
         />
@@ -282,12 +310,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                     <div>
                       <p className="text-sm font-medium text-gray-500">Scheduled Date</p>
                       <p className="text-sm text-gray-900">
-                        {new Date(activity.scheduled_date).toLocaleDateString('en-US', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
+                        {formatDate(activity.scheduled_date)}
                       </p>
                     </div>
                   </div>
@@ -298,12 +321,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                       <div>
                         <p className="text-sm font-medium text-gray-500">Actual Date</p>
                         <p className="text-sm text-gray-900">
-                          {new Date(activity.actual_date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
+                          {formatDate(activity.actual_date)}
                         </p>
                       </div>
                     </div>
@@ -349,7 +367,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                       <div>
                         <p className="text-sm font-medium text-gray-500">Participants</p>
                         <p className="text-sm text-gray-900">
-                          {activity.number_of_participants} students
+                          {activity.number_of_participants} student{activity.number_of_participants !== 1 ? 's' : ''}
                         </p>
                       </div>
                     </div>
@@ -358,38 +376,79 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
               </div>
             </Card>
 
-            {/* Volunteer Notes Card */}
-            {(activity.volunteer_notes || activity.assignment_notes) && (
+            {/* Volunteer Notes & Quotes Card */}
+            {(activity.volunteer_notes || activity.student_quotes || activity.assignment_notes) && (
               <Card>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Notes & Details
                 </h2>
                 
                 {activity.assignment_notes && (
-                  <div className="mb-4">
+                  <div className="mb-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-2">Assignment Notes</h3>
-                    <div className="bg-gray-50 p-3 rounded">
+                    <div className="bg-gray-50 p-4 rounded border">
                       <p className="text-sm text-gray-700">{activity.assignment_notes}</p>
                     </div>
                   </div>
                 )}
 
                 {activity.volunteer_notes && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Your Report</h3>
-                    <div className="bg-green-50 p-3 rounded">
-                      <p className="text-sm text-gray-700">{activity.volunteer_notes}</p>
+                  <div className="mb-6">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                      <DocumentTextIcon className="h-4 w-4 mr-2" />
+                      Activity Report
+                    </h3>
+                    <div className="bg-green-50 p-4 rounded border border-green-200">
+                      <p className="text-sm text-gray-700 whitespace-pre-line">{activity.volunteer_notes}</p>
                       {activity.engagement_level !== undefined && (
-                        <div className="mt-2 flex items-center">
-                          <span className="text-xs font-medium text-gray-500 mr-2">Engagement:</span>
+                        <div className="mt-3 flex items-center">
+                          <span className="text-xs font-medium text-gray-500 mr-2">Engagement Level:</span>
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${getEngagementColor(activity.engagement_level)}`}>
                             {getEngagementLevel(activity.engagement_level)}
                           </span>
                         </div>
                       )}
+                      {activity.number_of_participants !== undefined && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          <span className="font-medium">Participants:</span> {activity.number_of_participants}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
+
+                {activity.student_quotes && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                      <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
+                      Student Quotes & Feedback
+                    </h3>
+                    <div className="bg-purple-50 p-4 rounded border border-purple-200">
+                      <p className="text-sm text-gray-700 whitespace-pre-line italic">{activity.student_quotes}</p>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Media Gallery Placeholder */}
+            {activity.status === 'approved' && (
+              <Card>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  Activity Media
+                </h2>
+                <div className="text-center py-8">
+                  <div className="flex justify-center space-x-4 mb-4">
+                    <PhotoIcon className="h-12 w-12 text-gray-300" />
+                    <VideoCameraIcon className="h-12 w-12 text-gray-300" />
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    Photos and videos from this activity would appear here
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Media is uploaded through the activity submission form
+                  </p>
+                </div>
               </Card>
             )}
 
@@ -397,25 +456,56 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
             {canSubmit && !activity.volunteer_notes && (
               <Card className="bg-blue-50 border-blue-200">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                  Ready to Submit Your Report?
+                  Ready to Complete Your Activity Report?
                 </h2>
                 <p className="text-sm text-gray-700 mb-4">
-                  Please complete the activity report by providing details about:
+                  The multi-step submission form helps you provide comprehensive details about your activity:
                 </p>
-                <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-                  <li>The actual date the activity took place</li>
-                  <li>Number of participants</li>
-                  <li>Engagement level of students (1=Low, 2=Medium, 3=High)</li>
-                  <li>Detailed notes about what happened</li>
-                  <li>Any observations or challenges</li>
-                </ul>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="flex items-start">
+                    <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                      <CalendarIcon className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Activity Details</h4>
+                      <p className="text-xs text-gray-600">Date, participants, engagement level</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                      <DocumentTextIcon className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Notes & Quotes</h4>
+                      <p className="text-xs text-gray-600">Observations and student feedback</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                      <PhotoIcon className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Media Upload</h4>
+                      <p className="text-xs text-gray-600">Photos and videos from the activity</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                      <CheckCircleIcon className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Review & Submit</h4>
+                      <p className="text-xs text-gray-600">Final review before submission</p>
+                    </div>
+                  </div>
+                </div>
                 <div className="mt-4">
                   <Button
                     variant="default"
                     onClick={() => setShowSubmissionForm(true)}
                   >
                     <CheckCircleIcon className="h-4 w-4 mr-2" />
-                    Complete Activity Report
+                    Start Activity Report
                   </Button>
                 </div>
               </Card>
@@ -493,7 +583,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                         Complete your report
                       </p>
                       <p className="text-sm text-gray-500">
-                        Fill in activity details and submit for approval
+                        Use the multi-step form to provide activity details
                       </p>
                     </div>
                   </div>
@@ -546,6 +636,45 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                     </div>
                   </div>
                 )}
+              </div>
+            </Card>
+
+            {/* Action Buttons */}
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Actions
+              </h2>
+              <div className="space-y-2">
+                {canSubmit && (
+                  <Button
+                    variant="default"
+                    className="w-full justify-center"
+                    onClick={() => setShowSubmissionForm(true)}
+                  >
+                    <CheckCircleIcon className="h-4 w-4 mr-2" />
+                    Complete Report
+                  </Button>
+                )}
+                
+                {(activity.status === 'pending' || activity.status === 'rejected') && (
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-center"
+                    onClick={() => setShowSubmissionForm(true)}
+                  >
+                    <PencilIcon className="h-4 w-4 mr-2" />
+                    Update Report
+                  </Button>
+                )}
+                
+                <Link href={`/${unwrappedParams.locale}/volunteer/activities`}>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center"
+                  >
+                    Back to Activities
+                  </Button>
+                </Link>
               </div>
             </Card>
           </div>

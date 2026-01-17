@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
     "@formatjs/intl-localematcher": "^0.7.4",
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",

@@ -1,32 +1,6 @@
-// lib/api/activities.ts
+// lib/api/activities.ts - UPDATED VERSION
 import { apiRequest } from './api';
-
-export interface Activity {
-  id: string;
-  title: string;
-  description: string;
-  status: 'draft' | 'pending' | 'in_edit' | 'approved' | 'rejected' | 'completed' | 'cancelled';
-  scheduled_date: string;
-  actual_date?: string;
-  volunteer_id: string;
-  volunteer_name?: string;
-  school_id: string;
-  school_name?: string;
-  pilot_id: string;
-  pilot_name?: string;
-  activity_template_id?: string;
-  activity_template_name?: string;
-  number_of_participants?: number;
-  engagement_level?: 'low' | 'medium' | 'high' | number;
-  volunteer_notes?: string;
-  coordinator_feedback?: string;
-  assigned_by?: string;
-  assigned_by_name?: string;
-  assignment_notes?: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string;
-}
+import { Activity, ActivityStatus } from '@/lib/types'; // ADDED: Import types
 
 export interface ActivityFilters {
   status?: string;
@@ -47,6 +21,8 @@ export interface CreateActivityData {
   activity_template_id?: string;
   number_of_participants?: number;
   volunteer_notes?: string;
+  engagement_level?: 'low' | 'medium' | 'high'; // ADDED: for frontend form
+  student_quotes?: string; // ADDED: for beautified form
 }
 
 export interface UpdateActivityData {
@@ -54,10 +30,11 @@ export interface UpdateActivityData {
   description?: string;
   scheduled_date?: string;
   actual_date?: string;
-  status?: Activity['status'];
+  status?: ActivityStatus;
   number_of_participants?: number;
-  engagement_level?: 'low' | 'medium' | 'high' | number;
+  engagement_level?: 'low' | 'medium' | 'high' | number | string; // UPDATED: unified type
   volunteer_notes?: string;
+  student_quotes?: string;
   coordinator_feedback?: string;
   assignment_notes?: string;
 }
@@ -74,14 +51,27 @@ export const activitiesApi = {
       });
     }
     const query = params.toString() ? `?${params.toString()}` : '';
-    return apiRequest<{ data: Activity[]; count: number }>(`/activities${query}`);
+    return apiRequest<{ 
+      success: boolean; 
+      data: Activity[]; 
+      count: number;
+      message: string;
+    }>(`/activities${query}`);
   },
 
   // Get single activity
-  get: (id: string) => apiRequest<{ data: Activity }>(`/activities/${id}`),
+  get: (id: string) => apiRequest<{ 
+    success: boolean; 
+    data: Activity; 
+    message: string;
+  }>(`/activities/${id}`),
 
   // Create a new activity (volunteer creates their own activity)
-  create: (data: CreateActivityData) => apiRequest<{ data: Activity }>('/activities', {
+  create: (data: CreateActivityData) => apiRequest<{ 
+    success: boolean; 
+    data: Activity; 
+    message: string;
+  }>('/activities', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
@@ -94,24 +84,39 @@ export const activitiesApi = {
     scheduled_date: string;
     description?: string;
     assignment_notes?: string;
-  }) => apiRequest<{ data: Activity }>('/activities/assign', {
+  }) => apiRequest<{ 
+    success: boolean; 
+    data: Activity; 
+    message: string;
+  }>('/activities/assign', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
 
   // Update activity
-  update: (id: string, data: UpdateActivityData) => apiRequest<{ data: Activity }>(`/activities/${id}`, {
+  update: (id: string, data: UpdateActivityData) => apiRequest<{ 
+    success: boolean; 
+    data: Activity; 
+    message: string;
+  }>(`/activities/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
 
   // Delete activity (soft delete)
-  delete: (id: string) => apiRequest<{ success: boolean }>(`/activities/${id}`, { 
+  delete: (id: string) => apiRequest<{ 
+    success: boolean; 
+    message: string;
+  }>(`/activities/${id}`, { 
     method: 'DELETE' 
   }),
 
   // Submit for approval (volunteer)
-  submit: (id: string) => apiRequest<{ data: Activity }>(`/activities/${id}/submit`, { 
+  submit: (id: string) => apiRequest<{ 
+    success: boolean; 
+    data: Activity; 
+    message: string;
+  }>(`/activities/${id}/submit`, { 
     method: 'POST' 
   }),
 };

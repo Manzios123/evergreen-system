@@ -1,6 +1,6 @@
-import { ApiError, ApiResponse } from '@/lib/types';
+import { ApiError } from '@/lib/types'; // Assuming you have this type
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 // Extended API request with additional options
 export const apiRequest = async <T>(
@@ -8,6 +8,7 @@ export const apiRequest = async <T>(
   options: RequestInit = {},
   params?: Record<string, any>
 ): Promise<T> => {
+  // Get token from localStorage - using 'token' as per your code
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   
   // Construct URL with query parameters
@@ -74,7 +75,7 @@ export const apiRequest = async <T>(
       
       throw {
         status: response.status,
-        message: errorData.message || 'An error occurred',
+        message: errorData.error || errorData.message || 'An error occurred',
         errors: errorData.errors,
       } as ApiError;
     }
@@ -110,7 +111,7 @@ export const apiRequest = async <T>(
 
 // Helper methods for common HTTP verbs
 export const api = {
-  get: <T>(endpoint: string, params?: Record<string, any>, p0?: { responseType: string; }) =>
+  get: <T>(endpoint: string, params?: Record<string, any>) =>
     apiRequest<T>(endpoint, { method: 'GET' }, params),
 
   post: <T>(endpoint: string, data?: any, params?: Record<string, any>) => {
