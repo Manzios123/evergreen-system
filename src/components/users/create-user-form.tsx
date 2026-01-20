@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { usersApi } from '@/lib/api/users';
 import { pilotsApi } from '@/lib/api/pilots';
-import { schoolsApi } from '@/lib/api/schools';
+import { schoolsApi, getSchoolPilotId } from '@/lib/api/schools';
 import { handleApiError } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Pilot, School } from '@/lib/types';
@@ -64,7 +64,7 @@ export default function CreateUserForm() {
       try {
         console.log('Fetching pilots and schools...');
         
-        // Fetch pilots - now returns normalized ApiResponse
+        // Fetch pilots
         const pilotsResponse = await pilotsApi.getPilots({ 
           isActive: true,
           limit: 100
@@ -72,7 +72,6 @@ export default function CreateUserForm() {
         
         console.log('Pilots response:', pilotsResponse);
         
-        // Handle normalized response
         if (pilotsResponse.success && pilotsResponse.data) {
           console.log(`Setting ${pilotsResponse.data.length} pilots`);
           setPilots(pilotsResponse.data);
@@ -83,7 +82,7 @@ export default function CreateUserForm() {
         
         setIsLoadingPilots(false);
 
-        // Fetch schools - now returns normalized ApiResponse
+        // Fetch schools
         const schoolsResponse = await schoolsApi.getSchools({
           isActive: true,
           limit: 100
@@ -91,7 +90,6 @@ export default function CreateUserForm() {
         
         console.log('Schools response:', schoolsResponse);
         
-        // Handle normalized response
         if (schoolsResponse.success && schoolsResponse.data) {
           console.log(`Setting ${schoolsResponse.data.length} schools`);
           setSchools(schoolsResponse.data);
@@ -99,7 +97,7 @@ export default function CreateUserForm() {
           // Log school distribution by pilot
           const pilotCounts: Record<string, number> = {};
           schoolsResponse.data.forEach(school => {
-            const pilotId = school.pilot_id || 'no-pilot';
+            const pilotId = getSchoolPilotId(school) || 'no-pilot';
             pilotCounts[pilotId] = (pilotCounts[pilotId] || 0) + 1;
           });
           console.log('Schools by pilot:', pilotCounts);
@@ -137,17 +135,37 @@ export default function CreateUserForm() {
     
     // Filter schools that belong to ANY selected pilot AND have an ID
     const filtered = schools.filter((school): school is School & { id: string } => {
-      const schoolPilotId = school.pilot_id?.toString();
+      const schoolPilotId = getSchoolPilotId(school);
       const hasId = !!school.id;
-      const matches = schoolPilotId && selectedPilotIds.includes(schoolPilotId);
+      const matches = schoolPilotId && selectedPilotIds.includes(schoolPilotId.toString());
+      
+      if (hasId && matches) {
+        console.log(`School ${school.id} matches pilot ${schoolPilotId}`);
+      }
       
       return hasId && !!matches;
     });
     
     console.log(`Filtered schools count: ${filtered.length}`);
+    console.log('Filtered schools:', filtered.map(s => ({ id: s.id, name: s.name, pilotId: getSchoolPilotId(s) })));
     
     return filtered;
   }, [schools, selectedPilotIds]);
+
+  // Get pilot names for display
+  const getSelectedPilotNames = () => {
+    return selectedPilotIds.map(pilotId => {
+      const pilot = pilots.find(p => p.id.toString() === pilotId.toString());
+      return pilot ? pilot.name : `Pilot ID: ${pilotId}`;
+    }).join(', ');
+  };
+
+  // Get school pilot name for display
+  const getSchoolPilotName = (school: School) => {
+    const pilotId = getSchoolPilotId(school);
+    const pilot = pilots.find(p => p.id.toString() === pilotId?.toString());
+    return pilot ? pilot.name : 'No Pilot';
+  };
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
@@ -199,7 +217,10 @@ export default function CreateUserForm() {
     } else {
       newPilotIds = currentPilotIds.filter(id => id !== pilotId);
       // Also remove schools from deselected pilot
-      const schoolsToRemove = schools.filter(school => school.pilot_id?.toString() === pilotId && school.id).map(s => s.id!);
+      const schoolsToRemove = schools.filter(school => {
+        const schoolPilotId = getSchoolPilotId(school);
+        return schoolPilotId?.toString() === pilotId && school.id;
+      }).map(s => s.id!);
       const currentSchoolIds = watch('school_ids') || [];
       const newSchoolIds = currentSchoolIds.filter(id => !schoolsToRemove.includes(id));
       setValue('school_ids', newSchoolIds);
@@ -223,12 +244,12 @@ export default function CreateUserForm() {
     setValue('school_ids', newSchoolIds);
   };
 
-  // Get pilot names for display
-  const getSelectedPilotNames = () => {
-    return selectedPilotIds.map(pilotId => {
-      const pilot = pilots.find(p => p.id.toString() === pilotId.toString());
-      return pilot ? pilot.name : `Pilot ID: ${pilotId}`;
-    }).join(', ');
+  // Calculate pilot schools count
+  const getPilotSchoolsCount = (pilotId: string) => {
+    return schools.filter(school => {
+      const schoolPilotId = getSchoolPilotId(school);
+      return schoolPilotId?.toString() === pilotId.toString();
+    }).length;
   };
 
   return (
@@ -379,7 +400,7 @@ export default function CreateUserForm() {
                 .filter(pilot => pilot.status === 'active')
                 .map((pilot) => {
                   const isChecked = selectedPilotIds.includes(pilot.id.toString());
-                  const pilotSchoolsCount = schools.filter(s => s.pilot_id?.toString() === pilot.id.toString() && s.id).length;
+                  const pilotSchoolsCount = getPilotSchoolsCount(pilot.id.toString());
                   
                   return (
                     <div key={pilot.id} className="flex items-start p-3 border border-gray-200 rounded-md hover:bg-gray-50">
@@ -457,7 +478,6 @@ export default function CreateUserForm() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-2">
                 {filteredSchools.map((school) => {
-                  const pilot = pilots.find(p => p.id.toString() === school.pilot_id?.toString());
                   const isChecked = watch('school_ids')?.includes(school.id) || false;
                   return (
                     <div key={school.id} className="flex items-start p-3 border border-gray-200 rounded-md hover:bg-gray-50">
@@ -479,7 +499,7 @@ export default function CreateUserForm() {
                           {school.address && <p>📍 {school.address}</p>}
                           {school.city && <p>🏙️ {school.city}</p>}
                           {school.state && <p>📍 {school.state}</p>}
-                          {pilot && <p className="font-medium text-green-600 mt-2">📋 Pilot: {pilot.name}</p>}
+                          <p className="font-medium text-green-600 mt-2">📋 Pilot: {getSchoolPilotName(school)}</p>
                         </div>
                       </label>
                     </div>
