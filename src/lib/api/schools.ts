@@ -2,39 +2,6 @@
 import { api } from './api';
 import { School, SchoolStats, ApiResponse, PaginationParams } from '@/lib/types';
 
-// Helper function to normalize school data
-function normalizeSchoolData(school: any): any {
-  if (!school) return school;
-  
-  // Extract pilot_id from various possible field names
-  const pilotId = 
-    school.pilot_id || 
-    school.pilotId || 
-    (school.pilot && school.pilot.id) ||
-    null;
-  
-  // Normalize all field names to a consistent shape
-  return {
-    ...school,
-    id: school.id || school.ID || '',
-    name: school.name || school.school_name || '',
-    pilot_id: pilotId,
-    pilotId: pilotId, // Add alias for compatibility
-    address: school.address || '',
-    city: school.city || '',
-    state: school.state || school.province || '',
-    district: school.district || '',
-    created_at: school.created_at || school.createdAt || '',
-    updated_at: school.updated_at || school.updatedAt || '',
-    pilot_name: school.pilot_name || (school.pilot && school.pilot.name) || '',
-  };
-}
-
-// Helper function to get pilot ID from any school object
-export function getSchoolPilotId(school: any): string | null {
-  return school.pilot_id || school.pilotId || (school.pilot && school.pilot.id) || null;
-}
-
 // Helper function to normalize responses
 function normalizeResponse<T>(response: any): ApiResponse<T> {
   console.log('🔄 Normalizing response:', response);
@@ -51,20 +18,14 @@ function normalizeResponse<T>(response: any): ApiResponse<T> {
   
   // If it's already in ApiResponse format
   if (typeof response === 'object' && 'success' in response && 'data' in response) {
-    // Normalize schools data if present
-    if (Array.isArray(response.data)) {
-      response.data = response.data.map(normalizeSchoolData);
-    } else if (response.data && typeof response.data === 'object') {
-      response.data = normalizeSchoolData(response.data);
-    }
     return response as ApiResponse<T>;
   }
   
-  // If it's an array (direct response)
+  // If it's an array
   if (Array.isArray(response)) {
     return {
       success: true,
-      data: response.map(normalizeSchoolData) as T,
+      data: response as T,
       count: response.length,
       message: 'Success'
     };
@@ -74,7 +35,7 @@ function normalizeResponse<T>(response: any): ApiResponse<T> {
   if (typeof response === 'object') {
     return {
       success: true,
-      data: normalizeSchoolData(response) as T,
+      data: response as T,
       count: 1,
       message: 'Success'
     };

@@ -1,4 +1,4 @@
-import { ApiError } from '@/lib/types';
+import { ApiError } from '@/lib/types'; // Assuming you have this type
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
@@ -68,6 +68,8 @@ export const apiRequest = async <T>(
         // Clear invalid token
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
+          // Optional: Trigger auth refresh or redirect
+          // window.location.href = '/login';
         }
       }
       
@@ -89,35 +91,9 @@ export const apiRequest = async <T>(
       return await response.blob() as T;
     }
 
-    // Handle JSON responses - normalize to consistent format
+    // Handle JSON responses
     if (isJson) {
       const data = await response.json();
-      
-      // If response already has success field, return as-is
-      if (data && typeof data === 'object' && 'success' in data) {
-        return data as T;
-      }
-      
-      // If it's an array, wrap in consistent format
-      if (Array.isArray(data)) {
-        return {
-          success: true,
-          data: data,
-          count: data.length,
-          message: 'Success'
-        } as T;
-      }
-      
-      // If it's an object, wrap in consistent format
-      if (typeof data === 'object') {
-        return {
-          success: true,
-          data: data,
-          count: 1,
-          message: 'Success'
-        } as T;
-      }
-      
       return data as T;
     }
 
@@ -171,29 +147,6 @@ export const api = {
       method: 'POST',
       body: formData,
     }, params),
-};
-
-// Error handling helper
-export const handleApiError = (error: any): string => {
-  if (error.status === 401) {
-    return 'Session expired. Please login again.';
-  }
-  if (error.status === 403) {
-    return 'You do not have permission to perform this action.';
-  }
-  if (error.status === 404) {
-    return 'Resource not found.';
-  }
-  if (error.status === 409) {
-    return 'A conflict occurred. Please check your data.';
-  }
-  if (error.status === 422) {
-    return 'Validation error: ' + (error.errors ? Object.values(error.errors).join(', ') : error.message);
-  }
-  if (error.status >= 500) {
-    return 'Server error. Please try again later.';
-  }
-  return error.message || 'An unexpected error occurred.';
 };
 
 // Token management helper functions
