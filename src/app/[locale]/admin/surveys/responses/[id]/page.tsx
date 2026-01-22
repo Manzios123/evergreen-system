@@ -10,7 +10,14 @@ import { ArrowLeftIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
-interface ResponseDetail {
+interface ResponseAnswer {
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  answer: any;
+}
+
+interface ResponseDetailData {
   response: {
     id: string;
     submitted_at: string;
@@ -24,12 +31,13 @@ interface ResponseDetail {
     activity_id?: string;
     response_type: 'student' | 'volunteer';
   };
-  answers: Array<{
-    question_id: string;
-    question_text: string;
-    question_type: string;
-    answer: any;
-  }>;
+  answers: ResponseAnswer[];
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  error?: string;
 }
 
 export default function SurveyResponseDetailPage() {
@@ -38,24 +46,68 @@ export default function SurveyResponseDetailPage() {
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ResponseDetail | null>(null);
+  const [data, setData] = useState<ResponseDetailData | null>(null);
   
   useEffect(() => {
-    fetchResponse();
+    if (responseId) {
+      fetchResponse();
+    }
   }, [responseId]);
   
   const fetchResponse = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await api.get<ResponseDetail>(`/admin/surveys/response/${responseId}`);
-      setData(response);
-      setError(null);
+      const response = await api.get<ApiResponse<ResponseDetailData>>(`/admin/surveys/response/${responseId}`);
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch response details');
+      }
+      
+      if (!response.data) {
+        throw new Error('No data returned from server');
+      }
+      
+      setData(response.data);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch response details');
       console.error('Error fetching response:', err);
     } finally {
       setLoading(false);
     }
+  };
+  
+  const renderAnswer = (answer: any, questionType: string) => {
+    if (answer === null || answer === undefined) {
+      return 'No answer provided';
+    }
+    
+    if (typeof answer === 'string' || typeof answer === 'number') {
+      return String(answer);
+    }
+    
+    if (Array.isArray(answer)) {
+      return answer.length > 0 ? answer.join(', ') : 'No selection';
+    }
+    
+    if (typeof answer === 'object') {
+      // Handle object answers (like from JSON fields)
+      try {
+        if (questionType === 'agree_disagree_unsure') {
+          const options: Record<string, string> = {
+            'agree': 'Agree (Ndabyemera)',
+            'disagree': 'Disagree (Simbyemera)',
+            'unsure': 'Unsure (Simbizi neza)'
+          };
+          return options[answer] || String(answer);
+        }
+        return JSON.stringify(answer, null, 2);
+      } catch (e) {
+        return String(answer);
+      }
+    }
+    
+    return String(answer);
   };
   
   if (loading) {
@@ -83,19 +135,6 @@ export default function SurveyResponseDetailPage() {
   }
   
   const { response, answers } = data;
-  
-  const renderAnswer = (answer: any, questionType: string) => {
-    if (typeof answer === 'string' || typeof answer === 'number') {
-      return String(answer);
-    }
-    if (Array.isArray(answer)) {
-      return answer.join(', ');
-    }
-    if (typeof answer === 'object' && answer !== null) {
-      return JSON.stringify(answer);
-    }
-    return String(answer);
-  };
   
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -128,7 +167,7 @@ export default function SurveyResponseDetailPage() {
                 ? 'bg-blue-100 text-blue-800'
                 : 'bg-purple-100 text-purple-800'
             }`}>
-              {response.survey_type.toUpperCase()}
+              {response.response_type.toUpperCase()}
             </span>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
               {response.survey_period.replace('_', ' ')}
@@ -155,7 +194,7 @@ export default function SurveyResponseDetailPage() {
             </p>
           </div>
           
-          {response.survey_type === 'student' ? (
+          {response.response_type === 'student' ? (
             <>
               <div>
                 <p className="text-sm font-medium text-gray-500">Volunteer</p>
@@ -164,17 +203,21 @@ export default function SurveyResponseDetailPage() {
                 </p>
               </div>
               
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Students</p>
-                <p className="mt-1 text-sm text-gray-900">{response.total_students || 0}</p>
-              </div>
+              {response.total_students !== undefined && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Total Students</p>
+                  <p className="mt-1 text-sm text-gray-900">{response.total_students}</p>
+                </div>
+              )}
               
-              <div>
-                <p className="text-sm font-medium text-gray-500">Activity ID</p>
-                <p className="mt-1 text-sm text-gray-900">
-                  {response.activity_id ? response.activity_id.substring(0, 8) + '...' : 'N/A'}
-                </p>
-              </div>
+              {response.activity_id && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Activity ID</p>
+                  <p className="mt-1 text-sm text-gray-900 font-mono text-xs">
+                    {response.activity_id}
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <div>
@@ -192,31 +235,54 @@ export default function SurveyResponseDetailPage() {
         <h3 className="font-medium text-gray-900 mb-6">Survey Responses</h3>
         
         <div className="space-y-6">
-          {answers.map((answer, index) => (
-            <div key={answer.question_id} className="border-b pb-6 last:border-0">
-              <div className="flex items-start mb-4">
-                <span className="bg-gray-100 text-gray-800 text-sm font-medium px-2.5 py-0.5 rounded mr-3">
-                  {index + 1}
-                </span>
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900 mb-2">
-                    {answer.question_text}
-                  </h4>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    {answer.question_type.replace('_', ' ')}
+          {(answers || []).length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No answers found for this response
+            </div>
+          ) : (
+            (answers || []).map((answer, index) => (
+              <div key={answer.question_id || index} className="border-b pb-6 last:border-0">
+                <div className="flex items-start mb-4">
+                  <span className="bg-gray-100 text-gray-800 text-sm font-medium px-2.5 py-0.5 rounded mr-3">
+                    {index + 1}
                   </span>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 mb-2">
+                      {answer.question_text || `Question ${index + 1}`}
+                    </h4>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      {answer.question_type?.replace('_', ' ') || 'text'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-gray-900 whitespace-pre-wrap">
+                    {renderAnswer(answer.answer, answer.question_type)}
+                  </p>
                 </div>
               </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-gray-900 whitespace-pre-wrap">
-                  {renderAnswer(answer.answer, answer.question_type)}
-                </p>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </Card>
+      
+      {/* Navigation */}
+      <div className="flex justify-between">
+        <Button
+          variant="outline"
+          onClick={() => window.history.back()}
+        >
+          <ArrowLeftIcon className="h-4 w-4 mr-2" />
+          Go Back
+        </Button>
+        
+        <Link href="/admin/surveys">
+          <Button variant="default">
+            View All Responses
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }
