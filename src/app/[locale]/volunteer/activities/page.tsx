@@ -133,8 +133,8 @@ export default function VolunteerActivitiesPage() {
         title="No activities yet"
         description="You haven't been assigned any activities. Check back soon!"
         action={{
-          label: 'Create New Activity',
-          onClick: () => (window.location.href = createLocalizedUrl('/volunteer/activities/new')),
+          label: 'Dashboard',
+          onClick: () => (window.location.href = createLocalizedUrl('/volunteer/activities/dashboard')),
         }}
       />
     );
