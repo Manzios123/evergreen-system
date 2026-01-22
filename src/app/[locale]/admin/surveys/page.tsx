@@ -881,7 +881,7 @@ export default function AdminSurveysPage() {
                             variant={pagination.page === pageNum ? 'default' : 'outline'}
                             size="sm"
                             onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
-                            className="min-w-[40px]"
+                            className="min-w-10"
                           >
                             {pageNum}
                           </Button>

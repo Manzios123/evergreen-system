@@ -213,7 +213,7 @@ export default function SurveyResponseDetailPage() {
               {response.activity_id && (
                 <div>
                   <p className="text-sm font-medium text-gray-500">Activity ID</p>
-                  <p className="mt-1 text-sm text-gray-900 font-mono text-xs">
+                  <p className="mt-1 text-sm text-gray-900 font-mono">
                     {response.activity_id}
                   </p>
                 </div>

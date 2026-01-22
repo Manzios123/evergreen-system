@@ -22,9 +22,10 @@ import {
   ClockIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { pilotsApi } from '@/lib/api/pilots';
 import { exportsApi } from '@/lib/api/exports';
+import { reportsApi } from '@/lib/api/reports';
 import {
   BarChart,
   Bar,
@@ -41,128 +42,54 @@ import {
   Legend,
 } from 'recharts';
 
-// Mock data for reports (to be replaced with actual API)
-const mockReportData = {
-  overview: {
-    totalUsers: 125,
-    totalActivities: 345,
-    totalSurveys: 89,
-    totalPhotos: 567,
-    userGrowth: 12,
-    activityGrowth: 8,
-    surveyGrowth: -3,
-    avgEngagement: 78,
-  },
-  userStats: {
-    byRole: [
-      { name: 'Volunteer', value: 85, growth: 10 },
-      { name: 'Coordinator', value: 25, growth: 5 },
-      { name: 'Admin', value: 15, growth: 2 },
-    ],
-    byStatus: [
-      { name: 'Active', value: 100 },
-      { name: 'Inactive', value: 25 },
-    ],
-    byPilot: [
-      { name: 'Kigali Pilot', value: 45 },
-      { name: 'Northern Pilot', value: 35 },
-      { name: 'Southern Pilot', value: 30 },
-      { name: 'Eastern Pilot', value: 15 },
-    ],
-    activeUsers: 100,
-    newUsers: 15,
-  },
-  activityStats: {
-    byStatus: [
-      { name: 'Completed', value: 200 },
-      { name: 'In Progress', value: 85 },
-      { name: 'Pending', value: 40 },
-      { name: 'Cancelled', value: 20 },
-    ],
-    byMonth: [
-      { month: 'Jan', count: 25 },
-      { month: 'Feb', count: 30 },
-      { month: 'Mar', count: 40 },
-      { month: 'Apr', count: 35 },
-      { month: 'May', count: 50 },
-      { month: 'Jun', count: 55 },
-    ],
-    byPilot: [
-      { name: 'Kigali Pilot', value: 120 },
-      { name: 'Northern Pilot', value: 95 },
-      { name: 'Southern Pilot', value: 80 },
-      { name: 'Eastern Pilot', value: 50 },
-    ],
-    bySchoolType: [
-      { type: 'Primary', count: 150 },
-      { type: 'Secondary', count: 120 },
-      { type: 'Vocational', count: 50 },
-      { type: 'University', count: 25 },
-    ],
-    avgDuration: 3.5,
-    totalHours: 1207,
-  },
-  surveyStats: {
-    byType: [
-      { name: 'Student Feedback', value: 35 },
-      { name: 'Volunteer Experience', value: 30 },
-      { name: 'Activity Evaluation', value: 20 },
-      { name: 'Program Satisfaction', value: 4 },
-    ],
-    byStatus: [
-      { status: 'Submitted', count: 65 },
-      { status: 'Pending', count: 20 },
-      { status: 'Draft', count: 4 },
-    ],
-    completionRate: 73,
-    avgRating: 4.2,
-    responseTrends: [
-      { month: 'Jan', count: 10 },
-      { month: 'Feb', count: 12 },
-      { month: 'Mar', count: 15 },
-      { month: 'Apr', count: 18 },
-      { month: 'May', count: 20 },
-      { month: 'Jun', count: 14 },
-    ],
-  },
-  pilotStats: [
-    {
-      pilot: 'Kigali Pilot',
-      users: 45,
-      activities: 120,
-      schools: 15,
-      completionRate: 85,
-      engagement: 78,
-    },
-    {
-      pilot: 'Northern Pilot',
-      users: 35,
-      activities: 95,
-      schools: 12,
-      completionRate: 80,
-      engagement: 72,
-    },
-    {
-      pilot: 'Southern Pilot',
-      users: 30,
-      activities: 80,
-      schools: 10,
-      completionRate: 75,
-      engagement: 68,
-    },
-    {
-      pilot: 'Eastern Pilot',
-      users: 15,
-      activities: 50,
-      schools: 8,
-      completionRate: 70,
-      engagement: 65,
-    },
-  ],
-};
-
 // Chart colors
 const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#6b7280'];
+
+// Helper to normalize array data
+const normalizeArray = <T,>(data: any): T[] => {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (data.results && Array.isArray(data.results)) return data.results;
+  if (data.data && Array.isArray(data.data)) return data.data;
+  return [];
+};
+
+// Default empty data structure
+const defaultReportData = {
+  overview: {
+    totalUsers: 0,
+    totalActivities: 0,
+    totalSurveys: 0,
+    totalPhotos: 0,
+    userGrowth: 0,
+    activityGrowth: 0,
+    surveyGrowth: 0,
+    avgEngagement: 0,
+  },
+  userStats: {
+    byRole: [],
+    byStatus: [],
+    byPilot: [],
+    activeUsers: 0,
+    newUsers: 0,
+  },
+  activityStats: {
+    byStatus: [],
+    byMonth: [],
+    byPilot: [],
+    bySchoolType: [],
+    avgDuration: 0,
+    totalHours: 0,
+  },
+  surveyStats: {
+    byType: [],
+    byStatus: [],
+    completionRate: 0,
+    avgRating: 0,
+    responseTrends: [],
+  },
+  pilotStats: [],
+};
 
 export default function AdminReportsPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'activities' | 'surveys'>('overview');
@@ -170,15 +97,139 @@ export default function AdminReportsPage() {
   const [selectedPilot, setSelectedPilot] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch pilots for filter
+  // Fetch all reports data with filters
   const { 
     data: pilotsData, 
     isLoading: pilotsLoading, 
-    error: pilotsError 
-  } = useApiQuery<any>(
+    error: pilotsError,
+    refetch: refetchPilots
+  } = useApiQuery(
     ['pilots-for-reports'],
     () => pilotsApi.getPilots({ limit: 100 })
   );
+
+  // Overview data
+  const { 
+    data: overviewData, 
+    isLoading: overviewLoading, 
+    error: overviewError,
+    refetch: refetchOverview
+  } = useApiQuery(
+    ['reports-overview', dateRange, selectedPilot],
+    () => reportsApi.getOverview({ 
+      dateRange, 
+      pilotId: selectedPilot === 'all' ? undefined : selectedPilot 
+    })
+  );
+
+  // User stats data
+  const { 
+    data: userStatsData, 
+    isLoading: userStatsLoading, 
+    error: userStatsError,
+    refetch: refetchUserStats
+  } = useApiQuery(
+    ['reports-user-stats', dateRange, selectedPilot],
+    () => reportsApi.getUserStats({ 
+      dateRange, 
+      pilotId: selectedPilot === 'all' ? undefined : selectedPilot 
+    })
+  );
+
+  // Activity stats data
+  const { 
+    data: activityStatsData, 
+    isLoading: activityStatsLoading, 
+    error: activityStatsError,
+    refetch: refetchActivityStats
+  } = useApiQuery(
+    ['reports-activity-stats', dateRange, selectedPilot],
+    () => reportsApi.getActivityStats({ 
+      dateRange, 
+      pilotId: selectedPilot === 'all' ? undefined : selectedPilot 
+    })
+  );
+
+  // Survey stats data
+  const { 
+    data: surveyStatsData, 
+    isLoading: surveyStatsLoading, 
+    error: surveyStatsError,
+    refetch: refetchSurveyStats
+  } = useApiQuery(
+    ['reports-survey-stats', dateRange, selectedPilot],
+    () => reportsApi.getSurveyStats({ 
+      dateRange, 
+      pilotId: selectedPilot === 'all' ? undefined : selectedPilot 
+    })
+  );
+
+  // Pilot stats data
+  const { 
+    data: pilotStatsData, 
+    isLoading: pilotStatsLoading, 
+    error: pilotStatsError,
+    refetch: refetchPilotStats
+  } = useApiQuery(
+    ['reports-pilot-stats', dateRange],
+    () => reportsApi.getPilotStats({ dateRange })
+  );
+
+  // Build report data object from API responses
+  const reportData = useMemo(() => {
+    return {
+      overview: {
+        totalUsers: overviewData?.data?.totalUsers || 0,
+        totalActivities: overviewData?.data?.totalActivities || 0,
+        totalSurveys: overviewData?.data?.totalSurveys || 0,
+        totalPhotos: overviewData?.data?.totalPhotos || 0,
+        userGrowth: overviewData?.data?.userGrowth || 0,
+        activityGrowth: overviewData?.data?.activityGrowth || 0,
+        surveyGrowth: overviewData?.data?.surveyGrowth || 0,
+        avgEngagement: overviewData?.data?.avgEngagement || 0,
+      },
+      userStats: {
+        byRole: normalizeArray<any>(userStatsData?.data?.byRole),
+        byStatus: normalizeArray<any>(userStatsData?.data?.byStatus),
+        byPilot: normalizeArray<any>(userStatsData?.data?.byPilot),
+        activeUsers: userStatsData?.data?.activeUsers || 0,
+        newUsers: userStatsData?.data?.newUsers || 0,
+      },
+      activityStats: {
+        byStatus: normalizeArray<any>(activityStatsData?.data?.byStatus),
+        byMonth: normalizeArray<any>(activityStatsData?.data?.byMonth),
+        byPilot: normalizeArray<any>(activityStatsData?.data?.byPilot),
+        bySchoolType: normalizeArray<any>(activityStatsData?.data?.bySchoolType),
+        avgDuration: activityStatsData?.data?.avgDuration || 0,
+        totalHours: activityStatsData?.data?.totalHours || 0,
+      },
+      surveyStats: {
+        byType: normalizeArray<any>(surveyStatsData?.data?.byType),
+        byStatus: normalizeArray<any>(surveyStatsData?.data?.byStatus),
+        completionRate: surveyStatsData?.data?.completionRate || 0,
+        avgRating: surveyStatsData?.data?.avgRating || 0,
+        responseTrends: normalizeArray<any>(surveyStatsData?.data?.responseTrends),
+      },
+      pilotStats: normalizeArray<any>(pilotStatsData?.data),
+    };
+  }, [overviewData, userStatsData, activityStatsData, surveyStatsData, pilotStatsData]);
+
+  // Refetch all data when filters change
+  useEffect(() => {
+    refetchOverview();
+    refetchUserStats();
+    refetchActivityStats();
+    refetchSurveyStats();
+    refetchPilotStats();
+  }, [dateRange, selectedPilot]);
+
+  // Loading state - check if any query is loading
+  const isLoading = pilotsLoading || overviewLoading || userStatsLoading || 
+                   activityStatsLoading || surveyStatsLoading || pilotStatsLoading;
+
+  // Error state - check if any query has error
+  const hasError = pilotsError || overviewError || userStatsError || 
+                  activityStatsError || surveyStatsError || pilotStatsError;
 
   // Custom Tooltip for charts
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -246,16 +297,28 @@ export default function AdminReportsPage() {
   };
 
   // Loading state
-  if (pilotsLoading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
-        <SkeletonLoader type="card" />
-        <SkeletonLoader type="card" />
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <SkeletonLoader type="form"  />
+            <SkeletonLoader type="card"  />
+          </div>
+          <div className="flex space-x-3">
+            <SkeletonLoader type="table"/>
+            <SkeletonLoader type="table"/>
+            <SkeletonLoader type="table"/>
+          </div>
+        </div>
+        <SkeletonLoader type="card"/>
+        <SkeletonLoader type="card"/>
+        <SkeletonLoader type="card"/>
       </div>
     );
   }
 
-  if (pilotsError) {
+  if (hasError) {
     return (
       <Alert
         type="error"
@@ -281,16 +344,16 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Users</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {mockReportData.overview.totalUsers}
+                  {reportData.overview.totalUsers}
                 </p>
                 <div className="flex items-center mt-2">
-                  {mockReportData.overview.userGrowth >= 0 ? (
+                  {reportData.overview.userGrowth >= 0 ? (
                     <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
                   ) : (
                     <ArrowTrendingDownIcon className="h-4 w-4 text-red-500 mr-1" />
                   )}
-                  <span className={`text-xs ${mockReportData.overview.userGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {Math.abs(mockReportData.overview.userGrowth)}% from last period
+                  <span className={`text-xs ${reportData.overview.userGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {Math.abs(reportData.overview.userGrowth)}% from last period
                   </span>
                 </div>
               </div>
@@ -303,16 +366,16 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Activities</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {mockReportData.overview.totalActivities}
+                  {reportData.overview.totalActivities}
                 </p>
                 <div className="flex items-center mt-2">
-                  {mockReportData.overview.activityGrowth >= 0 ? (
+                  {reportData.overview.activityGrowth >= 0 ? (
                     <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
                   ) : (
                     <ArrowTrendingDownIcon className="h-4 w-4 text-red-500 mr-1" />
                   )}
-                  <span className={`text-xs ${mockReportData.overview.activityGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {Math.abs(mockReportData.overview.activityGrowth)}% from last period
+                  <span className={`text-xs ${reportData.overview.activityGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {Math.abs(reportData.overview.activityGrowth)}% from last period
                   </span>
                 </div>
               </div>
@@ -325,16 +388,16 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Surveys</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {mockReportData.overview.totalSurveys}
+                  {reportData.overview.totalSurveys}
                 </p>
                 <div className="flex items-center mt-2">
-                  {mockReportData.overview.surveyGrowth >= 0 ? (
+                  {reportData.overview.surveyGrowth >= 0 ? (
                     <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
                   ) : (
                     <ArrowTrendingDownIcon className="h-4 w-4 text-red-500 mr-1" />
                   )}
-                  <span className={`text-xs ${mockReportData.overview.surveyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {Math.abs(mockReportData.overview.surveyGrowth)}% from last period
+                  <span className={`text-xs ${reportData.overview.surveyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {Math.abs(reportData.overview.surveyGrowth)}% from last period
                   </span>
                 </div>
               </div>
@@ -347,12 +410,12 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Avg. Engagement</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {mockReportData.overview.avgEngagement}%
+                  {reportData.overview.avgEngagement}%
                 </p>
                 <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-green-500 rounded-full"
-                    style={{ width: `${mockReportData.overview.avgEngagement}%` }}
+                    style={{ width: `${Math.min(reportData.overview.avgEngagement, 100)}%` }}
                   />
                 </div>
               </div>
@@ -362,7 +425,7 @@ export default function AdminReportsPage() {
         </div>
 
         {/* Pilot Performance */}
-        {mockReportData.pilotStats.length > 0 && (
+        {reportData.pilotStats.length > 0 && (
           <Card>
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Pilot Program Performance</h3>
@@ -391,7 +454,7 @@ export default function AdminReportsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {mockReportData.pilotStats.map((pilot, index) => (
+                    {reportData.pilotStats.map((pilot: any, index: number) => (
                       <tr key={index} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center">
@@ -416,7 +479,7 @@ export default function AdminReportsPage() {
                             <div className="h-2 w-16 bg-gray-200 rounded-full overflow-hidden">
                               <div 
                                 className="h-full bg-green-500 rounded-full"
-                                style={{ width: `${pilot.completionRate}%` }}
+                                style={{ width: `${Math.min(pilot.completionRate, 100)}%` }}
                               />
                             </div>
                           </div>
@@ -427,7 +490,7 @@ export default function AdminReportsPage() {
                             <div className="h-2 w-16 bg-gray-200 rounded-full overflow-hidden">
                               <div 
                                 className="h-full bg-blue-500 rounded-full"
-                                style={{ width: `${pilot.engagement}%` }}
+                                style={{ width: `${Math.min(pilot.engagement, 100)}%` }}
                               />
                             </div>
                           </div>
@@ -446,25 +509,33 @@ export default function AdminReportsPage() {
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Activity Trends</h3>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockReportData.activityStats.byMonth}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="month" 
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12 }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar 
-                    dataKey="count" 
-                    fill="#10b981" 
-                    name="Activities"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {reportData.activityStats.byMonth.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={reportData.activityStats.byMonth}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="month" 
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar 
+                      dataKey="count" 
+                      fill="#10b981" 
+                      name="Activities"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState
+                  title="No activity data"
+                  description="No activity data available for the selected period"
+                  icon={<CalendarIcon className="h-12 w-12 text-gray-400" />}
+                />
+              )}
             </div>
           </div>
         </Card>
@@ -486,7 +557,7 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Active Users</p>
                 <p className="text-2xl font-bold text-green-600 mt-1">
-                  {mockReportData.userStats.activeUsers}
+                  {reportData.userStats.activeUsers}
                 </p>
               </div>
               <UserGroupIcon className="h-8 w-8 text-gray-300" />
@@ -498,7 +569,7 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">New Users</p>
                 <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {mockReportData.userStats.newUsers}
+                  {reportData.userStats.newUsers}
                 </p>
               </div>
               <ArrowTrendingUpIcon className="h-8 w-8 text-gray-300" />
@@ -510,10 +581,10 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Avg. per Pilot</p>
                 <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {mockReportData.userStats.byPilot.length > 0
+                  {reportData.userStats.byPilot.length > 0
                     ? Math.round(
-                        mockReportData.userStats.byPilot.reduce((sum, p) => sum + p.value, 0) /
-                        mockReportData.userStats.byPilot.length
+                        reportData.userStats.byPilot.reduce((sum: number, p: any) => sum + (p.value || 0), 0) /
+                        reportData.userStats.byPilot.length
                       )
                     : 0}
                 </p>
@@ -530,31 +601,39 @@ export default function AdminReportsPage() {
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Users by Role</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={mockReportData.userStats.byRole}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={renderCustomPieLabel}
-                      outerRadius={80}
-                      innerRadius={40}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {mockReportData.userStats.byRole.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36}
-                      formatter={(value) => <span className="text-sm">{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                {reportData.userStats.byRole.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={reportData.userStats.byRole}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={renderCustomPieLabel}
+                        outerRadius={80}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {reportData.userStats.byRole.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => <span className="text-sm">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No role data"
+                    description="No user role data available"
+                    icon={<UserGroupIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
               </div>
             </div>
           </Card>
@@ -564,32 +643,40 @@ export default function AdminReportsPage() {
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Users by Status</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={mockReportData.userStats.byStatus}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="name" 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar 
-                      dataKey="value" 
-                      fill="#3b82f6" 
-                      name="Users"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {reportData.userStats.byStatus.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportData.userStats.byStatus}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar 
+                        dataKey="value" 
+                        fill="#3b82f6" 
+                        name="Users"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No status data"
+                    description="No user status data available"
+                    icon={<UserGroupIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
               </div>
             </div>
           </Card>
         </div>
 
         {/* Users by Pilot - Horizontal Bar Chart */}
-        {mockReportData.userStats.byPilot.length > 0 && (
+        {reportData.userStats.byPilot.length > 0 && (
           <Card>
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Users by Pilot Program</h3>
@@ -597,7 +684,7 @@ export default function AdminReportsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     layout="vertical"
-                    data={mockReportData.userStats.byPilot}
+                    data={reportData.userStats.byPilot}
                     margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -638,7 +725,7 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Hours</p>
                 <p className="text-2xl font-bold text-green-600 mt-1">
-                  {mockReportData.activityStats.totalHours}
+                  {reportData.activityStats.totalHours}
                 </p>
               </div>
               <ClockIcon className="h-8 w-8 text-gray-300" />
@@ -650,7 +737,7 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Avg. Duration</p>
                 <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {mockReportData.activityStats.avgDuration}h
+                  {reportData.activityStats.avgDuration}h
                 </p>
               </div>
               <CalendarIcon className="h-8 w-8 text-gray-300" />
@@ -660,9 +747,9 @@ export default function AdminReportsPage() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Schools Covered</p>
+                <p className="text-sm font-medium text-gray-500">Total Activities</p>
                 <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {mockReportData.activityStats.bySchoolType.length}
+                  {reportData.activityStats.byStatus.reduce((sum: number, item: any) => sum + (item.value || 0), 0)}
                 </p>
               </div>
               <BuildingOfficeIcon className="h-8 w-8 text-gray-300" />
@@ -677,72 +764,88 @@ export default function AdminReportsPage() {
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Activities by Status</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={mockReportData.activityStats.byStatus}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={renderCustomPieLabel}
-                      outerRadius={80}
-                      innerRadius={40}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {mockReportData.activityStats.byStatus.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36}
-                      formatter={(value) => <span className="text-sm">{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                {reportData.activityStats.byStatus.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={reportData.activityStats.byStatus}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={renderCustomPieLabel}
+                        outerRadius={80}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {reportData.activityStats.byStatus.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => <span className="text-sm">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No status data"
+                    description="No activity status data available"
+                    icon={<CalendarIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
               </div>
             </div>
           </Card>
 
-          {/* Activities by School Type - Bar Chart */}
+          {/* Activities by Pilot - Bar Chart */}
           <Card>
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Activities by School Type</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Activities by Pilot</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={mockReportData.activityStats.bySchoolType}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="type" 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar 
-                      dataKey="count" 
-                      fill="#8b5cf6" 
-                      name="Activities"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {reportData.activityStats.byPilot.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportData.activityStats.byPilot}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar 
+                        dataKey="value" 
+                        fill="#8b5cf6" 
+                        name="Activities"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No pilot data"
+                    description="No activity data by pilot available"
+                    icon={<BuildingOfficeIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
               </div>
             </div>
           </Card>
         </div>
 
         {/* Monthly Activity Trends - Line Chart */}
-        {mockReportData.activityStats.byMonth.length > 0 && (
+        {reportData.activityStats.byMonth.length > 0 && (
           <Card>
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Activity Trends</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={mockReportData.activityStats.byMonth}>
+                  <LineChart data={reportData.activityStats.byMonth}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
                       dataKey="month" 
@@ -785,7 +888,7 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Completion Rate</p>
                 <p className="text-2xl font-bold text-green-600 mt-1">
-                  {mockReportData.surveyStats.completionRate}%
+                  {reportData.surveyStats.completionRate}%
                 </p>
               </div>
               <ChartBarIcon className="h-8 w-8 text-gray-300" />
@@ -797,7 +900,7 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Average Rating</p>
                 <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {mockReportData.surveyStats.avgRating}/5
+                  {reportData.surveyStats.avgRating}/5
                 </p>
               </div>
               <StarIcon className="h-8 w-8 text-gray-300" />
@@ -809,11 +912,27 @@ export default function AdminReportsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Response Trend</p>
                 <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {mockReportData.surveyStats.responseTrends[mockReportData.surveyStats.responseTrends.length - 1]?.count || 0}
+                  {reportData.surveyStats.responseTrends[reportData.surveyStats.responseTrends.length - 1]?.count || 0}
                 </p>
                 <div className="flex items-center mt-2">
-                  <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-xs text-green-600">+12% from last month</span>
+                  {reportData.surveyStats.responseTrends.length >= 2 ? (
+                    <>
+                      {reportData.surveyStats.responseTrends[reportData.surveyStats.responseTrends.length - 1]?.count >= 
+                       reportData.surveyStats.responseTrends[reportData.surveyStats.responseTrends.length - 2]?.count ? (
+                        <ArrowTrendingUpIcon className="h-4 w-4 text-green-500 mr-1" />
+                      ) : (
+                        <ArrowTrendingDownIcon className="h-4 w-4 text-red-500 mr-1" />
+                      )}
+                      <span className={`text-xs ${reportData.surveyStats.responseTrends[reportData.surveyStats.responseTrends.length - 1]?.count >= 
+                        reportData.surveyStats.responseTrends[reportData.surveyStats.responseTrends.length - 2]?.count ? 'text-green-600' : 'text-red-600'}`}>
+                        {reportData.surveyStats.responseTrends.length >= 2 ? 
+                          Math.abs(reportData.surveyStats.responseTrends[reportData.surveyStats.responseTrends.length - 1]?.count - 
+                                  reportData.surveyStats.responseTrends[reportData.surveyStats.responseTrends.length - 2]?.count) || 0 : 0} from last month
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-gray-500">No trend data</span>
+                  )}
                 </div>
               </div>
               <ArrowTrendingUpIcon className="h-8 w-8 text-gray-300" />
@@ -828,31 +947,39 @@ export default function AdminReportsPage() {
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Surveys by Type</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={mockReportData.surveyStats.byType}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={renderCustomPieLabel}
-                      outerRadius={80}
-                      innerRadius={40}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {mockReportData.surveyStats.byType.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36}
-                      formatter={(value) => <span className="text-sm">{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                {reportData.surveyStats.byType.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={reportData.surveyStats.byType}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={renderCustomPieLabel}
+                        outerRadius={80}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {reportData.surveyStats.byType.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => <span className="text-sm">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No type data"
+                    description="No survey type data available"
+                    icon={<DocumentTextIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
               </div>
             </div>
           </Card>
@@ -862,38 +989,46 @@ export default function AdminReportsPage() {
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Survey Responses by Status</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={mockReportData.surveyStats.byStatus}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="status" 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar 
-                      dataKey="count" 
-                      fill="#f59e0b" 
-                      name="Responses"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {reportData.surveyStats.byStatus.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportData.surveyStats.byStatus}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="status" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar 
+                        dataKey="count" 
+                        fill="#f59e0b" 
+                        name="Responses"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No status data"
+                    description="No survey status data available"
+                    icon={<DocumentTextIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
               </div>
             </div>
           </Card>
         </div>
 
         {/* Response Trends - Line Chart */}
-        {mockReportData.surveyStats.responseTrends.length > 0 && (
+        {reportData.surveyStats.responseTrends.length > 0 && (
           <Card>
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Response Trends Over Time</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={mockReportData.surveyStats.responseTrends}>
+                  <LineChart data={reportData.surveyStats.responseTrends}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
                       dataKey="month" 
@@ -957,7 +1092,7 @@ export default function AdminReportsPage() {
             className="rounded-md border-gray-300 py-2 pl-3 pr-10 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
           >
             <option value="all">All Pilot Programs</option>
-            {pilotsData?.data?.map((pilot: any) => (
+            {normalizeArray<any>(pilotsData?.data).map((pilot: any) => (
               <option key={pilot.id} value={pilot.id}>{pilot.name}</option>
             ))}
           </select>
@@ -993,13 +1128,14 @@ export default function AdminReportsPage() {
             <div className="text-center">
               <p className="text-sm font-medium text-gray-500">Scope</p>
               <p className="text-lg font-semibold text-gray-900 mt-1">
-                {selectedPilot === 'all' ? 'All Pilots' : pilotsData?.data?.find((p: any) => p.id === selectedPilot)?.name}
+                {selectedPilot === 'all' ? 'All Pilots' : 
+                  normalizeArray<any>(pilotsData?.data).find((p: any) => p.id === selectedPilot)?.name || 'Unknown Pilot'}
               </p>
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-gray-500">Data Points</p>
               <p className="text-lg font-semibold text-gray-900 mt-1">
-                {mockReportData.overview.totalUsers + mockReportData.overview.totalActivities + mockReportData.overview.totalSurveys}
+                {reportData.overview.totalUsers + reportData.overview.totalActivities + reportData.overview.totalSurveys}
               </p>
             </div>
             <div className="text-center">
