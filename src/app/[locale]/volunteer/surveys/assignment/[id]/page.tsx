@@ -1,4 +1,4 @@
-// app/[locale]/volunteer/surveys/assignment/[id]/page.tsx
+// app/[locale]/volunteer/surveys/assignment/[id]/page.tsx - UPDATED WITH MULTI-SUBMIT SUPPORT
 'use client';
 
 import { SurveyForm } from '@/components/surveys/survey-form';
@@ -54,6 +54,13 @@ interface AssignmentResponse {
   completed_at: string | null;
   response_id: string | null;
   can_edit: boolean;
+  // New fields for student surveys
+  submission_stats?: {
+    submissions_count: number;
+    last_submission_at: string | null;
+    my_submissions_count: number;
+    my_last_submission_at: string | null;
+  };
 }
 
 interface SurveyAssignmentPageProps {
@@ -66,6 +73,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
   const router = useRouter();
   const urlParams = useParams();
   const [surveyData, setSurveyData] = useState<any>(null);
+  const [showSubmissionSuccess, setShowSubmissionSuccess] = useState(false);
   
   // Use params from props or from useParams hook (client-side)
   const assignmentId = params?.id || (urlParams?.id as string);
@@ -115,13 +123,23 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
   }, [apiResponse, assignmentId]);
 
   const handleComplete = () => {
-    // Refresh the data to show completion status
+    // Refresh the data to show updated stats
     refetch();
-    // Redirect after a short delay to show success message
-    setTimeout(() => {
-      router.push('/volunteer/surveys/volunteer');
-      router.refresh();
-    }, 1500);
+    
+    // Show success message for student surveys
+    if (apiResponse?.assignment?.survey_type === 'student') {
+      setShowSubmissionSuccess(true);
+      // Hide success message after 5 seconds
+      setTimeout(() => {
+        setShowSubmissionSuccess(false);
+      }, 5000);
+    } else {
+      // For volunteer surveys, redirect after a short delay
+      setTimeout(() => {
+        router.push('/volunteer/surveys/volunteer');
+        router.refresh();
+      }, 1500);
+    }
   };
 
   // Show loading state if still getting the ID or fetching data
@@ -173,8 +191,12 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  // Check if survey is completed
-  if (apiResponse.completed) {
+  const assignment = apiResponse.assignment;
+  const isVolunteerSurvey = assignment.survey_type === 'volunteer';
+  const isStudentSurvey = assignment.survey_type === 'student';
+
+  // Check if volunteer survey is completed (student surveys are never blocked)
+  if (isVolunteerSurvey && apiResponse.completed) {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <Alert
@@ -215,8 +237,8 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  // Check if user can edit
-  if (!apiResponse.can_edit) {
+  // Check if user can edit (only relevant for volunteer surveys)
+  if (isVolunteerSurvey && !apiResponse.can_edit) {
     return (
       <div className="max-w-3xl mx-auto">
         <Alert
@@ -235,10 +257,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
     );
   }
 
-  const assignment = apiResponse.assignment;
   const isOverdue = assignment.due_date && new Date(assignment.due_date) < new Date();
-  const isVolunteerSurvey = assignment.survey_type === 'volunteer';
-  const isStudentSurvey = assignment.survey_type === 'student';
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -313,6 +332,54 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
             </p>
           </div>
         </div>
+
+        {/* Student Survey Submission Stats Banner */}
+        {isStudentSurvey && apiResponse.submission_stats && (
+          <div className="mt-6">
+            <Alert
+              type="info"
+              title="Student Survey Progress"
+            >
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="font-medium">Total Submissions:</p>
+                  <p className="text-lg">{apiResponse.submission_stats.submissions_count}</p>
+                  {apiResponse.submission_stats.last_submission_at && (
+                    <p className="text-sm text-gray-600">
+                      Last submission: {new Date(apiResponse.submission_stats.last_submission_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium">Your Submissions:</p>
+                  <p className="text-lg">{apiResponse.submission_stats.my_submissions_count}</p>
+                  {apiResponse.submission_stats.my_last_submission_at && (
+                    <p className="text-sm text-gray-600">
+                      Your last: {new Date(apiResponse.submission_stats.my_last_submission_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <p className="mt-3 text-sm">
+                You can submit multiple student surveys. Each submission helps build a more complete picture.
+              </p>
+            </Alert>
+          </div>
+        )}
+
+        {/* Success message for student survey submissions */}
+        {showSubmissionSuccess && isStudentSurvey && (
+          <div className="mt-6">
+            <Alert
+              type="success"
+              title="Survey Submitted Successfully!"
+            >
+              <p className="mt-2">
+                Your student survey has been recorded. You can submit another survey if needed.
+              </p>
+            </Alert>
+          </div>
+        )}
       </div>
 
       {/* Survey Form */}
@@ -320,10 +387,12 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
         <div className="p-6">
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-gray-900">
-              Complete Survey
+              {isStudentSurvey ? 'Submit Student Survey' : 'Complete Survey'}
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Please answer all questions honestly. Your feedback is valuable!
+              {isStudentSurvey 
+                ? 'Please collect responses from students and enter the aggregated results below.'
+                : 'Please answer all questions honestly. Your feedback is valuable!'}
             </p>
           </div>
 
@@ -344,6 +413,8 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
               <p className="mt-2">
                 This is a student survey. Please collect responses from students and enter the aggregated results below.
                 You can write questions on the board and record votes, or collect individual student responses.
+                <br /><br />
+                <strong>Note:</strong> You can submit multiple times as you collect more student responses.
               </p>
             </Alert>
           )}

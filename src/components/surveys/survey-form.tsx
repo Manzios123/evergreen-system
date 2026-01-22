@@ -1,4 +1,4 @@
-// components/surveys/survey-form.tsx
+// components/surveys/survey-form.tsx - UPDATED WITH MULTI-SUBMIT SUPPORT
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -19,6 +19,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // For student surveys, track aggregated responses
   const [totalStudents, setTotalStudents] = useState<number>(0);
@@ -62,6 +63,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       // Additional validation for student surveys
@@ -104,8 +106,30 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       
       console.log('Survey submitted successfully:', result);
       
-      // Call onComplete which will refresh the page and redirect
-      onComplete();
+      // For student surveys, reset the form and show success message
+      if (surveyType === 'student') {
+        // Clear form for next submission
+        setTotalStudents(0);
+        const resetResponses: Record<string, any> = {};
+        questions.forEach((question: any) => {
+          resetResponses[question.id] = '';
+        });
+        setResponses(resetResponses);
+        
+        // Show success message
+        setSuccessMessage('Student survey submitted successfully! You can submit another survey.');
+        
+        // Call onComplete which will refresh stats but not redirect
+        onComplete();
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setSuccessMessage(null);
+        }, 5000);
+      } else {
+        // For volunteer surveys, call onComplete which will refresh and redirect
+        onComplete();
+      }
       
     } catch (err: any) {
       console.error('Survey submission error:', err);
@@ -260,6 +284,15 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
         </Alert>
       )}
 
+      {successMessage && (
+        <Alert
+          type="success"
+          title="Success!"
+        >
+          {successMessage}
+        </Alert>
+      )}
+
       {/* Student survey specific fields */}
       {surveyType === 'student' && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
@@ -286,8 +319,8 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
             <p className="font-medium mb-1">Instructions:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>For each question below, enter the aggregated results from all students.</li>
-              <li>For agree/disagree questions, enter the counts for each option.</li>
-              <li>For text questions, summarize the common responses from students.</li>
+              <li>You can submit multiple times as you collect more student responses.</li>
+              <li>Each submission helps build a more complete picture of student feedback.</li>
             </ul>
           </div>
         </div>
@@ -341,6 +374,8 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                 <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
                 Submitting...
               </>
+            ) : surveyType === 'student' ? (
+              'Submit Student Survey'
             ) : (
               'Submit Survey'
             )}

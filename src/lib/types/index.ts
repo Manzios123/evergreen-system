@@ -60,16 +60,33 @@ export interface User {
   updated_at: string;
 }
 
+// Update the School interface to match D1 schema
 export interface School {
-  id?: string;
+  [x: string]: any;
+  id: string;
   name: string;
+  province?: string;
+  district?: string;
   address?: string;
-  city?: string;
-  state?: string;
-  zip_code?: string;
   pilot_id?: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+  is_active?: boolean; // computed field: 1 if deleted_at IS NULL, else 0
+}
+
+// Add SchoolContact interface
+export interface SchoolContact {
+  id: string;
+  school_id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
 }
 
 export interface Pilot {
@@ -286,3 +303,4 @@ export interface PaginationParams {
   limit?: number;
   offset?: number;
 }
+

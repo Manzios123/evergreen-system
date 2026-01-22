@@ -1,9 +1,9 @@
-import RoleLayout from '@/components/layout/RoleLayout';
+
 import CreateSchoolForm from '@/components/schools/create-school-form';
 
 export default function CreateSchoolPage() {
   return (
-    <RoleLayout role="admin">
+    
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Create New School</h1>
@@ -16,6 +16,6 @@ export default function CreateSchoolPage() {
           <CreateSchoolForm />
         </div>
       </div>
-    </RoleLayout>
+    
   );
 }

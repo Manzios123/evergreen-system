@@ -9,46 +9,28 @@ import { schoolsApi } from '@/lib/api/schools';
 import { pilotsApi } from '@/lib/api/pilots';
 import { handleApiError } from '@/lib/api';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Pilot } from '@/lib/types';
+import { Pilot } from '@/lib/api/types';
 
+// School schema - ONLY include fields that exist in D1 schema
 const schoolSchema = z.object({
   name: z.string().min(2, 'School name must be at least 2 characters'),
   pilot_id: z.string().min(1, 'Please select a pilot'),
   province: z.string().optional(),
   district: z.string().optional(),
   address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  zip_code: z.string().optional(),
-  contacts: z.array(z.object({
-    name: z.string().min(1, 'Contact name is required'),
-    email: z.string().email('Valid email is required'),
-    phone: z.string().optional(),
-    role: z.string().min(1, 'Contact role is required'),
-    isPrimary: z.boolean().optional(),
-  })).optional(),
 });
 
-type FormData = z.infer<typeof schoolSchema>;
+// Contact schema for school contacts table
+const contactSchema = z.object({
+  name: z.string().min(1, 'Contact name is required'),
+  email: z.string().email('Valid email is required'),
+  phone: z.string().optional(),
+  role: z.string().min(1, 'Contact role is required'),
+  is_primary: z.boolean().optional(),
+});
 
-// Create a type that matches what the API expects
-type CreateSchoolData = Omit<FormData, 'contacts'> & {
-  contacts?: Array<{
-    name: string;
-    email: string;
-    phone?: string;
-    role: string;
-    isPrimary?: boolean;
-  }>;
-};
-
-interface Contact {
-  name: string;
-  email: string;
-  phone?: string;
-  role: string;
-  isPrimary: boolean;
-}
+type SchoolFormData = z.infer<typeof schoolSchema>;
+type ContactFormData = z.infer<typeof contactSchema>;
 
 export default function CreateSchoolForm() {
   const router = useRouter();
@@ -58,17 +40,16 @@ export default function CreateSchoolForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [pilots, setPilots] = useState<Pilot[]>([]);
   const [isLoadingPilots, setIsLoadingPilots] = useState(true);
-  const [contacts, setContacts] = useState<Contact[]>([
-    { name: '', email: '', phone: '', role: 'Principal', isPrimary: true }
+  const [contacts, setContacts] = useState<ContactFormData[]>([
+    { name: '', email: '', phone: '', role: 'Principal', is_primary: true }
   ]);
 
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors },
     reset,
-  } = useForm<FormData>({
+  } = useForm<SchoolFormData>({
     resolver: zodResolver(schoolSchema),
     defaultValues: {
       name: '',
@@ -76,10 +57,6 @@ export default function CreateSchoolForm() {
       province: '',
       district: '',
       address: '',
-      city: '',
-      state: '',
-      zip_code: '',
-      contacts: [],
     },
   });
 
@@ -88,7 +65,6 @@ export default function CreateSchoolForm() {
     const fetchPilots = async () => {
       try {
         const pilotsResponse = await pilotsApi.getPilots({ 
-          isActive: true,
           limit: 100
         });
         
@@ -108,7 +84,7 @@ export default function CreateSchoolForm() {
 
   // Add a new contact field
   const addContact = () => {
-    setContacts([...contacts, { name: '', email: '', phone: '', role: 'Teacher', isPrimary: false }]);
+    setContacts([...contacts, { name: '', email: '', phone: '', role: 'Teacher', is_primary: false }]);
   };
 
   // Remove a contact field
@@ -118,19 +94,19 @@ export default function CreateSchoolForm() {
     setContacts(newContacts);
     
     // If we removed a primary contact and there are other contacts, make the first one primary
-    if (contacts[index].isPrimary && newContacts.length > 0) {
-      newContacts[0].isPrimary = true;
+    if (contacts[index].is_primary && newContacts.length > 0) {
+      newContacts[0].is_primary = true;
     }
   };
 
   // Update a contact field
-  const updateContact = (index: number, field: keyof Contact, value: string | boolean) => {
+  const updateContact = (index: number, field: keyof ContactFormData, value: string | boolean) => {
     const newContacts = [...contacts];
     
-    if (field === 'isPrimary' && value === true) {
+    if (field === 'is_primary' && value === true) {
       // If setting this as primary, unset all others
       newContacts.forEach((contact, i) => {
-        contact.isPrimary = i === index;
+        contact.is_primary = i === index;
       });
     } else {
       (newContacts[index] as any)[field] = value;
@@ -139,67 +115,50 @@ export default function CreateSchoolForm() {
     setContacts(newContacts);
   };
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: SchoolFormData) => {
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
 
     try {
-      // Filter out empty contacts
-      const validContacts = contacts.filter(contact => 
-        contact.name.trim() && contact.email.trim() && contact.role.trim()
-      );
-
-      // Prepare API data according to your backend schema
-      const schoolData: CreateSchoolData = {
-        name: data.name,
-        pilot_id: data.pilot_id,
-        province: data.province || undefined,
-        district: data.district || undefined,
-        address: data.address || undefined,
-        city: data.city || undefined,
-        state: data.state || undefined,
-        zip_code: data.zip_code || undefined,
-      };
-
-      console.log('Creating school with data:', schoolData);
+      console.log('Creating school with data:', data);
       
-      // First create the school with type assertion
-      const response = await schoolsApi.createSchool(schoolData as any);
+      // Create the school (only schema fields)
+      const response = await schoolsApi.createSchool(data);
       
-      // Check if we have a valid response with an ID
       if (!response.success || !response.data || !response.data.id) {
-        throw new Error('Failed to create school: No valid ID returned');
+        throw new Error(response.message || 'Failed to create school');
       }
 
       const schoolId = response.data.id;
       
-      // If we have valid contacts, add them
+      // Filter out empty contacts and add them
+      const validContacts = contacts.filter(contact => 
+        contact.name.trim() && contact.email.trim() && contact.role.trim()
+      );
+      
       if (validContacts.length > 0) {
-        for (const contact of validContacts) {
-          try {
-            await schoolsApi.addContact(schoolId, {
-              name: contact.name,
-              email: contact.email,
-              phone: contact.phone || undefined,
-              role: contact.role,
-              isPrimary: contact.isPrimary,
-            });
-          } catch (contactErr) {
-            console.error('Failed to add contact:', contactErr);
-            // Continue with other contacts even if one fails
-          }
-        }
+        // Create contacts in parallel
+        await Promise.all(
+          validContacts.map(contact => 
+            schoolsApi.createContact(schoolId, contact).catch((err: any) => {
+              console.warn('Failed to add contact:', err);
+              // Don't fail the whole operation if one contact fails
+              return null;
+            })
+          )
+        );
       }
       
-      setSuccess('School created successfully!');
+      setSuccess('School created successfully! Redirecting...');
       reset();
-      setContacts([{ name: '', email: '', phone: '', role: 'Principal', isPrimary: true }]);
+      setContacts([{ name: '', email: '', phone: '', role: 'Principal', is_primary: true }]);
       
-      // Redirect after 2 seconds
+      // Redirect after 1.5 seconds
       setTimeout(() => {
         router.push('/admin/schools');
-      }, 2000);
+        router.refresh();
+      }, 1500);
       
     } catch (err: any) {
       console.error('Error creating school:', err);
@@ -230,7 +189,7 @@ export default function CreateSchoolForm() {
             <div className="ml-3">
               <h3 className="text-sm font-medium text-green-800">Success</h3>
               <div className="mt-2 text-sm text-green-700">
-                {success} Redirecting to schools list...
+                {success}
               </div>
             </div>
           </div>
@@ -260,7 +219,7 @@ export default function CreateSchoolForm() {
         {/* Pilot Selection */}
         <div className="sm:col-span-2">
           <label htmlFor="pilot_id" className="block text-sm font-medium text-gray-700">
-            Pilot *
+            Pilot Program *
           </label>
           <div className="mt-1">
             {isLoadingPilots ? (
@@ -273,7 +232,7 @@ export default function CreateSchoolForm() {
               </div>
             ) : pilots.length === 0 ? (
               <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-md">
-                No active pilots available. Create a pilot first.
+                No pilots available. Create a pilot first.
                 <button
                   type="button"
                   onClick={() => router.push('/admin/pilots/new')}
@@ -289,13 +248,11 @@ export default function CreateSchoolForm() {
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
               >
                 <option value="">Select a pilot...</option>
-                {pilots
-                  .filter(pilot => pilot.status === 'active')
-                  .map((pilot) => (
-                    <option key={pilot.id} value={pilot.id}>
-                      {pilot.name} {pilot.description && `- ${pilot.description}`}
-                    </option>
-                  ))}
+                {pilots.map((pilot) => (
+                  <option key={pilot.id} value={pilot.id}>
+                    {pilot.name} {pilot.description && `- ${pilot.description}`}
+                  </option>
+                ))}
               </select>
             )}
             {errors.pilot_id && (
@@ -332,54 +289,6 @@ export default function CreateSchoolForm() {
               {...register('district')}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
               placeholder="E.g., Tshwane"
-            />
-          </div>
-        </div>
-
-        {/* City */}
-        <div>
-          <label htmlFor="city" className="block text-sm font-medium text-gray-700">
-            City/Town
-          </label>
-          <div className="mt-1">
-            <input
-              type="text"
-              id="city"
-              {...register('city')}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
-              placeholder="E.g., Johannesburg"
-            />
-          </div>
-        </div>
-
-        {/* State */}
-        <div>
-          <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-            State/Region
-          </label>
-          <div className="mt-1">
-            <input
-              type="text"
-              id="state"
-              {...register('state')}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
-              placeholder="E.g., Gauteng"
-            />
-          </div>
-        </div>
-
-        {/* ZIP Code */}
-        <div>
-          <label htmlFor="zip_code" className="block text-sm font-medium text-gray-700">
-            ZIP/Postal Code
-          </label>
-          <div className="mt-1">
-            <input
-              type="text"
-              id="zip_code"
-              {...register('zip_code')}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
-              placeholder="E.g., 2001"
             />
           </div>
         </div>
@@ -471,7 +380,7 @@ export default function CreateSchoolForm() {
                   </label>
                   <input
                     type="tel"
-                    value={contact.phone}
+                    value={contact.phone || ''}
                     onChange={(e) => updateContact(index, 'phone', e.target.value)}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
                     placeholder="+27 12 345 6789"
@@ -502,8 +411,8 @@ export default function CreateSchoolForm() {
                     <input
                       type="checkbox"
                       id={`primary-${index}`}
-                      checked={contact.isPrimary}
-                      onChange={(e) => updateContact(index, 'isPrimary', e.target.checked)}
+                      checked={contact.is_primary || false}
+                      onChange={(e) => updateContact(index, 'is_primary', e.target.checked)}
                       className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                     />
                     <label htmlFor={`primary-${index}`} className="ml-2 text-xs text-gray-700">
@@ -524,28 +433,6 @@ export default function CreateSchoolForm() {
           <p className="text-xs text-gray-500">
             At least one contact is recommended for communication purposes. Primary contact will be the main point of contact.
           </p>
-        </div>
-      </div>
-
-      {/* Help Text */}
-      <div className="rounded-md bg-blue-50 p-4">
-        <div className="flex">
-          <div className="shrink-0">
-            <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-blue-800">Information</h3>
-            <div className="mt-2 text-sm text-blue-700">
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Schools must be assigned to an active pilot</li>
-                <li>Contact information is optional but highly recommended for coordination</li>
-                <li>Address and location details help with volunteer assignments</li>
-                <li>You can add multiple contacts and designate one as primary</li>
-              </ul>
-            </div>
-          </div>
         </div>
       </div>
 
