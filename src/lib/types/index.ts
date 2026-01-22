@@ -304,3 +304,55 @@ export interface PaginationParams {
   offset?: number;
 }
 
+// Add these types to the existing file
+
+export interface AdminSurveyResponse {
+  id: string;
+  survey_template_id: string;
+  template_name: string;
+  survey_type: string;
+  survey_period: string;
+  pilot_id: string;
+  pilot_name?: string;
+  submitted_at: string;
+  // Student specific
+  submitted_by?: string;
+  submitted_by_name?: string;
+  total_students?: number;
+  activity_id?: string;
+  // Volunteer specific
+  volunteer_id?: string;
+  volunteer_name?: string;
+  volunteer_email?: string;
+}
+
+export interface AdminSurveyStats {
+  totalSubmissions: number;
+  submissionsThisWeek: number;
+  submissionsThisMonth: number;
+  submissionsOverTime: Array<{ date: string; count: number }>;
+  submissionsPerTemplate: Array<{ template_id: string; template_name: string; count: number }>;
+  studentTotalStudentsSum?: number;
+}
+
+export interface AdminSurveyDetail {
+  response: {
+    id: string;
+    submitted_at: string;
+    template_name: string;
+    survey_type: string;
+    survey_period: string;
+    pilot_name: string;
+    submitted_by_name?: string;
+    volunteer_name?: string;
+    total_students?: number;
+    activity_id?: string;
+    response_type: 'student' | 'volunteer';
+  };
+  answers: Array<{
+    question_id: string;
+    question_text: string;
+    question_type: string;
+    answer: any;
+  }>;
+}

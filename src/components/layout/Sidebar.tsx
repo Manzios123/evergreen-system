@@ -67,7 +67,7 @@ export default function Sidebar({ role }: SidebarProps) {
       { name: 'Pilots', href: '/admin/pilots', icon: ChartBarIcon },
       { name: 'Schools', href: '/admin/schools', icon: BuildingLibraryIcon },
       { name: 'Activities', href: '/admin/activities', icon: CalendarIcon },
-      { name: 'Templates', href: '/admin/templates', icon: ClipboardDocumentListIcon },
+      { name: 'Surveys', href: '/admin/surveys', icon: ClipboardDocumentListIcon },
       { name: 'Exports', href: '/admin/exports', icon: ArrowDownTrayIcon },
       { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
     ],
