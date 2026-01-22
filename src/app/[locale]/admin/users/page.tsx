@@ -43,6 +43,14 @@ interface UserWithPilot extends User {
   name?: string;
 }
 
+// Define API response type to match backend
+interface UsersApiResponse {
+  users: UserWithPilot[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export default function AdminUsersPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,13 +59,13 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<UserWithPilot | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // Fetch users
+  // Fetch users - Updated to expect UsersApiResponse type
   const { 
     data: usersData, 
     isLoading, 
     error, 
     refetch 
-  } = useApiQuery<{ data: UserWithPilot[]; count: number }>(
+  } = useApiQuery<UsersApiResponse>(
     ['users', searchTerm, roleFilter, statusFilter],
     () => api.get('/users', {
       search: searchTerm,
@@ -216,8 +224,9 @@ export default function AdminUsersPage() {
     },
   ];
 
+  // Updated to use usersData?.users instead of usersData?.data
   const filteredUsers = useMemo(() => {
-    return usersData?.data || [];
+    return usersData?.users || [];
   }, [usersData]);
 
   // Role options
@@ -236,7 +245,7 @@ export default function AdminUsersPage() {
     { value: 'pending', label: 'Pending' },
   ];
 
-  // Stats
+  // Stats - Updated to use filteredUsers (which now uses usersData?.users)
   const stats = useMemo(() => {
     if (!filteredUsers) return null;
 
