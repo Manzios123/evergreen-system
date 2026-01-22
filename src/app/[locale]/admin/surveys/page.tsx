@@ -15,9 +15,7 @@ import {
   ArrowDownTrayIcon,
   EyeIcon,
   MagnifyingGlassIcon,
-  FunnelIcon,
-  PlusIcon,
-  ArrowLeftIcon
+  FunnelIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import {
@@ -35,24 +33,22 @@ import {
 
 interface SurveyResponse {
   id: string;
-  submitted_at: string;
-  // Student specific
-  total_students?: number;
-  activity_id?: string;
-  submitted_by?: string;
-  submitted_by_name?: string;
-  submitted_by_email?: string;
-  // Volunteer specific
-  volunteer_id?: string;
-  volunteer_name?: string;
-  volunteer_email?: string;
-  // Common
   survey_template_id: string;
   template_name: string;
   survey_type: string;
   survey_period: string;
   pilot_id: string;
   pilot_name?: string;
+  submitted_at: string;
+  // Student specific
+  submitted_by?: string;
+  submitted_by_name?: string;
+  total_students?: number;
+  activity_id?: string;
+  // Volunteer specific
+  volunteer_id?: string;
+  volunteer_name?: string;
+  volunteer_email?: string;
 }
 
 interface SurveyStats {
@@ -125,19 +121,41 @@ export default function AdminSurveysPage() {
 
   const fetchPilots = async () => {
     try {
-      const data = await api.get<Pilot[]>('/pilots');
-      setPilots(data || []);
+      const data = await api.get<any>('/pilots');
+      // Ensure data is an array
+      if (Array.isArray(data)) {
+        setPilots(data);
+      } else if (data && Array.isArray(data.results)) {
+        setPilots(data.results);
+      } else if (data && data.data && Array.isArray(data.data)) {
+        setPilots(data.data);
+      } else {
+        console.warn('Pilots API returned non-array format:', data);
+        setPilots([]);
+      }
     } catch (err) {
       console.error('Error fetching pilots:', err);
+      setPilots([]); // Set to empty array on error
     }
   };
 
   const fetchTemplates = async () => {
     try {
-      const data = await api.get<Template[]>('/survey-templates');
-      setTemplates(data || []);
+      const data = await api.get<any>('/survey-templates');
+      // Ensure data is an array
+      if (Array.isArray(data)) {
+        setTemplates(data);
+      } else if (data && Array.isArray(data.results)) {
+        setTemplates(data.results);
+      } else if (data && data.data && Array.isArray(data.data)) {
+        setTemplates(data.data);
+      } else {
+        console.warn('Templates API returned non-array format:', data);
+        setTemplates([]);
+      }
     } catch (err) {
       console.error('Error fetching templates:', err);
+      setTemplates([]);
     }
   };
 
@@ -163,21 +181,39 @@ export default function AdminSurveysPage() {
       if (dateTo) params.to = dateTo;
       if (searchQuery && searchQuery.trim()) params.search = searchQuery;
       
-      const response = await api.get<{ success: boolean; data: SurveyResponse[], total: number, error?: string }>(
-        '/admin/surveys/responses',
-        params
-      );
+      const response = await api.get<any>('/admin/surveys/responses', params);
       
-      // Check response success flag
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch responses');
+      // Handle different response formats
+      let responseData: SurveyResponse[] = [];
+      let total = 0;
+      
+      if (response && response.success) {
+        // New format with success flag
+        if (Array.isArray(response.data)) {
+          responseData = response.data;
+        }
+        total = response.total || 0;
+      } else if (Array.isArray(response)) {
+        // Legacy format: direct array
+        responseData = response;
+        total = response.length;
+      } else if (response && response.data && Array.isArray(response.data)) {
+        // Another possible format
+        responseData = response.data;
+        total = response.total || response.data.length || 0;
+      } else if (response && response.results && Array.isArray(response.results)) {
+        // Results format
+        responseData = response.results;
+        total = response.total || response.results.length || 0;
+      } else {
+        console.warn('Unexpected response format:', response);
       }
       
-      setResponses(response.data || []);
+      setResponses(responseData);
       setPagination(prev => ({
         ...prev,
-        total: response.total || 0,
-        totalPages: Math.ceil((response.total || 0) / pagination.limit)
+        total,
+        totalPages: Math.ceil(total / pagination.limit)
       }));
       setError(null);
     } catch (err: any) {
@@ -206,16 +242,21 @@ export default function AdminSurveysPage() {
       if (dateFrom) params.from = dateFrom;
       if (dateTo) params.to = dateTo;
       
-      const response = await api.get<{ success: boolean; data: SurveyStats, error?: string }>('/admin/surveys/stats', params);
+      const response = await api.get<any>('/admin/surveys/stats', params);
       
-      // Check response success flag
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to fetch stats');
+      // Handle different response formats
+      if (response && response.success && response.data) {
+        setStats(response.data);
+      } else if (response && !response.success) {
+        console.error('Stats API returned error:', response.error);
+        setStats(null);
+      } else {
+        // Assume direct stats object
+        setStats(response);
       }
-      
-      setStats(response.data);
     } catch (err: any) {
       console.error('Error fetching stats:', err);
+      setStats(null);
     } finally {
       setStatsLoading(false);
     }
@@ -276,23 +317,24 @@ export default function AdminSurveysPage() {
     setSearchQuery('');
   };
 
-  const filteredTemplates = templates.filter(t => {
-    const typeMatch = activeTab === 'admin' 
-      ? t.survey_type === 'volunteer'  // Admin tab shows volunteer templates
-      : t.survey_type === activeTab;   // Other tabs match exactly
-    
-    return typeMatch && (!pilotId || t.pilot_id === pilotId);
-  });
+  // Fix: Ensure filteredTemplates is always an array
+  const filteredTemplates = Array.isArray(templates) ? templates.filter(t => 
+    t.survey_type === activeTab && 
+    (!pilotId || t.pilot_id === pilotId)
+  ) : [];
 
-  const surveyPeriods = Array.from(new Set(
-    filteredTemplates.map(t => t.survey_period)
-  ));
-
-  // Colors for charts
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+  // Fix: Ensure surveyPeriods is always an array
+  const surveyPeriods = Array.isArray(templates) ? 
+    Array.from(new Set(
+      templates
+        .filter(t => t.survey_type === activeTab)
+        .map(t => t.survey_period)
+        .filter(Boolean)
+    )) : [];
 
   if (showAdminForm && adminAssignment) {
-    // Redirect to the survey form page
+    // We'll implement the survey form component later
+    // For now, redirect to the volunteer survey form
     window.location.href = `/volunteer/surveys/assignment/${adminAssignment.assignment_id}`;
     return null;
   }
@@ -470,7 +512,7 @@ export default function AdminSurveysPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">All Pilots</option>
-                  {pilots.map(pilot => (
+                  {Array.isArray(pilots) && pilots.map(pilot => (
                     <option key={pilot.id} value={pilot.id}>
                       {pilot.name}
                     </option>
@@ -597,12 +639,12 @@ export default function AdminSurveysPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      {activeTab === 'student' ? 'Total Students' : 'Unique Volunteers'}
+                      {activeTab === 'student' ? 'Total Students' : 'Active Volunteers'}
                     </p>
                     <p className="text-2xl font-semibold text-gray-900">
                       {activeTab === 'student' 
                         ? stats.studentTotalStudentsSum || 0
-                        : new Set(responses.map(r => r.volunteer_id || r.submitted_by)).size
+                        : stats.totalSubmissions
                       }
                     </p>
                   </div>
@@ -617,7 +659,7 @@ export default function AdminSurveysPage() {
           )}
 
           {/* Charts */}
-          {stats && stats.submissionsOverTime && stats.submissionsOverTime.length > 0 && (
+          {stats && stats.submissionsOverTime && stats.submissionsPerTemplate && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="p-6">
                 <h3 className="font-medium text-gray-900 mb-4">Submissions Over Time</h3>
@@ -647,28 +689,26 @@ export default function AdminSurveysPage() {
                 </div>
               </Card>
               
-              {stats.submissionsPerTemplate && stats.submissionsPerTemplate.length > 0 && (
-                <Card className="p-6">
-                  <h3 className="font-medium text-gray-900 mb-4">Submissions by Template</h3>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={stats.submissionsPerTemplate}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="template_name" 
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                        />
-                        <YAxis />
-                        <Tooltip formatter={(value) => [`${value} submissions`, 'Count']} />
-                        <Legend />
-                        <Bar dataKey="count" fill="#82ca9d" name="Submissions" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </Card>
-              )}
+              <Card className="p-6">
+                <h3 className="font-medium text-gray-900 mb-4">Submissions by Template</h3>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.submissionsPerTemplate}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="template_name" 
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis />
+                      <Tooltip formatter={(value) => [`${value} submissions`, 'Count']} />
+                      <Legend />
+                      <Bar dataKey="count" fill="#82ca9d" name="Submissions" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
             </div>
           )}
 
@@ -747,9 +787,6 @@ export default function AdminSurveysPage() {
                             <div className="text-sm font-medium text-gray-900">
                               {response.template_name}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {response.survey_type}
-                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
@@ -775,16 +812,9 @@ export default function AdminSurveysPage() {
                                 <div className="text-sm text-gray-900">
                                   {response.submitted_by_name || 'Unknown'}
                                 </div>
-                                {response.submitted_by_email && (
-                                  <div className="text-xs text-gray-500">
-                                    {response.submitted_by_email}
-                                  </div>
-                                )}
-                                {response.activity_id && (
-                                  <div className="text-xs text-gray-500">
-                                    Activity: {response.activity_id.substring(0, 8)}...
-                                  </div>
-                                )}
+                                <div className="text-xs text-gray-500">
+                                  Activity: {response.activity_id ? response.activity_id.substring(0, 8) + '...' : 'N/A'}
+                                </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {response.total_students || 0}
@@ -793,11 +823,11 @@ export default function AdminSurveysPage() {
                           ) : (
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
-                                {response.volunteer_name || response.submitted_by_name || 'Unknown'}
+                                {response.volunteer_name || response.volunteer_email || 'Unknown'}
                               </div>
-                              {(response.volunteer_email || response.submitted_by_email) && (
+                              {response.volunteer_email && (
                                 <div className="text-xs text-gray-500">
-                                  {response.volunteer_email || response.submitted_by_email}
+                                  {response.volunteer_email}
                                 </div>
                               )}
                             </td>
@@ -824,14 +854,14 @@ export default function AdminSurveysPage() {
                     <div className="flex-1 flex justify-between sm:hidden">
                       <Button
                         variant="outline"
-                        onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                         disabled={pagination.page === 1}
                       >
                         Previous
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => setPagination(prev => ({ ...prev, page: Math.min(pagination.totalPages, prev.page + 1) }))}
+                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
                         disabled={pagination.page === pagination.totalPages}
                       >
                         Next
@@ -845,29 +875,17 @@ export default function AdminSurveysPage() {
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                          let pageNum;
-                          if (pagination.totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (pagination.page <= 3) {
-                            pageNum = i + 1;
-                          } else if (pagination.page >= pagination.totalPages - 2) {
-                            pageNum = pagination.totalPages - 4 + i;
-                          } else {
-                            pageNum = pagination.page - 2 + i;
-                          }
-                          return (
-                            <Button
-                              key={pageNum}
-                              variant={pagination.page === pageNum ? 'default' : 'outline'}
-                              size="sm"
-                              onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
-                              className="min-w-10"
-                            >
-                              {pageNum}
-                            </Button>
-                          );
-                        })}
+                        {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(pageNum => (
+                          <Button
+                            key={pageNum}
+                            variant={pagination.page === pageNum ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
+                            className="min-w-[40px]"
+                          >
+                            {pageNum}
+                          </Button>
+                        ))}
                       </div>
                     </div>
                   </div>
