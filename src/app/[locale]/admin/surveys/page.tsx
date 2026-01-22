@@ -15,7 +15,9 @@ import {
   ArrowDownTrayIcon,
   EyeIcon,
   MagnifyingGlassIcon,
-  FunnelIcon
+  FunnelIcon,
+  PlusIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import {
@@ -28,30 +30,29 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
+  ResponsiveContainer
 } from 'recharts';
 
 interface SurveyResponse {
   id: string;
+  submitted_at: string;
+  // Student specific
+  total_students?: number;
+  activity_id?: string;
+  submitted_by?: string;
+  submitted_by_name?: string;
+  submitted_by_email?: string;
+  // Volunteer specific
+  volunteer_id?: string;
+  volunteer_name?: string;
+  volunteer_email?: string;
+  // Common
   survey_template_id: string;
   template_name: string;
   survey_type: string;
   survey_period: string;
   pilot_id: string;
   pilot_name?: string;
-  submitted_at: string;
-  // Student specific
-  submitted_by?: string;
-  submitted_by_name?: string;
-  total_students?: number;
-  activity_id?: string;
-  // Volunteer specific
-  volunteer_id?: string;
-  volunteer_name?: string;
-  volunteer_email?: string;
 }
 
 interface SurveyStats {
@@ -144,10 +145,16 @@ export default function AdminSurveysPage() {
     setLoading(true);
     try {
       const params: Record<string, any> = {
-        type: activeTab,
         page: pagination.page,
         limit: pagination.limit
       };
+      
+      // Map frontend tab to backend type
+      let backendType = activeTab;
+      if (activeTab === 'admin') {
+        backendType = 'volunteer'; // Admin/coordinator surveys are stored in volunteer tables
+      }
+      params.type = backendType;
       
       if (pilotId) params.pilot_id = pilotId;
       if (templateId) params.template_id = templateId;
@@ -156,10 +163,15 @@ export default function AdminSurveysPage() {
       if (dateTo) params.to = dateTo;
       if (searchQuery && searchQuery.trim()) params.search = searchQuery;
       
-      const response = await api.get<{ data: SurveyResponse[], total: number }>(
+      const response = await api.get<{ success: boolean; data: SurveyResponse[], total: number, error?: string }>(
         '/admin/surveys/responses',
         params
       );
+      
+      // Check response success flag
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch responses');
+      }
       
       setResponses(response.data || []);
       setPagination(prev => ({
@@ -179,9 +191,14 @@ export default function AdminSurveysPage() {
   const fetchStats = async () => {
     setStatsLoading(true);
     try {
-      const params: Record<string, any> = {
-        type: activeTab
-      };
+      const params: Record<string, any> = {};
+      
+      // Map frontend tab to backend type
+      let backendType = activeTab;
+      if (activeTab === 'admin') {
+        backendType = 'volunteer';
+      }
+      params.type = backendType;
       
       if (pilotId) params.pilot_id = pilotId;
       if (templateId) params.template_id = templateId;
@@ -189,8 +206,14 @@ export default function AdminSurveysPage() {
       if (dateFrom) params.from = dateFrom;
       if (dateTo) params.to = dateTo;
       
-      const data = await api.get<SurveyStats>('/admin/surveys/stats', params);
-      setStats(data);
+      const response = await api.get<{ success: boolean; data: SurveyStats, error?: string }>('/admin/surveys/stats', params);
+      
+      // Check response success flag
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch stats');
+      }
+      
+      setStats(response.data);
     } catch (err: any) {
       console.error('Error fetching stats:', err);
     } finally {
@@ -214,7 +237,7 @@ export default function AdminSurveysPage() {
   const handleExport = async () => {
     try {
       const params: Record<string, any> = {
-        type: activeTab,
+        type: activeTab === 'admin' ? 'volunteer' : activeTab,
         format: 'csv'
       };
       
@@ -253,23 +276,23 @@ export default function AdminSurveysPage() {
     setSearchQuery('');
   };
 
-  const filteredTemplates = templates.filter(t => 
-    t.survey_type === activeTab && 
-    (!pilotId || t.pilot_id === pilotId)
-  );
+  const filteredTemplates = templates.filter(t => {
+    const typeMatch = activeTab === 'admin' 
+      ? t.survey_type === 'volunteer'  // Admin tab shows volunteer templates
+      : t.survey_type === activeTab;   // Other tabs match exactly
+    
+    return typeMatch && (!pilotId || t.pilot_id === pilotId);
+  });
 
   const surveyPeriods = Array.from(new Set(
-    templates
-      .filter(t => t.survey_type === activeTab)
-      .map(t => t.survey_period)
+    filteredTemplates.map(t => t.survey_period)
   ));
 
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
   if (showAdminForm && adminAssignment) {
-    // We'll implement the survey form component later
-    // For now, redirect to the volunteer survey form
+    // Redirect to the survey form page
     window.location.href = `/volunteer/surveys/assignment/${adminAssignment.assignment_id}`;
     return null;
   }
@@ -574,12 +597,12 @@ export default function AdminSurveysPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      {activeTab === 'student' ? 'Total Students' : 'Active Volunteers'}
+                      {activeTab === 'student' ? 'Total Students' : 'Unique Volunteers'}
                     </p>
                     <p className="text-2xl font-semibold text-gray-900">
                       {activeTab === 'student' 
                         ? stats.studentTotalStudentsSum || 0
-                        : stats.totalSubmissions
+                        : new Set(responses.map(r => r.volunteer_id || r.submitted_by)).size
                       }
                     </p>
                   </div>
@@ -594,7 +617,7 @@ export default function AdminSurveysPage() {
           )}
 
           {/* Charts */}
-          {stats && (
+          {stats && stats.submissionsOverTime && stats.submissionsOverTime.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="p-6">
                 <h3 className="font-medium text-gray-900 mb-4">Submissions Over Time</h3>
@@ -624,26 +647,28 @@ export default function AdminSurveysPage() {
                 </div>
               </Card>
               
-              <Card className="p-6">
-                <h3 className="font-medium text-gray-900 mb-4">Submissions by Template</h3>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats.submissionsPerTemplate}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="template_name" 
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis />
-                      <Tooltip formatter={(value) => [`${value} submissions`, 'Count']} />
-                      <Legend />
-                      <Bar dataKey="count" fill="#82ca9d" name="Submissions" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
+              {stats.submissionsPerTemplate && stats.submissionsPerTemplate.length > 0 && (
+                <Card className="p-6">
+                  <h3 className="font-medium text-gray-900 mb-4">Submissions by Template</h3>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats.submissionsPerTemplate}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="template_name" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis />
+                        <Tooltip formatter={(value) => [`${value} submissions`, 'Count']} />
+                        <Legend />
+                        <Bar dataKey="count" fill="#82ca9d" name="Submissions" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              )}
             </div>
           )}
 
@@ -722,6 +747,9 @@ export default function AdminSurveysPage() {
                             <div className="text-sm font-medium text-gray-900">
                               {response.template_name}
                             </div>
+                            <div className="text-xs text-gray-500">
+                              {response.survey_type}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
@@ -747,9 +775,16 @@ export default function AdminSurveysPage() {
                                 <div className="text-sm text-gray-900">
                                   {response.submitted_by_name || 'Unknown'}
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  Activity: {response.activity_id ? response.activity_id.substring(0, 8) + '...' : 'N/A'}
-                                </div>
+                                {response.submitted_by_email && (
+                                  <div className="text-xs text-gray-500">
+                                    {response.submitted_by_email}
+                                  </div>
+                                )}
+                                {response.activity_id && (
+                                  <div className="text-xs text-gray-500">
+                                    Activity: {response.activity_id.substring(0, 8)}...
+                                  </div>
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {response.total_students || 0}
@@ -758,11 +793,11 @@ export default function AdminSurveysPage() {
                           ) : (
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
-                                {response.volunteer_name || response.volunteer_email || 'Unknown'}
+                                {response.volunteer_name || response.submitted_by_name || 'Unknown'}
                               </div>
-                              {response.volunteer_email && (
+                              {(response.volunteer_email || response.submitted_by_email) && (
                                 <div className="text-xs text-gray-500">
-                                  {response.volunteer_email}
+                                  {response.volunteer_email || response.submitted_by_email}
                                 </div>
                               )}
                             </td>
@@ -789,14 +824,14 @@ export default function AdminSurveysPage() {
                     <div className="flex-1 flex justify-between sm:hidden">
                       <Button
                         variant="outline"
-                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                        onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
                         disabled={pagination.page === 1}
                       >
                         Previous
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                        onClick={() => setPagination(prev => ({ ...prev, page: Math.min(pagination.totalPages, prev.page + 1) }))}
                         disabled={pagination.page === pagination.totalPages}
                       >
                         Next
@@ -810,17 +845,29 @@ export default function AdminSurveysPage() {
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(pageNum => (
-                          <Button
-                            key={pageNum}
-                            variant={pagination.page === pageNum ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
-                            className="min-w-10"
-                          >
-                            {pageNum}
-                          </Button>
-                        ))}
+                        {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (pagination.totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (pagination.page <= 3) {
+                            pageNum = i + 1;
+                          } else if (pagination.page >= pagination.totalPages - 2) {
+                            pageNum = pagination.totalPages - 4 + i;
+                          } else {
+                            pageNum = pagination.page - 2 + i;
+                          }
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={pagination.page === pageNum ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
+                              className="min-w-10"
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>

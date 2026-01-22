@@ -304,26 +304,27 @@ export interface PaginationParams {
   offset?: number;
 }
 
-// Add these types to the existing file
-
+// Add these interfaces for admin survey responses
 export interface AdminSurveyResponse {
   id: string;
+  submitted_at: string;
+  // Student specific
+  total_students?: number;
+  activity_id?: string;
+  submitted_by?: string;
+  submitted_by_name?: string;
+  submitted_by_email?: string;
+  // Volunteer specific
+  volunteer_id?: string;
+  volunteer_name?: string;
+  volunteer_email?: string;
+  // Common
   survey_template_id: string;
   template_name: string;
   survey_type: string;
   survey_period: string;
   pilot_id: string;
   pilot_name?: string;
-  submitted_at: string;
-  // Student specific
-  submitted_by?: string;
-  submitted_by_name?: string;
-  total_students?: number;
-  activity_id?: string;
-  // Volunteer specific
-  volunteer_id?: string;
-  volunteer_name?: string;
-  volunteer_email?: string;
 }
 
 export interface AdminSurveyStats {
@@ -335,24 +336,12 @@ export interface AdminSurveyStats {
   studentTotalStudentsSum?: number;
 }
 
-export interface AdminSurveyDetail {
-  response: {
-    id: string;
-    submitted_at: string;
-    template_name: string;
-    survey_type: string;
-    survey_period: string;
-    pilot_name: string;
-    submitted_by_name?: string;
-    volunteer_name?: string;
-    total_students?: number;
-    activity_id?: string;
-    response_type: 'student' | 'volunteer';
-  };
-  answers: Array<{
-    question_id: string;
-    question_text: string;
-    question_type: string;
-    answer: any;
-  }>;
+export interface AdminApiResponse<T> {
+  success: boolean;
+  data: T;
+  error?: string;
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
 }
