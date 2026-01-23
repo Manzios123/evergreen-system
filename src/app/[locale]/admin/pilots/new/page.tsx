@@ -1,9 +1,9 @@
-import RoleLayout from '@/components/layout/RoleLayout';
+
 import CreatePilotForm from '@/components/pilots/create-pilot-form';
 
 export default function CreatePilotPage() {
   return (
-    <RoleLayout role="admin">
+    
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Create New Pilot</h1>
@@ -16,6 +16,6 @@ export default function CreatePilotPage() {
           <CreatePilotForm />
         </div>
       </div>
-    </RoleLayout>
+   
   );
 }
