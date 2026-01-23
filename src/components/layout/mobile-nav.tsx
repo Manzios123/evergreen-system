@@ -16,7 +16,7 @@ const navigation = {
     { name: 'Pilots', href: '/admin/pilots' },
     { name: 'Schools', href: '/admin/schools' },
     { name: 'Activities', href: '/admin/activities' },
-    { name: 'Templates', href: '/admin/templates' },
+    { name: 'Surveys', href: '/admin/surveys' },
     { name: 'Exports', href: '/admin/exports' },
     { name: 'Reports', href: '/admin/reports' },
   ],

@@ -345,3 +345,55 @@ export interface AdminApiResponse<T> {
   limit?: number;
   totalPages?: number;
 }
+
+// Report data types
+export interface OverviewStats {
+  totalUsers: number;
+  totalActivities: number;
+  totalSurveys: number;
+  totalPhotos: number;
+  userGrowth: number;
+  activityGrowth: number;
+  surveyGrowth: number;
+  avgEngagement: number;
+}
+
+export interface UserStats {
+  byRole: Array<{ name: string; value: number }>;
+  byStatus: Array<{ name: string; value: number }>;
+  byPilot: Array<{ name: string; value: number }>;
+  activeUsers: number;
+  newUsers: number;
+}
+
+export interface ActivityStats {
+  byStatus: Array<{ name: string; value: number }>;
+  byMonth: Array<{ month: string; count: number }>;
+  byPilot: Array<{ name: string; value: number }>;
+  bySchoolType: Array<{ type: string; count: number }>;
+  avgDuration: number;
+  totalHours: number;
+}
+
+export interface SurveyStats {
+  byType: Array<{ name: string; value: number }>;
+  byStatus: Array<{ status: string; count: number }>;
+  completionRate: number;
+  avgRating: number;
+  responseTrends: Array<{ month: string; count: number }>;
+}
+
+export interface PilotStats {
+  pilot: string;
+  users: number;
+  activities: number;
+  schools: number;
+  completionRate: number;
+  engagement: number;
+}
+
+export interface ReportsApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
