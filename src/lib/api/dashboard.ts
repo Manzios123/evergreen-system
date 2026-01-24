@@ -164,5 +164,10 @@ export interface AdminDashboard {
 export const dashboardApi = {
   getVolunteerDashboard: () => apiRequest<VolunteerDashboard>('/dashboard/volunteer'),
   getCoordinatorDashboard: () => apiRequest<CoordinatorDashboard>('/dashboard/coordinator'),
-  getAdminDashboard: () => apiRequest<AdminDashboard>('/dashboard/admin/'),
+  getAdminDashboard: () => apiRequest<AdminDashboard>('/dashboard/admin'),
+  
+  // Get system statistics (extracted from admin dashboard)
+  getSystemStats: () => 
+    apiRequest<AdminDashboard>('/dashboard/admin')
+      .then(dashboard => dashboard.systemStatistics),
 };

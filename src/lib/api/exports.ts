@@ -2,61 +2,111 @@ import { api } from './api';
 import { ExportConfig, ExportJob, ApiResponse, PaginationParams } from '@/lib/types';
 
 export const exportsApi = {
-  // Create export job
-  createExport: (type: string, config: ExportConfig) =>
-    api.post<ApiResponse<ExportJob>>(`/exports/${type}`, config),
+  // Immediate export endpoints (no job tracking)
+  
+  // Export activities with filters
+  exportActivities: (
+    filters?: {
+      pilot_id?: string;
+      start_date?: string;
+      end_date?: string;
+      status?: string;
+    },
+    format: 'json' | 'csv' = 'json'
+  ) => {
+    const params = {
+      ...filters,
+      format,
+    };
+    return api.get<any>(`/exports/activities`, params);
+  },
 
-  // Get export job status
-  getExportStatus: (jobId: string) =>
-    api.get<ApiResponse<ExportJob>>(`/exports/jobs/${jobId}`),
+  // Export surveys with filters
+  exportSurveys: (
+    filters?: {
+      pilot_id?: string;
+      type?: string;
+      start_date?: string;
+      end_date?: string;
+    },
+    format: 'json' | 'csv' = 'json'
+  ) => {
+    const params = {
+      ...filters,
+      format,
+    };
+    return api.get<any>(`/exports/surveys`, params);
+  },
 
-  // List export jobs
-  getExportJobs: (params?: PaginationParams & {
-    type?: string;
-    status?: string;
-    userId?: string;
-  }) =>
-    api.get<ApiResponse<ExportJob[]>>('/exports/jobs', params),
+  // Export users (admin only)
+  exportUsers: (
+    filters?: {
+      role?: string;
+    },
+    format: 'json' | 'csv' = 'json'
+  ) => {
+    const params = {
+      ...filters,
+      format,
+    };
+    return api.get<any>(`/exports/users`, params);
+  },
 
-  // Download export
-  downloadExport: (jobId: string) =>
-    api.get<Blob>(`/exports/jobs/${jobId}/download`, undefined, {
-      responseType: 'blob',
-    }),
+  // Export schools (coordinator/admin)
+  exportSchools: (
+    filters?: {
+      pilot_id?: string;
+    },
+    format: 'json' | 'csv' = 'json'
+  ) => {
+    const params = {
+      ...filters,
+      format,
+    };
+    return api.get<any>(`/exports/schools`, params);
+  },
 
-  // Cancel export job
-  cancelExport: (jobId: string) =>
-    api.delete<ApiResponse<void>>(`/exports/jobs/${jobId}`),
+  // Export pilots (admin only)
+  exportPilots: (
+    filters?: {
+      status?: string;
+    },
+    format: 'json' | 'csv' = 'json'
+  ) => {
+    const params = {
+      ...filters,
+      format,
+    };
+    return api.get<any>(`/exports/pilots`, params);
+  },
 
-  // Predefined exports
-  exportActivities: (filters?: Record<string, any>, format: 'json' | 'csv' | 'excel' = 'excel') =>
-    api.post<ApiResponse<ExportJob>>('/exports/activities', { filters, format }),
+  // Export activity templates
+  exportActivityTemplates: (
+    filters?: {
+      category?: string;
+    },
+    format: 'json' | 'csv' = 'json'
+  ) => {
+    const params = {
+      ...filters,
+      format,
+    };
+    return api.get<any>(`/exports/activity-templates`, params);
+  },
 
-  exportUsers: (filters?: Record<string, any>, format: 'json' | 'csv' | 'excel' = 'excel') =>
-    api.post<ApiResponse<ExportJob>>('/exports/users', { filters, format }),
-
-  exportSurveys: (templateId?: string, filters?: Record<string, any>, format: 'json' | 'csv' | 'excel' = 'excel') =>
-    api.post<ApiResponse<ExportJob>>('/exports/surveys', { templateId, filters, format }),
-
-  exportPhotos: (activityId?: string, filters?: Record<string, any>, format: 'json' | 'csv' = 'json') =>
-    api.post<ApiResponse<ExportJob>>('/exports/photos', { activityId, filters, format }),
-
-  exportReports: (reportType: 'monthly' | 'quarterly' | 'annual' | 'pilot', filters?: Record<string, any>) =>
-    api.post<ApiResponse<ExportJob>>('/exports/reports', { reportType, filters, format: 'pdf' }),
-
-  // Get available export types
-  getExportTypes: () =>
-    api.get<ApiResponse<Array<{
-      type: string;
-      name: string;
-      description: string;
-      formats: string[];
-      availableFilters: string[];
-    }>>>('/exports/types'),
-
-  // Get export template (for CSV/Excel)
-  getExportTemplate: (type: string) =>
-    api.get<Blob>(`/exports/templates/${type}`, undefined, {
-      responseType: 'blob',
-    }),
+  // Export all data (admin only)
+  exportAll: (
+    filters?: {
+      pilot_id?: string;
+      start_date?: string;
+      end_date?: string;
+    },
+    format: 'json' | 'csv' = 'json'
+  ) => {
+    const params = {
+      ...filters,
+      format,
+    };
+    return api.get<any>(`/exports/all`, params);
+  },
 };
