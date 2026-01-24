@@ -66,7 +66,7 @@ export default function ActivityReportPage() {
     refetch: refetchPhotos,
   } = useApiQuery<ApiResponse<PhotoApiItem[]>>(
     ['activity-photos', id],
-    () => api.get(`/activities/${id}/photos`)
+    () => api.get(`/activities/${id}/media`)
   );
 
   const activity = activityResponse?.data;
