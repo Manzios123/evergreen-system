@@ -18,7 +18,7 @@ const navigation = {
     { name: 'Activities', href: '/admin/activities' },
     { name: 'Surveys', href: '/admin/surveys' },
     { name: 'Exports', href: '/admin/exports' },
-    { name: 'Reports', href: '/admin/reports' },
+    //{ name: 'Reports', href: '/admin/reports' },
   ],
   coordinator: [
     { name: 'Dashboard', href: '/coordinator/dashboard' },

@@ -69,7 +69,7 @@ export default function Sidebar({ role }: SidebarProps) {
       { name: 'Activities', href: '/admin/activities', icon: CalendarIcon },
       { name: 'Surveys', href: '/admin/surveys', icon: ClipboardDocumentListIcon },
       { name: 'Exports', href: '/admin/exports', icon: ArrowDownTrayIcon },
-      { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
+     // { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
     ],
     coordinator: [
       { name: 'Dashboard', href: '/coordinator/dashboard', icon: HomeIcon, exact: true },
