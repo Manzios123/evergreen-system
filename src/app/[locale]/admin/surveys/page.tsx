@@ -74,6 +74,12 @@ interface Pilot {
   name: string;
 }
 
+interface AutoAssignResponse {
+  assignment_id: string;
+  message?: string;
+  success?: boolean;
+}
+
 type TabType = 'student' | 'volunteer' | 'admin';
 
 export default function AdminSurveysPage() {
@@ -265,7 +271,7 @@ export default function AdminSurveysPage() {
   const loadAdminSurvey = async () => {
     setAdminSurveyLoading(true);
     try {
-      const response = await api.post('/survey-assignments/auto-assign-role-survey');
+      const response = await api.post<AutoAssignResponse>('/survey-assignments/auto-assign-role-survey');
       // MODIFIED: Redirect to admin assignment route instead of volunteer
       window.location.href = `/admin/surveys/assignment/${response.assignment_id}`;
     } catch (err: any) {
@@ -331,14 +337,6 @@ export default function AdminSurveysPage() {
         .map(t => t.survey_period)
         .filter(Boolean)
     )) : [];
-
-  // REMOVED: The redirect block that was sending to volunteer route
-  // if (showAdminForm && adminAssignment) {
-  //   // We'll implement the survey form component later
-  //   // For now, redirect to the volunteer survey form
-  //   window.location.href = `/volunteer/surveys/assignment/${adminAssignment.assignment_id}`;
-  //   return null;
-  // }
 
   return (
     <div className="space-y-6">
