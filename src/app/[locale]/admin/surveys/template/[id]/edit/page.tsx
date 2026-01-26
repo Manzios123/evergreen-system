@@ -4,14 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api/api';
-import Card from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
-import Input from '@/components/ui/input';
-import Textarea from '@/components/ui/textarea';
-import Select from '@/components/ui/select';
-import Checkbox from '@/components/ui/checkbox';
-import SkeletonLoader from '@/components/ui/skeleton-loader';
 import EmptyState from '@/components/ui/empty-state';
 import { PlusIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 
@@ -40,6 +34,17 @@ interface SurveyTemplate {
   creator_name: string;
   questions: SurveyQuestion[];
 }
+
+// Helper function to format date
+const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return date.toLocaleDateString();
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
 
 const QUESTION_TYPES = [
   { value: 'text', label: 'Text' },
@@ -141,7 +146,6 @@ export default function EditSurveyTemplatePage() {
       updatedQuestions[index] = { 
         ...updatedQuestions[index], 
         [field]: value,
-        // Clear options if changing from multiple choice
         ...(value !== 'multiple_choice' && value !== 'checkbox' ? { options: [] } : {})
       };
     } else {
@@ -163,7 +167,6 @@ export default function EditSurveyTemplatePage() {
 
   const handleRemoveQuestion = (index: number) => {
     const updatedQuestions = questions.filter((_, i) => i !== index);
-    // Update order indices
     const reorderedQuestions = updatedQuestions.map((q, i) => ({
       ...q,
       order_index: i,
@@ -182,13 +185,11 @@ export default function EditSurveyTemplatePage() {
     const updatedQuestions = [...questions];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     
-    // Swap questions
     [updatedQuestions[index], updatedQuestions[newIndex]] = [
       updatedQuestions[newIndex],
       updatedQuestions[index],
     ];
     
-    // Update order indices
     const reorderedQuestions = updatedQuestions.map((q, i) => ({
       ...q,
       order_index: i,
@@ -235,13 +236,11 @@ export default function EditSurveyTemplatePage() {
       newErrors.change_reason = 'Change reason is required';
     }
 
-    // Validate questions
     questions.forEach((question, index) => {
       if (!question.question_text.trim()) {
         newErrors[`question_${index}_text`] = 'Question text is required';
       }
 
-      // Validate options for multiple choice
       if (
         (question.question_type === 'multiple_choice' || question.question_type === 'checkbox') &&
         (!question.options || question.options.length === 0)
@@ -283,15 +282,15 @@ export default function EditSurveyTemplatePage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <SkeletonLoader className="h-8 w-48 mb-2" />
-          <SkeletonLoader className="h-4 w-64" />
+          <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
+          <div className="h-4 w-64 bg-gray-200 rounded animate-pulse"></div>
         </div>
-        <Card className="p-6">
-          <SkeletonLoader className="h-6 w-full mb-4" />
-          <SkeletonLoader className="h-4 w-3/4 mb-4" />
-          <SkeletonLoader className="h-4 w-1/2 mb-6" />
-          <SkeletonLoader className="h-10 w-32" />
-        </Card>
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <div className="h-6 w-full bg-gray-200 rounded animate-pulse mb-4"></div>
+          <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse mb-4"></div>
+          <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse mb-6"></div>
+          <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+        </div>
       </div>
     );
   }
@@ -353,57 +352,89 @@ export default function EditSurveyTemplatePage() {
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Template Details Form */}
-          <Card className="lg:col-span-2">
-            <div className="p-6">
+          <div className="lg:col-span-2">
+            <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Template Information</h2>
               
               <div className="space-y-4">
                 <div>
-                  <Input
-                    label="Template Name *"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Template Name *
+                  </label>
+                  <input
+                    type="text"
                     value={formData.name || ''}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    error={errors.name}
-                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   />
+                  {errors.name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                  )}
                 </div>
                 
                 <div>
-                  <Textarea
-                    label="Description"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
                     value={formData.description || ''}
                     onChange={(e) => handleInputChange('description', e.target.value)}
                     rows={3}
                     placeholder="Describe the purpose of this survey template..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Select
-                    label="Survey Type *"
-                    value={formData.survey_type || 'student'}
-                    onChange={(e) => handleInputChange('survey_type', e.target.value)}
-                    options={SURVEY_TYPES}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Survey Type *
+                    </label>
+                    <select
+                      value={formData.survey_type || 'student'}
+                      onChange={(e) => handleInputChange('survey_type', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    >
+                      {SURVEY_TYPES.map(type => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   
-                  <Select
-                    label="Survey Period *"
-                    value={formData.survey_period || 'pre_activity'}
-                    onChange={(e) => handleInputChange('survey_period', e.target.value)}
-                    options={SURVEY_PERIODS}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Survey Period *
+                    </label>
+                    <select
+                      value={formData.survey_period || 'pre_activity'}
+                      onChange={(e) => handleInputChange('survey_period', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    >
+                      {SURVEY_PERIODS.map(period => (
+                        <option key={period.value} value={period.value}>
+                          {period.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 
                 <div>
-                  <Textarea
-                    label="Change Reason *"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Change Reason *
+                  </label>
+                  <textarea
                     value={formData.change_reason || ''}
                     onChange={(e) => handleInputChange('change_reason', e.target.value)}
                     rows={2}
                     placeholder="Explain what changes you made and why..."
-                    error={errors.change_reason}
-                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   />
+                  {errors.change_reason && (
+                    <p className="mt-1 text-sm text-red-600">{errors.change_reason}</p>
+                  )}
                   <p className="text-sm text-gray-500 mt-1">
                     Required for tracking template version history. This will create version {template.version + 1}.
                   </p>
@@ -443,7 +474,7 @@ export default function EditSurveyTemplatePage() {
                 ) : (
                   <div className="space-y-6">
                     {questions.map((question, index) => (
-                      <Card key={index} className="border border-gray-200">
+                      <div key={index} className="border border-gray-200 rounded-lg">
                         <div className="p-4">
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
@@ -453,79 +484,98 @@ export default function EditSurveyTemplatePage() {
                               <span className="text-sm font-medium text-gray-700">Question {index + 1}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Button
+                              <button
                                 type="button"
-                                variant="ghost"
-                                size="sm"
+                                className="p-1 text-gray-400 hover:text-gray-500"
                                 onClick={() => handleMoveQuestion(index, 'up')}
                                 disabled={index === 0}
                               >
                                 <ArrowUpIcon className="h-4 w-4" />
-                              </Button>
-                              <Button
+                              </button>
+                              <button
                                 type="button"
-                                variant="ghost"
-                                size="sm"
+                                className="p-1 text-gray-400 hover:text-gray-500"
                                 onClick={() => handleMoveQuestion(index, 'down')}
                                 disabled={index === questions.length - 1}
                               >
                                 <ArrowDownIcon className="h-4 w-4" />
-                              </Button>
-                              <Button
+                              </button>
+                              <button
                                 type="button"
-                                variant="ghost"
-                                size="sm"
+                                className="p-1 text-red-400 hover:text-red-500"
                                 onClick={() => handleRemoveQuestion(index)}
-                                className="text-red-600 hover:text-red-700"
                               >
                                 <TrashIcon className="h-4 w-4" />
-                              </Button>
+                              </button>
                             </div>
                           </div>
 
                           <div className="space-y-4">
                             <div>
-                              <Input
-                                label="Question Text *"
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Question Text *
+                              </label>
+                              <input
+                                type="text"
                                 value={question.question_text}
                                 onChange={(e) =>
                                   handleQuestionChange(index, 'question_text', e.target.value)
                                 }
-                                error={errors[`question_${index}_text`]}
-                                required
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                               />
+                              {errors[`question_${index}_text`] && (
+                                <p className="mt-1 text-sm text-red-600">{errors[`question_${index}_text`]}</p>
+                              )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <Select
-                                label="Question Type"
-                                value={question.question_type}
-                                onChange={(e) =>
-                                  handleQuestionChange(index, 'question_type', e.target.value)
-                                }
-                                options={QUESTION_TYPES}
-                              />
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Question Type
+                                </label>
+                                <select
+                                  value={question.question_type}
+                                  onChange={(e) =>
+                                    handleQuestionChange(index, 'question_type', e.target.value)
+                                  }
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                >
+                                  {QUESTION_TYPES.map(type => (
+                                    <option key={type.value} value={type.value}>
+                                      {type.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                               
                               <div className="flex items-end">
-                                <Checkbox
-                                  label="Required"
-                                  checked={question.is_required}
-                                  onChange={(e) =>
-                                    handleQuestionChange(index, 'is_required', e.target.checked)
-                                  }
-                                />
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={question.is_required}
+                                    onChange={(e) =>
+                                      handleQuestionChange(index, 'is_required', e.target.checked)
+                                    }
+                                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">Required</span>
+                                </label>
                               </div>
                             </div>
 
                             {/* Component ID */}
                             <div>
-                              <Input
-                                label="Component ID (Optional)"
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Component ID (Optional)
+                              </label>
+                              <input
+                                type="text"
                                 value={question.component_id || ''}
                                 onChange={(e) =>
                                   handleQuestionChange(index, 'component_id', e.target.value)
                                 }
                                 placeholder="Used for integration with other systems"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                               />
                             </div>
 
@@ -561,23 +611,22 @@ export default function EditSurveyTemplatePage() {
                                   <div className="space-y-2">
                                     {question.options!.map((option, optionIndex) => (
                                       <div key={optionIndex} className="flex items-center gap-2">
-                                        <Input
+                                        <input
+                                          type="text"
                                           value={option}
                                           onChange={(e) =>
                                             handleOptionChange(index, optionIndex, e.target.value)
                                           }
                                           placeholder={`Option ${optionIndex + 1}`}
-                                          className="flex-1"
+                                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                                         />
-                                        <Button
+                                        <button
                                           type="button"
-                                          variant="ghost"
-                                          size="sm"
+                                          className="p-2 text-red-400 hover:text-red-500"
                                           onClick={() => handleRemoveOption(index, optionIndex)}
-                                          className="text-red-600 hover:text-red-700"
                                         >
                                           <TrashIcon className="h-4 w-4" />
-                                        </Button>
+                                        </button>
                                       </div>
                                     ))}
                                   </div>
@@ -586,17 +635,17 @@ export default function EditSurveyTemplatePage() {
                             )}
                           </div>
                         </div>
-                      </Card>
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Sidebar with Actions & Info */}
-          <Card className="h-fit">
-            <div className="p-6">
+          <div className="h-fit">
+            <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Editing Information</h3>
               
               <div className="space-y-4 mb-6">
@@ -625,7 +674,7 @@ export default function EditSurveyTemplatePage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Created</label>
-                  <p className="text-sm text-gray-600">{new Date(template.created_at).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-600">{formatDate(template.created_at)}</p>
                 </div>
               </div>
 
@@ -660,7 +709,7 @@ export default function EditSurveyTemplatePage() {
                 </ul>
               </div>
             </div>
-          </Card>
+          </div>
         </div>
       </form>
     </div>

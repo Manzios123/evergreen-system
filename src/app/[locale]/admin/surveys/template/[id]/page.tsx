@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api/api';
@@ -9,8 +9,6 @@ import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
 import EmptyState from '@/components/ui/empty-state';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
-import Badge from '@/components/ui/badge';
-import { formatDate } from '@/lib/utils/date-utils';
 
 // Define types based on backend response
 interface SurveyQuestion {
@@ -21,7 +19,6 @@ interface SurveyQuestion {
   order_index: number;
   is_required: boolean;
   created_at: string;
-  options?: string[]; // For multiple-choice questions
 }
 
 interface SurveyTemplate {
@@ -39,6 +36,53 @@ interface SurveyTemplate {
   creator_name: string;
   questions: SurveyQuestion[];
 }
+
+// Helper function to format date
+const formatDate = (dateString: string, includeTime: boolean = false): string => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
+    if (includeTime) {
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
+    return date.toLocaleDateString();
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
+
+// Helper functions to get display names
+const getSurveyTypeDisplay = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    student: 'Student',
+    volunteer: 'Volunteer',
+    activity_monitoring: 'Activity Monitoring',
+  };
+  return typeMap[type] || type;
+};
+
+const getSurveyPeriodDisplay = (period: string): string => {
+  const periodMap: Record<string, string> = {
+    pre_activity: 'Pre-Activity',
+    post_activity: 'Post-Activity',
+    mid_pilot: 'Mid-Pilot',
+    end_pilot: 'End of Pilot',
+  };
+  return periodMap[period] || period;
+};
+
+const getQuestionTypeDisplay = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    text: 'Text',
+    multiple_choice: 'Multiple Choice',
+    checkbox: 'Checkbox',
+    scale: 'Scale',
+    date: 'Date',
+    time: 'Time',
+  };
+  return typeMap[type] || type;
+};
 
 export default function ViewSurveyTemplatePage() {
   const params = useParams();
@@ -65,53 +109,19 @@ export default function ViewSurveyTemplatePage() {
     router.push('/admin/surveys/templates');
   };
 
-  // Map survey type to display name
-  const getSurveyTypeDisplay = (type: string) => {
-    const typeMap: Record<string, string> = {
-      student: 'Student',
-      volunteer: 'Volunteer',
-      activity_monitoring: 'Activity Monitoring',
-    };
-    return typeMap[type] || type;
-  };
-
-  // Map survey period to display name
-  const getSurveyPeriodDisplay = (period: string) => {
-    const periodMap: Record<string, string> = {
-      pre_activity: 'Pre-Activity',
-      post_activity: 'Post-Activity',
-      mid_pilot: 'Mid-Pilot',
-      end_pilot: 'End of Pilot',
-    };
-    return periodMap[period] || period;
-  };
-
-  // Map question type to display name
-  const getQuestionTypeDisplay = (type: string) => {
-    const typeMap: Record<string, string> = {
-      text: 'Text',
-      multiple_choice: 'Multiple Choice',
-      checkbox: 'Checkbox',
-      scale: 'Scale',
-      date: 'Date',
-      time: 'Time',
-    };
-    return typeMap[type] || type;
-  };
-
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <SkeletonLoader className="h-8 w-48 mb-2" />
-          <SkeletonLoader className="h-4 w-64" />
+          <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
+          <div className="h-4 w-64 bg-gray-200 rounded animate-pulse"></div>
         </div>
-        <Card className="p-6">
-          <SkeletonLoader className="h-6 w-full mb-4" />
-          <SkeletonLoader className="h-4 w-3/4 mb-4" />
-          <SkeletonLoader className="h-4 w-1/2 mb-6" />
-          <SkeletonLoader className="h-10 w-32" />
-        </Card>
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <div className="h-6 w-full bg-gray-200 rounded animate-pulse mb-4"></div>
+          <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse mb-4"></div>
+          <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse mb-6"></div>
+          <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+        </div>
       </div>
     );
   }
@@ -161,8 +171,8 @@ export default function ViewSurveyTemplatePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Template Details */}
-        <Card className="lg:col-span-2">
-          <div className="p-6">
+        <div className="lg:col-span-2">
+          <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Template Details</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -176,15 +186,15 @@ export default function ViewSurveyTemplatePage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Survey Type</label>
-                <Badge variant="outline" className="mt-1">
+                <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 mt-1">
                   {getSurveyTypeDisplay(template.survey_type)}
-                </Badge>
+                </span>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Survey Period</label>
-                <Badge variant="outline" className="mt-1">
+                <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 mt-1">
                   {getSurveyPeriodDisplay(template.survey_period)}
-                </Badge>
+                </span>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pilot</label>
@@ -223,33 +233,19 @@ export default function ViewSurveyTemplatePage() {
                             </span>
                             <h4 className="font-medium text-gray-900">{question.question_text}</h4>
                             {question.is_required && (
-                              <Badge variant="error" size="sm">
+                              <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
                                 Required
-                              </Badge>
+                              </span>
                             )}
                           </div>
-                          <Badge variant="outline" size="sm">
+                          <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
                             {getQuestionTypeDisplay(question.question_type)}
-                          </Badge>
+                          </span>
                         </div>
                         
                         {question.component_id && (
                           <div className="mt-2">
                             <span className="text-xs text-gray-500">Component ID: {question.component_id}</span>
-                          </div>
-                        )}
-                        
-                        {/* Display options for multiple choice questions */}
-                        {question.question_type === 'multiple_choice' && question.options && question.options.length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Options:</p>
-                            <ul className="space-y-1">
-                              {question.options.map((option, idx) => (
-                                <li key={idx} className="text-sm text-gray-600">
-                                  {idx + 1}. {option}
-                                </li>
-                              ))}
-                            </ul>
                           </div>
                         )}
                       </div>
@@ -258,11 +254,11 @@ export default function ViewSurveyTemplatePage() {
               )}
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Sidebar with Metadata */}
-        <Card className="h-fit">
-          <div className="p-6">
+        <div className="h-fit">
+          <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Template Information</h3>
             
             <div className="space-y-4">
@@ -279,16 +275,18 @@ export default function ViewSurveyTemplatePage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Version</label>
                 <div className="flex items-center gap-2">
-                  <Badge variant="success" size="sm">
+                  <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
                     v{template.version}
-                  </Badge>
+                  </span>
                   <span className="text-sm text-gray-600">Latest</span>
                 </div>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <Badge variant="success">Active</Badge>
+                <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                  Active
+                </span>
               </div>
               
               <div>
@@ -314,7 +312,7 @@ export default function ViewSurveyTemplatePage() {
               </div>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
