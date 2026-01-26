@@ -87,9 +87,6 @@ export default function AdminExportsPage() {
     }
   );
 
-  // Since backend doesn't have export job tracking, we'll show a simple message
-  const exports = []; // Empty array since no job tracking exists
-
   const handleExport = async (type: string, format: 'csv' | 'json', options?: any) => {
     setIsCreatingExport(true);
     try {
@@ -129,12 +126,24 @@ export default function AdminExportsPage() {
           throw new Error(`Unsupported export type: ${type}`);
       }
       
+      console.log('Export result:', result);
+      console.log('Result type:', typeof result);
+      
       // Handle the result based on format
       if (format === 'csv') {
         // Result should be a Blob for CSV
-        const blob = result as Blob;
-        const filename = `${type}-export-${timestamp}.csv`;
-        downloadBlob(blob, filename);
+        if (result instanceof Blob) {
+          const blob = result;
+          const filename = `${type}-export-${timestamp}.csv`;
+          downloadBlob(blob, filename);
+        } else {
+          // If it's not a blob, try to convert it
+          console.log('Result is not a Blob, converting...', result);
+          const csvString = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+          const blob = new Blob([csvString], { type: 'text/csv' });
+          const filename = `${type}-export-${timestamp}.csv`;
+          downloadBlob(blob, filename);
+        }
       } else {
         // For JSON, convert to blob and download
         const jsonString = JSON.stringify(result, null, 2);
@@ -145,9 +154,23 @@ export default function AdminExportsPage() {
       
       // Show success message
       alert(`${type.charAt(0).toUpperCase() + type.slice(1)} export completed. The file will download automatically.`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create export:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error details:', {
+        message: error?.message,
+        status: error?.status,
+        stack: error?.stack
+      });
+      
+      let errorMessage = 'Unknown error';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.toString) {
+        errorMessage = error.toString();
+      }
+      
       alert(`Failed to create export. Please try again. Error: ${errorMessage}`);
     } finally {
       setIsCreatingExport(false);
@@ -294,7 +317,7 @@ export default function AdminExportsPage() {
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-indigo-600">{systemStats.totalSchools}</p>
-                <p className="text-sm text-gray-500">Total Schools</p>
+                <p className="text-sm text-gray500">Total Schools</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-teal-600">{systemStats.totalPilots}</p>

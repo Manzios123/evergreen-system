@@ -1,6 +1,67 @@
-
 import { api } from './api';
 import { ExportConfig, ExportJob, ApiResponse, PaginationParams } from '@/lib/types';
+
+// Helper function specifically for export downloads
+const exportDownload = async <T>(
+  endpoint: string,
+  params?: Record<string, any>
+): Promise<Blob | any> => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  
+  // Construct URL with query parameters
+  let url = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}${endpoint}`;
+  if (params) {
+    const queryString = new URLSearchParams(
+      Object.entries(params).filter(([_, value]) => value !== undefined && value !== null)
+    ).toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+  }
+
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: 'omit',
+    });
+
+    if (!response.ok) {
+      let errorData: any;
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        errorData = await response.json();
+      } else {
+        errorData = { message: await response.text() };
+      }
+      
+      throw {
+        status: response.status,
+        message: errorData.error || errorData.message || 'An error occurred',
+        errors: errorData.errors,
+      };
+    }
+
+    // Always return as blob for exports
+    return await response.blob();
+  } catch (error) {
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw {
+        status: 503,
+        message: 'Unable to connect to server. Please check your connection.',
+      };
+    }
+    throw error;
+  }
+};
 
 export const exportsApi = {
   // Immediate export endpoints
@@ -19,7 +80,8 @@ export const exportsApi = {
       ...filters,
       format,
     };
-    return api.get<any>(`/exports/activities`, params);
+    // Use the specialized download function instead of api.get
+    return exportDownload(`/exports/activities`, params);
   },
 
   // Export surveys with filters
@@ -36,7 +98,7 @@ export const exportsApi = {
       ...filters,
       format,
     };
-    return api.get<any>(`/exports/surveys`, params);
+    return exportDownload(`/exports/surveys`, params);
   },
 
   // Export users (admin only)
@@ -50,7 +112,7 @@ export const exportsApi = {
       ...filters,
       format,
     };
-    return api.get<any>(`/exports/users`, params);
+    return exportDownload(`/exports/users`, params);
   },
 
   // Export schools (coordinator/admin)
@@ -64,7 +126,7 @@ export const exportsApi = {
       ...filters,
       format,
     };
-    return api.get<any>(`/exports/schools`, params);
+    return exportDownload(`/exports/schools`, params);
   },
 
   // Export pilots (admin only)
@@ -78,7 +140,7 @@ export const exportsApi = {
       ...filters,
       format,
     };
-    return api.get<any>(`/exports/pilots`, params);
+    return exportDownload(`/exports/pilots`, params);
   },
 
   // Export activity templates
@@ -92,7 +154,7 @@ export const exportsApi = {
       ...filters,
       format,
     };
-    return api.get<any>(`/exports/activity-templates`, params);
+    return exportDownload(`/exports/activity-templates`, params);
   },
 
   // Export all data (admin only)
@@ -108,7 +170,7 @@ export const exportsApi = {
       ...filters,
       format,
     };
-    return api.get<any>(`/exports/all`, params);
+    return exportDownload(`/exports/all`, params);
   },
 
   // Export reports - Keep for compatibility but implement with existing backend
@@ -151,20 +213,18 @@ export const exportsApi = {
       }
     }
     
-    return api.get<any>(`/exports/activities`, params);
+    return exportDownload(`/exports/activities`, params);
   },
 
   // Download export file - For compatibility with reports page
   downloadExport: (jobId: string) =>
-    api.get<Blob>(`/exports/jobs/${jobId}/download`, undefined, {
-      responseType: 'blob',
-    }),
+    exportDownload(`/exports/jobs/${jobId}/download`),
 
-  // Cancel export job - For compatibility
+  // Cancel export job - For compatibility (use regular api for JSON responses)
   cancelExport: (jobId: string) =>
     api.delete<ApiResponse<void>>(`/exports/jobs/${jobId}`),
 
-  // List export jobs - For compatibility
+  // List export jobs - For compatibility (use regular api for JSON responses)
   getExportJobs: (params?: PaginationParams & {
     type?: string;
     status?: string;
@@ -172,7 +232,7 @@ export const exportsApi = {
   }) =>
     api.get<ApiResponse<ExportJob[]>>('/exports/jobs', params),
 
-  // Get export job status - For compatibility
+  // Get export job status - For compatibility (use regular api for JSON responses)
   getExportStatus: (jobId: string) =>
     api.get<ApiResponse<ExportJob>>(`/exports/jobs/${jobId}`),
-}
+};
