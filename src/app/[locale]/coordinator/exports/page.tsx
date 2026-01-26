@@ -6,12 +6,15 @@ import Button from '@/components/ui/button';
 import DataTable from '@/components/ui/data-table';
 import StatusBadge from '@/components/ui/status-badge';
 import SearchFilter from '@/components/ui/search-filter';
+import { Progress } from '@/components/ui/proggress';
 import EmptyState from '@/components/ui/empty-state';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import Alert from '@/components/ui/alert';
-import { Progress } from '@/components/ui/proggress';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/use-api';
-import { ExportJob } from '@/lib/types';
+import { ExportJob, ActivityStatus } from '@/lib/types';
+import { api } from '@/lib/api';
+import { exportsApi } from '@/lib/api/exports';
+import { dashboardApi } from '@/lib/api/dashboard';
 import {
   ArrowDownTrayIcon,
   CalendarIcon,
@@ -23,234 +26,171 @@ import {
   PhotoIcon,
   UserGroupIcon,
   BuildingOfficeIcon,
+  ChartBarIcon,
+  ServerIcon,
+  CircleStackIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
-import { format as formatDate } from 'date-fns';
+import { format } from 'date-fns';
 
-// Import the API
-import { api } from '@/lib/api/api';
+interface SystemStats {
+  totalUsers: number;
+  totalActivities: number;
+  totalSurveys: number;
+  totalPilots: number;
+  totalSchools: number;
+}
 
-export default function CoordinatorExportsPage() {
+export default function AdminExportsPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [exportType, setExportType] = useState<'all' | 'activities' | 'surveys' | 'photos'>('all');
   const [isCreatingExport, setIsCreatingExport] = useState(false);
+  const [selectedExportType, setSelectedExportType] = useState<string>('');
+  const [selectedFormat, setSelectedFormat] = useState<string>('');
 
-  // Fetch export jobs
+  // Fetch system stats from admin dashboard
   const { 
-    data: exports, 
-    isLoading, 
-    error, 
-    refetch 
-  } = useApiQuery<ExportJob[]>(
-    ['exports', exportType],
-    () => api.get('/exports', { type: exportType === 'all' ? undefined : exportType })
+    data: systemStats, 
+    isLoading: statsLoading, 
+    error: statsError 
+  } = useApiQuery<SystemStats>(
+    ['system-stats'],
+    async () => {
+      const stats = await dashboardApi.getSystemStats();
+      return {
+        totalUsers: stats.total_users || 0,
+        totalActivities: stats.total_activities || 0,
+        totalSurveys: (stats.activity_surveys || 0) + (stats.student_surveys || 0) + (stats.volunteer_surveys || 0),
+        totalPilots: stats.total_pilots || 0,
+        totalSchools: stats.total_schools || 0,
+      };
+    }
   );
 
-  // Create export mutation
-  const createExportMutation = useApiMutation(
-    (data: { type: string; format: string; filters?: any }) => 
-      api.post('/exports', data)
-  );
+  // Since backend doesn't have export job tracking, we'll show a simple message
+  const exports = []; // Empty array since no job tracking exists
+
+  const handleExport = async (type: string, format: string, options?: any) => {
+    setIsCreatingExport(true);
+    try {
+      let downloadUrl = '';
+      const params: any = { format };
+      
+      // Add any options as query params
+      if (options) {
+        Object.assign(params, options);
+      }
+      
+      // Create the appropriate export URL
+      switch (type) {
+        case 'activities':
+          downloadUrl = `/api/exports/activities?${new URLSearchParams(params).toString()}`;
+          break;
+        case 'surveys':
+          downloadUrl = `/api/exports/surveys?${new URLSearchParams(params).toString()}`;
+          break;
+        case 'users':
+          downloadUrl = `/api/exports/users?${new URLSearchParams(params).toString()}`;
+          break;
+        case 'schools':
+          downloadUrl = `/api/exports/schools?${new URLSearchParams(params).toString()}`;
+          break;
+        case 'pilots':
+          downloadUrl = `/api/exports/pilots?${new URLSearchParams(params).toString()}`;
+          break;
+        case 'activity-templates':
+          downloadUrl = `/api/exports/activity-templates?${new URLSearchParams(params).toString()}`;
+          break;
+        case 'full_backup':
+        case 'all':
+          downloadUrl = `/api/exports/all?${new URLSearchParams(params).toString()}`;
+          break;
+        default:
+          throw new Error(`Unsupported export type: ${type}`);
+      }
+      
+      // Trigger download
+      window.open(downloadUrl, '_blank');
+      
+      // Show success message
+      alert(`Export of ${type} has been initiated. The file will download automatically.`);
+    } catch (error) {
+      console.error('Failed to create export:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create export. Please try again. Error: ${errorMessage}`);
+    } finally {
+      setIsCreatingExport(false);
+      setSelectedExportType('');
+      setSelectedFormat('');
+    }
+  };
+
+  const handleFullBackup = () => {
+    if (window.confirm('Full system backup will export all data. This may take a while. Continue?')) {
+      handleExport('all', 'json', {
+        compress: true,
+      });
+    }
+  };
 
   const exportTypes = [
-    { id: 'activities', label: 'Activities', icon: CalendarIcon, color: 'bg-blue-100 text-blue-600' },
-    { id: 'surveys', label: 'Surveys', icon: DocumentTextIcon, color: 'bg-purple-100 text-purple-600' },
-    { id: 'photos', label: 'Photos', icon: PhotoIcon, color: 'bg-green-100 text-green-600' },
-    { id: 'volunteers', label: 'Volunteers', icon: UserGroupIcon, color: 'bg-orange-100 text-orange-600' },
-    { id: 'schools', label: 'Schools', icon: BuildingOfficeIcon, color: 'bg-indigo-100 text-indigo-600' },
+    { 
+      id: 'all', 
+      label: 'Full System Backup', 
+      icon: CircleStackIcon, 
+      color: 'bg-red-100 text-red-600',
+      description: 'Complete database backup including all data',
+      requiresConfirmation: true,
+    },
+    { 
+      id: 'activities', 
+      label: 'All Activities', 
+      icon: CalendarIcon, 
+      color: 'bg-blue-100 text-blue-600',
+      description: 'All activities across all pilot programs',
+    },
+    { 
+      id: 'surveys', 
+      label: 'All Surveys', 
+      icon: DocumentTextIcon, 
+      color: 'bg-purple-100 text-purple-600',
+      description: 'All survey responses and results',
+    },
+    { 
+      id: 'users', 
+      label: 'User Directory', 
+      icon: UserGroupIcon, 
+      color: 'bg-orange-100 text-orange-600',
+      description: 'All user accounts and profiles',
+    },
+    { 
+      id: 'schools', 
+      label: 'Schools Directory', 
+      icon: BuildingOfficeIcon, 
+      color: 'bg-indigo-100 text-indigo-600',
+      description: 'All schools and their information',
+    },
+    { 
+      id: 'pilots', 
+      label: 'Pilot Programs', 
+      icon: ChartBarIcon, 
+      color: 'bg-teal-100 text-teal-600',
+      description: 'All pilot programs and their configurations',
+    },
+    { 
+      id: 'activity-templates', 
+      label: 'Activity Templates', 
+      icon: DocumentTextIcon, 
+      color: 'bg-green-100 text-green-600',
+      description: 'All activity templates and their configurations',
+    },
   ];
 
   const exportFormats = [
     { id: 'csv', label: 'CSV', description: 'Comma-separated values' },
-    { id: 'excel', label: 'Excel', description: 'Microsoft Excel format' },
     { id: 'json', label: 'JSON', description: 'JavaScript Object Notation' },
-    { id: 'pdf', label: 'PDF', description: 'Portable Document Format' },
   ];
 
-  const handleCreateExport = async (type: string, format: string) => {
-    setIsCreatingExport(true);
-    try {
-      await createExportMutation.mutateAsync({
-        type,
-        format,
-        filters: {
-          dateRange: {
-            start: formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-            end: formatDate(new Date(), 'yyyy-MM-dd'),
-          },
-        },
-      });
-      refetch();
-    } catch (error) {
-      console.error('Failed to create export:', error);
-    } finally {
-      setIsCreatingExport(false);
-    }
-  };
-
-  const handleDownload = (exportJob: ExportJob) => {
-    if (exportJob.downloadUrl) {
-      window.open(exportJob.downloadUrl, '_blank');
-    }
-  };
-
-  const handleSearch = (query: string) => {
-    setSearchTerm(query);
-  };
-
-  // Map export status to ActivityStatus for StatusBadge component
-  const getMappedStatus = (status: ExportJob['status']) => {
-    switch (status) {
-      case 'pending': return 'pending';
-      case 'processing': return 'in_edit'; // Map to closest ActivityStatus
-      case 'completed': return 'completed';
-      case 'failed': return 'rejected';
-      default: return 'pending';
-    }
-  };
-
-  const columns = [
-    {
-      key: 'export',
-      header: 'Export',
-      render: (exportJob: ExportJob) => {
-        // Cast exportJob to any to access potentially missing properties
-        const job = exportJob as any;
-        
-        return (
-          <div className="flex items-start space-x-3">
-            <div className="shrink-0">
-              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                job.type === 'activities' ? 'bg-blue-100 text-blue-600' :
-                job.type === 'surveys' ? 'bg-purple-100 text-purple-600' :
-                job.type === 'photos' ? 'bg-green-100 text-green-600' :
-                job.type === 'volunteers' ? 'bg-orange-100 text-orange-600' :
-                job.type === 'schools' ? 'bg-indigo-100 text-indigo-600' :
-                'bg-gray-100 text-gray-600'
-              }`}>
-                {job.type === 'activities' && <CalendarIcon className="h-5 w-5" />}
-                {job.type === 'surveys' && <DocumentTextIcon className="h-5 w-5" />}
-                {job.type === 'photos' && <PhotoIcon className="h-5 w-5" />}
-                {job.type === 'volunteers' && <UserGroupIcon className="h-5 w-5" />}
-                {job.type === 'schools' && <BuildingOfficeIcon className="h-5 w-5" />}
-              </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-gray-900 capitalize">
-                  {job.type} Export
-                </p>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                  {job.format.toUpperCase()}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center text-sm text-gray-500">
-                <CalendarIcon className="h-4 w-4 mr-1 shrink-0" />
-                {formatDate(new Date(job.createdAt), 'MMM d, yyyy HH:mm')}
-              </div>
-              {job.description && (
-                <p className="mt-1 text-sm text-gray-500">{job.description}</p>
-              )}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (exportJob: ExportJob) => {
-        const job = exportJob as any;
-        
-        if (job.status === 'processing') {
-          return (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="inline-flex items-center rounded-full ring-1 ring-inset font-medium bg-blue-100 text-blue-800 ring-blue-600/20 px-3 py-1.5 text-sm">
-                  <span>Processing</span>
-                </div>
-                {job.progress && (
-                  <span className="text-xs text-gray-500">{job.progress || 0}%</span>
-                )}
-              </div>
-              {job.progress !== undefined && (
-                <Progress value={job.progress || 0} />
-              )}
-            </div>
-          );
-        }
-        
-        // Use StatusBadge for other statuses with mapped ActivityStatus
-        return <StatusBadge status={getMappedStatus(job.status)} />;
-      },
-    },
-    {
-      key: 'size',
-      header: 'Size',
-      render: (exportJob: ExportJob) => (
-        <div className="text-sm text-gray-900">
-          {exportJob.fileSize ? `${(exportJob.fileSize / 1024 / 1024).toFixed(2)} MB` : '--'}
-        </div>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (exportJob: ExportJob) => {
-        const job = exportJob as any;
-        
-        return (
-          <div className="flex space-x-2">
-            {job.status === 'completed' && job.downloadUrl && (
-              <Button
-                size="sm"
-                variant="outline"
-                icon={<ArrowDownTrayIcon className="h-4 w-4" />}
-                onClick={() => handleDownload(job)}
-              >
-                Download
-              </Button>
-            )}
-            {job.status === 'failed' && (
-              <Button
-                size="sm"
-                variant="outline"
-                icon={<XCircleIcon className="h-4 w-4" />}
-                onClick={() => {
-                  // Retry failed export
-                  handleCreateExport(job.type, job.format);
-                }}
-              >
-                Retry
-              </Button>
-            )}
-            {(job.status === 'pending' || job.status === 'processing') && (
-              <Button size="sm" variant="outline" disabled>
-                <ClockIcon className="h-4 w-4 mr-1" />
-                {job.status === 'pending' ? 'Queued' : 'Processing'}
-              </Button>
-            )}
-          </div>
-        );
-      },
-    },
-  ];
-
-  const filteredExports = useMemo(() => {
-    if (!exports) return [];
-    if (!searchTerm) return exports;
-    
-    return exports.filter(exportJob => {
-      const job = exportJob as any;
-      return (
-        job.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.format.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (job.description && job.description.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    });
-  }, [exports, searchTerm]);
-
-  if (isLoading) {
+  if (statsLoading) {
     return (
       <div className="space-y-6">
         <SkeletonLoader type="card" />
@@ -259,123 +199,137 @@ export default function CoordinatorExportsPage() {
     );
   }
 
-  if (error) {
+  if (statsError) {
+    const errorMessage = statsError instanceof Error ? statsError.message : String(statsError);
     return (
       <Alert
         type="error"
-        title="Unable to load exports"
-        onClose={() => refetch()}
+        title="Unable to load system statistics"
       >
-        <p className="mb-2">There was an error loading export history. Please try again.</p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-        >
-          Try Again
-        </Button>
+        <div className="space-y-2">
+          <p>There was an error loading system statistics. Please try again.</p>
+          <p className="text-sm text-gray-600">
+            Error: {errorMessage}
+          </p>
+        </div>
       </Alert>
     );
   }
-
-  const stats = {
-    total: exports?.length || 0,
-    completed: exports?.filter(e => e.status === 'completed').length || 0,
-    processing: exports?.filter(e => e.status === 'processing').length || 0,
-    failed: exports?.filter(e => e.status === 'failed').length || 0,
-  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Data Exports</h1>
+          <h1 className="text-2xl font-bold text-gray-900">System Exports</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Export data from your pilot program for analysis and reporting
+            Export system-wide data for backup, analysis, and reporting
           </p>
         </div>
-        <SearchFilter
-          onSearch={handleSearch}
-          placeholder="Search exports by type or description..."
-        />
+        <div className="w-full sm:w-64">
+          <SearchFilter
+            placeholder="Search export types..."
+            onSearch={setSearchTerm}
+          />
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Exports</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {stats.total}
-              </p>
+      {/* Warning Alert for Large Exports */}
+      <Alert
+        type="warning"
+        title="Large Data Exports"
+      >
+        Full system backups and large data exports may take several minutes to process. Please schedule these during off-peak hours.
+      </Alert>
+
+      {/* System Statistics */}
+      {systemStats && (
+        <Card>
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">System Statistics</h2>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-600">{systemStats.totalUsers}</p>
+                <p className="text-sm text-gray-500">Total Users</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">{systemStats.totalActivities}</p>
+                <p className="text-sm text-gray-500">Total Activities</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-purple-600">{systemStats.totalSurveys}</p>
+                <p className="text-sm text-gray-500">Total Surveys</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-indigo-600">{systemStats.totalSchools}</p>
+                <p className="text-sm text-gray-500">Total Schools</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-teal-600">{systemStats.totalPilots}</p>
+                <p className="text-sm text-gray-500">Total Pilots</p>
+              </div>
             </div>
-            <DocumentArrowDownIcon className="h-8 w-8 text-gray-300" />
           </div>
         </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Completed</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">
-                {stats.completed}
-              </p>
-            </div>
-            <CheckCircleIcon className="h-8 w-8 text-gray-300" />
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Processing</p>
-              <p className="text-2xl font-bold text-yellow-600 mt-1">
-                {stats.processing}
-              </p>
-            </div>
-            <ClockIcon className="h-8 w-8 text-gray-300" />
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Failed</p>
-              <p className="text-2xl font-bold text-red-600 mt-1">
-                {stats.failed}
-              </p>
-            </div>
-            <XCircleIcon className="h-8 w-8 text-gray-300" />
-          </div>
-        </Card>
-      </div>
+      )}
 
       {/* Quick Export Cards */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Export</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Exports</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {exportTypes.map((exportTypeItem) => (
             <Card key={exportTypeItem.id} className="p-4 hover:shadow-md transition-shadow">
-              <div className="flex flex-col items-center text-center">
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center mb-3 ${exportTypeItem.color}`}>
-                  <exportTypeItem.icon className="h-6 w-6" />
+              <div className="flex flex-col h-full">
+                <div className="flex items-start mb-3">
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center mr-3 ${exportTypeItem.color}`}>
+                    <exportTypeItem.icon className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-gray-900">{exportTypeItem.label}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{exportTypeItem.description}</p>
+                  </div>
                 </div>
-                <h3 className="font-medium text-gray-900 mb-2">{exportTypeItem.label}</h3>
-                <div className="flex space-x-2 mt-2">
-                  {exportFormats.slice(0, 2).map((format) => (
+                
+                <div className="mt-auto pt-3 border-t">
+                  {exportTypeItem.id === 'all' ? (
                     <Button
-                      key={format.id}
-                      size="sm"
                       variant="outline"
-                      onClick={() => handleCreateExport(exportTypeItem.id, format.id)}
-                      loading={isCreatingExport}
-                      className="flex-1"
+                      className="w-full"
+                      onClick={handleFullBackup}
+                      loading={isCreatingExport && selectedExportType === exportTypeItem.id}
                     >
-                      {format.id.toUpperCase()}
+                      Create Backup
                     </Button>
-                  ))}
+                  ) : (
+                    <div className="space-y-2">
+                      <select
+                        value={selectedExportType === exportTypeItem.id ? selectedFormat : ''}
+                        onChange={(e) => {
+                          setSelectedExportType(exportTypeItem.id);
+                          setSelectedFormat(e.target.value);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      >
+                        <option value="">Select format...</option>
+                        {exportFormats.map((format) => (
+                          <option key={format.id} value={format.id}>
+                            {format.label} ({format.description})
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {selectedExportType === exportTypeItem.id && selectedFormat && (
+                        <Button
+                          variant="default"
+                          className="w-full"
+                          onClick={() => handleExport(exportTypeItem.id, selectedFormat)}
+                          loading={isCreatingExport && selectedExportType === exportTypeItem.id}
+                        >
+                          Export as {selectedFormat.toUpperCase()}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -383,69 +337,32 @@ export default function CoordinatorExportsPage() {
         </div>
       </div>
 
-      {/* Export History */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Export History</h2>
-          <div className="flex space-x-2">
-            <Button
-              variant={exportType === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setExportType('all')}
-            >
-              All
-            </Button>
-            <Button
-              variant={exportType === 'activities' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setExportType('activities')}
-            >
-              Activities
-            </Button>
-            <Button
-              variant={exportType === 'surveys' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setExportType('surveys')}
-            >
-              Surveys
-            </Button>
-            <Button
-              variant={exportType === 'photos' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setExportType('photos')}
-            >
-              Photos
-            </Button>
+      {/* Export Information */}
+      <Card>
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Export Information</h2>
+          <div className="space-y-4 text-sm text-gray-600">
+            <p>
+              <strong>Note:</strong> The current export system provides immediate downloads. There is no export job tracking or history available.
+            </p>
+            <div className="bg-blue-50 p-4 rounded-md">
+              <h3 className="font-medium text-blue-900 mb-2">Available Export Formats:</h3>
+              <ul className="list-disc list-inside space-y-1">
+                <li><strong>CSV:</strong> Comma-separated values format for spreadsheet applications</li>
+                <li><strong>JSON:</strong> JavaScript Object Notation for data interchange</li>
+              </ul>
+            </div>
+            <div className="bg-yellow-50 p-4 rounded-md">
+              <h3 className="font-medium text-yellow-900 mb-2">Permissions:</h3>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Only administrators can export user data and full system backups</li>
+                <li>Coordinators can export data for their assigned pilots only</li>
+                <li>Volunteers have access to their own data only</li>
+              </ul>
+            </div>
           </div>
         </div>
-
-        {filteredExports.length > 0 ? (
-          <Card>
-            <DataTable
-              data={filteredExports}
-              columns={columns}
-            />
-          </Card>
-        ) : (
-          <EmptyState
-            icon={<DocumentArrowDownIcon className="h-12 w-12 text-gray-400" />}
-            title="No exports found"
-            description={
-              searchTerm || exportType !== 'all'
-                ? "Try adjusting your filters to find exports."
-                : "You haven't created any exports yet. Use the quick export buttons above to get started."
-            }
-            action={
-              searchTerm
-                ? {
-                    label: 'Clear Search',
-                    onClick: () => setSearchTerm(''),
-                  }
-                : undefined
-            }
-          />
-        )}
-      </div>
+      </Card>
     </div>
   );
 }

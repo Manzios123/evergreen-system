@@ -41,11 +41,32 @@ interface SystemStats {
   totalSchools: number;
 }
 
+// Helper function to download blob as file
+const downloadBlob = (blob: Blob, filename: string) => {
+  // Create a temporary URL for the blob
+  const url = window.URL.createObjectURL(blob);
+  
+  // Create a temporary anchor element
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  
+  // Append to body, click, and remove
+  document.body.appendChild(a);
+  a.click();
+  
+  // Cleanup
+  setTimeout(() => {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }, 100);
+};
+
 export default function AdminExportsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreatingExport, setIsCreatingExport] = useState(false);
   const [selectedExportType, setSelectedExportType] = useState<string>('');
-  const [selectedFormat, setSelectedFormat] = useState<string>('');
+  const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json' | ''>('');
 
   // Fetch system stats from admin dashboard
   const { 
@@ -69,50 +90,61 @@ export default function AdminExportsPage() {
   // Since backend doesn't have export job tracking, we'll show a simple message
   const exports = []; // Empty array since no job tracking exists
 
-  const handleExport = async (type: string, format: string, options?: any) => {
+  const handleExport = async (type: string, format: 'csv' | 'json', options?: any) => {
     setIsCreatingExport(true);
     try {
-      let downloadUrl = '';
-      const params: any = { format };
+      const params: any = { 
+        format,
+        ...options 
+      };
       
-      // Add any options as query params
-      if (options) {
-        Object.assign(params, options);
-      }
+      // Call the appropriate export API function
+      let result: Blob | any;
+      const timestamp = new Date().toISOString().slice(0, 10);
       
-      // Create the appropriate export URL
       switch (type) {
         case 'activities':
-          downloadUrl = `/api/exports/activities?${new URLSearchParams(params).toString()}`;
+          result = await exportsApi.exportActivities(params, format);
           break;
         case 'surveys':
-          downloadUrl = `/api/exports/surveys?${new URLSearchParams(params).toString()}`;
+          result = await exportsApi.exportSurveys(params, format);
           break;
         case 'users':
-          downloadUrl = `/api/exports/users?${new URLSearchParams(params).toString()}`;
+          result = await exportsApi.exportUsers(params, format);
           break;
         case 'schools':
-          downloadUrl = `/api/exports/schools?${new URLSearchParams(params).toString()}`;
+          result = await exportsApi.exportSchools(params, format);
           break;
         case 'pilots':
-          downloadUrl = `/api/exports/pilots?${new URLSearchParams(params).toString()}`;
+          result = await exportsApi.exportPilots(params, format);
           break;
         case 'activity-templates':
-          downloadUrl = `/api/exports/activity-templates?${new URLSearchParams(params).toString()}`;
+          result = await exportsApi.exportActivityTemplates(params, format);
           break;
         case 'full_backup':
         case 'all':
-          downloadUrl = `/api/exports/all?${new URLSearchParams(params).toString()}`;
+          result = await exportsApi.exportAll(params, format);
           break;
         default:
           throw new Error(`Unsupported export type: ${type}`);
       }
       
-      // Trigger download
-      window.open(downloadUrl, '_blank');
+      // Handle the result based on format
+      if (format === 'csv') {
+        // Result should be a Blob for CSV
+        const blob = result as Blob;
+        const filename = `${type}-export-${timestamp}.csv`;
+        downloadBlob(blob, filename);
+      } else {
+        // For JSON, convert to blob and download
+        const jsonString = JSON.stringify(result, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const filename = `${type}-export-${timestamp}.json`;
+        downloadBlob(blob, filename);
+      }
       
       // Show success message
-      alert(`Export of ${type} has been initiated. The file will download automatically.`);
+      alert(`${type.charAt(0).toUpperCase() + type.slice(1)} export completed. The file will download automatically.`);
     } catch (error) {
       console.error('Failed to create export:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -186,8 +218,8 @@ export default function AdminExportsPage() {
   ];
 
   const exportFormats = [
-    { id: 'csv', label: 'CSV', description: 'Comma-separated values' },
-    { id: 'json', label: 'JSON', description: 'JavaScript Object Notation' },
+    { id: 'csv' as const, label: 'CSV', description: 'Comma-separated values' },
+    { id: 'json' as const, label: 'JSON', description: 'JavaScript Object Notation' },
   ];
 
   if (statsLoading) {
@@ -306,7 +338,7 @@ export default function AdminExportsPage() {
                         value={selectedExportType === exportTypeItem.id ? selectedFormat : ''}
                         onChange={(e) => {
                           setSelectedExportType(exportTypeItem.id);
-                          setSelectedFormat(e.target.value);
+                          setSelectedFormat(e.target.value as 'csv' | 'json' | '');
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       >
@@ -322,7 +354,7 @@ export default function AdminExportsPage() {
                         <Button
                           variant="default"
                           className="w-full"
-                          onClick={() => handleExport(exportTypeItem.id, selectedFormat)}
+                          onClick={() => handleExport(exportTypeItem.id, selectedFormat as 'csv' | 'json')}
                           loading={isCreatingExport && selectedExportType === exportTypeItem.id}
                         >
                           Export as {selectedFormat.toUpperCase()}

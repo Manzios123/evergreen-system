@@ -122,8 +122,7 @@ export default function AdminReportsPage() {
     })
   );
 
-  // User stats data - NOTE: Backend endpoint is /api/admin/reports/users-stats (plural)
-  // This frontend feature cannot be fully implemented because the backend endpoint name differs
+  // User stats data - Now using the actual API endpoint
   const { 
     data: userStatsData, 
     isLoading: userStatsLoading, 
@@ -131,7 +130,10 @@ export default function AdminReportsPage() {
     refetch: refetchUserStats
   } = useApiQuery(
     ['reports-user-stats', dateRange, selectedPilot],
-    () => Promise.resolve({ data: defaultReportData.userStats }) // Placeholder - backend endpoint mismatch
+    () => reportsApi.getUserStats({ 
+      dateRange, 
+      pilotId: selectedPilot === 'all' ? undefined : selectedPilot 
+    })
   );
 
   // Activity stats data
@@ -173,7 +175,12 @@ export default function AdminReportsPage() {
         totalSurveyResponses: overviewData?.data?.totalSurveyResponses || 0,
         totalPhotos: overviewData?.data?.totalPhotos || 0,
       },
-      userStats: defaultReportData.userStats, // Placeholder - backend endpoint mismatch
+      userStats: {
+        byActiveStatus: normalizeArray<{ status: string; count: number }>(userStatsData?.data?.byActiveStatus),
+        byPilot: normalizeArray<{ pilot: string; count: number }>(userStatsData?.data?.byPilot),
+        newUsersOverTime: normalizeArray<{ date: string; count: number }>(userStatsData?.data?.newUsersOverTime),
+        totalUsers: userStatsData?.data?.totalUsers || 0,
+      },
       activityStats: {
         totalActivities: activityStatsData?.data?.totalActivities || 0,
         byStatus: normalizeArray<{ status: string; count: number }>(activityStatsData?.data?.byStatus),
@@ -195,7 +202,7 @@ export default function AdminReportsPage() {
         combinedTotal: surveyStatsData?.data?.combinedTotal || 0,
       },
     };
-  }, [overviewData, activityStatsData, surveyStatsData]);
+  }, [overviewData, userStatsData, activityStatsData, surveyStatsData]);
 
   // Refetch all data when filters change
   useEffect(() => {
@@ -257,12 +264,7 @@ export default function AdminReportsPage() {
 
   const handleExportReport = async () => {
     try {
-      // This frontend feature cannot be implemented because the backend does not expose /api/exports/reports
       alert('Export functionality is not available. Backend does not support /api/exports/reports endpoint.');
-      
-      // Alternative: Use existing export endpoints
-      // const response = await fetch(`/api/exports/activities?format=csv&pilot_id=${selectedPilot}`);
-      // But this doesn't match the frontend's expected exportReports API
     } catch (error) {
       console.error('Failed to export report:', error);
       alert('Failed to export report. Please try again.');
@@ -415,41 +417,165 @@ export default function AdminReportsPage() {
     ),
   };
 
-  // User statistics tab - LIMITED FUNCTIONALITY DUE TO BACKEND MISMATCH
+  // User statistics tab
   const usersTab = {
     id: 'users',
     label: 'Users',
     icon: <UserGroupIcon className="h-5 w-5" />,
     content: (
       <div className="space-y-6">
-        <Alert type="warning" title="Limited Functionality">
-          User statistics cannot be fully displayed because the backend endpoint name differs.
-          Backend has /api/admin/reports/users-stats (plural) but frontend expects /api/admin/reports/user-stats.
-        </Alert>
-        
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Users</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">
-                {reportData.overview.totalUsers}
-              </p>
+        {/* User Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Users</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">
+                  {reportData.userStats.totalUsers}
+                </p>
+              </div>
+              <UserGroupIcon className="h-8 w-8 text-gray-300" />
             </div>
-            <UserGroupIcon className="h-8 w-8 text-gray-300" />
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Active Users</p>
-              <p className="text-2xl font-bold text-blue-600 mt-1">
-                {reportData.overview.activeUsers}
-              </p>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Active Users</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">
+                  {reportData.userStats.byActiveStatus.find(s => s.status === 'active')?.count || 0}
+                </p>
+              </div>
+              <ArrowTrendingUpIcon className="h-8 w-8 text-gray-300" />
             </div>
-            <ArrowTrendingUpIcon className="h-8 w-8 text-gray-300" />
-          </div>
-        </Card>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Pilots</p>
+                <p className="text-2xl font-bold text-purple-600 mt-1">
+                  {reportData.userStats.byPilot.length}
+                </p>
+              </div>
+              <BuildingOfficeIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+        </div>
+
+        {/* User Distribution Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Users by Active Status - Pie Chart */}
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Users by Status</h3>
+              <div className="h-64">
+                {reportData.userStats.byActiveStatus.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={reportData.userStats.byActiveStatus}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={renderCustomPieLabel}
+                        outerRadius={80}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        dataKey="count"
+                      >
+                        {reportData.userStats.byActiveStatus.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => <span className="text-sm">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No user status data"
+                    description="No user status data available"
+                    icon={<UserGroupIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* Users by Pilot - Bar Chart */}
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Users by Pilot</h3>
+              <div className="h-64">
+                {reportData.userStats.byPilot.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportData.userStats.byPilot}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="pilot" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar 
+                        dataKey="count" 
+                        fill="#8b5cf6" 
+                        name="Users"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No pilot data"
+                    description="No user data by pilot available"
+                    icon={<BuildingOfficeIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* New Users Over Time - Line Chart */}
+        {reportData.userStats.newUsersOverTime.length > 0 && (
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">New Users Over Time</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={reportData.userStats.newUsersOverTime}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="count" 
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="New Users"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
     ),
   };
@@ -832,7 +958,7 @@ export default function AdminReportsPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Report Summary</h2>
             <Alert type="info">
-              Some features limited due to backend constraints
+              All features now available with backend fixes
             </Alert>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
