@@ -266,8 +266,8 @@ export default function AdminSurveysPage() {
     setAdminSurveyLoading(true);
     try {
       const response = await api.post('/survey-assignments/auto-assign-role-survey');
-      setAdminAssignment(response);
-      setShowAdminForm(true);
+      // MODIFIED: Redirect to admin assignment route instead of volunteer
+      window.location.href = `/admin/surveys/assignment/${response.assignment_id}`;
     } catch (err: any) {
       setError(err.message || 'Failed to load admin survey');
     } finally {
@@ -332,12 +332,13 @@ export default function AdminSurveysPage() {
         .filter(Boolean)
     )) : [];
 
-  if (showAdminForm && adminAssignment) {
-    // We'll implement the survey form component later
-    // For now, redirect to the volunteer survey form
-    window.location.href = `/volunteer/surveys/assignment/${adminAssignment.assignment_id}`;
-    return null;
-  }
+  // REMOVED: The redirect block that was sending to volunteer route
+  // if (showAdminForm && adminAssignment) {
+  //   // We'll implement the survey form component later
+  //   // For now, redirect to the volunteer survey form
+  //   window.location.href = `/volunteer/surveys/assignment/${adminAssignment.assignment_id}`;
+  //   return null;
+  // }
 
   return (
     <div className="space-y-6">

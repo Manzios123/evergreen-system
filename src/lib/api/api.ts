@@ -1,17 +1,39 @@
-import { ApiError } from '@/lib/types'; // Assuming you have this type
+import { ApiError } from '@/lib/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
-// Extended API request with additional options
+// Helper function to safely serialize query parameters
+function buildQuery(params?: Record<string, any>): string {
+  if (!params) return '';
+
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+
+    if (Array.isArray(value)) {
+      value.forEach(v => {
+        if (v !== undefined && v !== null) {
+          searchParams.append(key, String(v));
+        }
+      });
+      return;
+    }
+
+    searchParams.append(key, String(value));
+  });
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+}
+
 export const apiRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
   params?: Record<string, any>
 ): Promise<T> => {
-  // Get token from localStorage - using 'token' as per your code
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   
-  // Construct URL with query parameters
   let url = `${API_BASE_URL}${endpoint}`;
   if (params) {
     const queryString = new URLSearchParams(
@@ -22,18 +44,14 @@ export const apiRequest = async <T>(
     }
   }
 
-  // Handle headers based on request body type
   const headers: HeadersInit = {};
   
-  // Only set Content-Type for JSON, not for FormData
   if (options.body && !(options.body instanceof FormData)) {
     if (typeof options.body === 'string') {
       headers['Content-Type'] = 'application/json';
     }
   } else if (options.body instanceof FormData) {
-    // Don't set Content-Type for FormData - browser will set it with boundary
   } else {
-    // For requests without body or with other body types
     headers['Content-Type'] = 'application/json';
   }
   
@@ -51,7 +69,6 @@ export const apiRequest = async <T>(
       credentials: 'omit',
     });
 
-    // Handle non-JSON responses (like file downloads)
     const contentType = response.headers.get('content-type');
     const isJson = contentType?.includes('application/json');
     
@@ -63,13 +80,9 @@ export const apiRequest = async <T>(
         errorData = { message: await response.text() };
       }
       
-      // Handle 401 Unauthorized - token expired or invalid
       if (response.status === 401) {
-        // Clear invalid token
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
-          // Optional: Trigger auth refresh or redirect
-          // window.location.href = '/login';
         }
       }
       
@@ -80,18 +93,15 @@ export const apiRequest = async <T>(
       } as ApiError;
     }
 
-    // Handle empty responses
     if (response.status === 204) {
       return null as T;
     }
 
-    // Handle file downloads
     if (contentType?.includes('application/octet-stream') || 
         contentType?.includes('text/csv')) {
       return await response.blob() as T;
     }
 
-    // Handle JSON responses
     if (isJson) {
       const data = await response.json();
       return data as T;
@@ -109,10 +119,11 @@ export const apiRequest = async <T>(
   }
 };
 
-// Helper methods for common HTTP verbs
 export const api = {
-  get: <T>(endpoint: string, params?: Record<string, any>, p0?: any) =>
-    apiRequest<T>(endpoint, { method: 'GET' }, params),
+  get: <T>(endpoint: string, options?: { params?: Record<string, any> }): Promise<T> => {
+    const query = buildQuery(options?.params);
+    return apiRequest<T>(`${endpoint}${query}`, { method: 'GET' });
+  },
 
   post: <T>(endpoint: string, data?: any, params?: Record<string, any>) => {
     const body = data instanceof FormData ? data : JSON.stringify(data);
@@ -141,7 +152,6 @@ export const api = {
   delete: <T>(endpoint: string, params?: Record<string, any>) =>
     apiRequest<T>(endpoint, { method: 'DELETE' }, params),
 
-  // For file uploads
   upload: <T>(endpoint: string, formData: FormData, params?: Record<string, any>) =>
     apiRequest<T>(endpoint, {
       method: 'POST',
@@ -149,16 +159,13 @@ export const api = {
     }, params),
 };
 
-// Token management helper functions
 export const auth = {
-  // Save token after login
   setToken: (token: string) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('token', token);
     }
   },
   
-  // Get current token
   getToken: (): string | null => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('token');
@@ -166,14 +173,12 @@ export const auth = {
     return null;
   },
   
-  // Remove token (logout)
   clearToken: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
     }
   },
   
-  // Check if user is logged in
   isAuthenticated: (): boolean => {
     if (typeof window !== 'undefined') {
       return !!localStorage.getItem('token');

@@ -4,11 +4,10 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api/api';
-import Card from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
 import EmptyState from '@/components/ui/empty-state';
-import SkeletonLoader from '@/components/ui/skeleton-loader';
 
 // Define types based on backend response
 interface SurveyQuestion {
@@ -116,12 +115,12 @@ export default function ViewSurveyTemplatePage() {
           <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
           <div className="h-4 w-64 bg-gray-200 rounded animate-pulse"></div>
         </div>
-        <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+        <Card className="p-6">
           <div className="h-6 w-full bg-gray-200 rounded animate-pulse mb-4"></div>
           <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse mb-4"></div>
           <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse mb-6"></div>
           <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
-        </div>
+        </Card>
       </div>
     );
   }
@@ -136,11 +135,12 @@ export default function ViewSurveyTemplatePage() {
             label: 'Back to Templates',
             onClick: handleBack,
           }}
-          secondaryAction={{
-            label: 'Try Again',
-            onClick: () => refetch(),
-          }}
         />
+        <div className="mt-4 text-center">
+          <Button variant="outline" onClick={() => refetch()}>
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -164,7 +164,7 @@ export default function ViewSurveyTemplatePage() {
       </div>
 
       {error && (
-        <Alert variant="error" className="mb-6">
+        <Alert type="error">
           {error}
         </Alert>
       )}
@@ -172,7 +172,7 @@ export default function ViewSurveyTemplatePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Template Details */}
         <div className="lg:col-span-2">
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <Card className="p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Template Details</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -253,12 +253,12 @@ export default function ViewSurveyTemplatePage() {
                 </div>
               )}
             </div>
-          </div>
+          </Card>
         </div>
 
         {/* Sidebar with Metadata */}
         <div className="h-fit">
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          <Card className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Template Information</h3>
             
             <div className="space-y-4">
@@ -311,7 +311,7 @@ export default function ViewSurveyTemplatePage() {
                 </Button>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>

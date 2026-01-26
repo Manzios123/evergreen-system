@@ -305,11 +305,12 @@ export default function EditSurveyTemplatePage() {
             label: 'Back to Templates',
             onClick: () => router.push('/admin/surveys/templates'),
           }}
-          secondaryAction={{
-            label: 'Try Again',
-            onClick: () => refetch(),
-          }}
         />
+        <div className="mt-4 text-center">
+          <Button variant="outline" onClick={() => refetch()}>
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -338,13 +339,13 @@ export default function EditSurveyTemplatePage() {
       </div>
 
       {successMessage && (
-        <Alert variant="success" className="mb-6" onDismiss={() => setSuccessMessage(null)}>
+        <Alert type="success" onClose={() => setSuccessMessage(null)}>
           {successMessage}
         </Alert>
       )}
 
       {errors.submit && (
-        <Alert variant="error" className="mb-6">
+        <Alert type="error">
           {errors.submit}
         </Alert>
       )}
