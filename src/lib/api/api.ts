@@ -109,10 +109,24 @@ export const apiRequest = async <T>(
   }
 };
 
+// Helper method to serialize query parameters
+const serializeParams = (params: Record<string, any> | undefined): Record<string, any> | undefined => {
+  if (!params) return undefined;
+  
+  // If params has a 'params' key, use that as the actual params object
+  if ('params' in params) {
+    return params.params;
+  }
+  // Otherwise treat the entire object as params
+  return params;
+};
+
 // Helper methods for common HTTP verbs
 export const api = {
-  get: <T>(endpoint: string, params?: Record<string, any>, p0?: any) =>
-    apiRequest<T>(endpoint, { method: 'GET' }, params),
+  get: <T>(endpoint: string, paramsOrOptions?: Record<string, any> | { params?: Record<string, any> }) => {
+    const params = serializeParams(paramsOrOptions);
+    return apiRequest<T>(endpoint, { method: 'GET' }, params);
+  },
 
   post: <T>(endpoint: string, data?: any, params?: Record<string, any>) => {
     const body = data instanceof FormData ? data : JSON.stringify(data);
