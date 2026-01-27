@@ -335,7 +335,7 @@ export default function AdminSurveysPage() {
   if (showAdminForm && adminAssignment) {
     // We'll implement the survey form component later
     // For now, redirect to the volunteer survey form
-    window.location.href = `/volunteer/surveys/assignment/${adminAssignment.assignment_id}`;
+    window.location.href = `/coordinator/surveys/assignment/${adminAssignment.assignment_id}`;
     return null;
   }
 

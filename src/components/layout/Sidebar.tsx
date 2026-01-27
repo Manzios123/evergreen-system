@@ -83,7 +83,7 @@ export default function Sidebar({ role }: SidebarProps) {
       },
       { name: 'Volunteers', href: '/coordinator/volunteers', icon: UserGroupIcon },
       { name: 'Schools', href: '/coordinator/schools', icon: AcademicCapIcon },
-      { name: 'Student Surveys', href: '/coordinator/surveys/student', icon: DocumentTextIcon },
+      { name: 'Surveys', href: '/coordinator/surveys', icon: DocumentTextIcon },
       { name: 'Exports', href: '/coordinator/exports', icon: ArrowDownTrayIcon },
     ],
     volunteer: [

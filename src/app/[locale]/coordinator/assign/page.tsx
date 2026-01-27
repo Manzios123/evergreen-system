@@ -29,6 +29,21 @@ import { useParams } from 'next/navigation';
 import { api } from '@/lib/api/api';
 import { useState, useEffect, useMemo } from 'react';
 
+// Helper function to normalize API responses to arrays
+function toArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  
+  // Handle common API response shapes
+  const v = value as any;
+  if (Array.isArray(v?.data)) return v.data;
+  if (Array.isArray(v?.items)) return v.items;
+  if (Array.isArray(v?.results)) return v.results;
+  if (Array.isArray(v?.users)) return v.users;
+  if (Array.isArray(v?.schools)) return v.schools;
+  
+  return [];
+}
+
 // Simplified schema without coerce - we'll handle number conversion manually
 const assignActivitySchema = z.object({
   activity_template_id: z.string().min(1, 'Template is required'),
@@ -126,27 +141,38 @@ export default function AssignActivityPage() {
   const [numberOfParticipants, setNumberOfParticipants] = useState<number>(25);
   
   // Fetch data for dropdowns
-  const { data: templates, isLoading: templatesLoading } = useApiQuery<ActivityTemplate[]>(
+  const { data: templatesResponse, isLoading: templatesLoading } = useApiQuery<unknown>(
     ['activity-templates'],
     () => api.get('/activity-templates')
   );
 
   // Fetch volunteers using the correct endpoint: /api/users?role=volunteer
-  const { data: usersResponse, isLoading: volunteersLoading } = useApiQuery<{
-    users: Volunteer[];
-    total: number;
-  }>(
+  const { data: usersResponse, isLoading: volunteersLoading } = useApiQuery<unknown>(
     ['volunteers'],
     () => api.get('/users?role=volunteer')
   );
 
-  // Extract volunteers from response
-  const volunteers = usersResponse?.users || [];
-
-  const { data: schools, isLoading: schoolsLoading } = useApiQuery<School[]>(
+  const { data: schoolsResponse, isLoading: schoolsLoading } = useApiQuery<unknown>(
     ['schools'],
     () => api.get('/schools')
   );
+
+  // Normalize API responses to arrays
+  const templatesArr = useMemo(() => toArray<ActivityTemplate>(templatesResponse), [templatesResponse]);
+  const schoolsArr = useMemo(() => toArray<School>(schoolsResponse), [schoolsResponse]);
+  
+  // Normalize volunteers response - extract users array from response
+  const volunteersArr = useMemo(() => {
+    if (Array.isArray(usersResponse)) return usersResponse as Volunteer[];
+    
+    // Handle nested structure like { users: [...], total: number }
+    const response = usersResponse as any;
+    if (response && Array.isArray(response.users)) {
+      return response.users as Volunteer[];
+    }
+    
+    return toArray<Volunteer>(usersResponse);
+  }, [usersResponse]);
 
   const {
     register,
@@ -168,14 +194,14 @@ export default function AssignActivityPage() {
   
   // Filter volunteers by selected school
   const filteredVolunteers = useMemo(() => {
-    if (!volunteers || !schoolId) return volunteers || [];
+    if (!volunteersArr || !schoolId) return volunteersArr || [];
     
-    return volunteers.filter(volunteer => 
+    return volunteersArr.filter(volunteer => 
       volunteer.school_ids && 
       volunteer.school_ids.length > 0 && 
       volunteer.school_ids.includes(schoolId)
     );
-  }, [volunteers, schoolId]);
+  }, [volunteersArr, schoolId]);
 
   // Update selected volunteers when school changes
   useEffect(() => {
@@ -234,7 +260,7 @@ export default function AssignActivityPage() {
     
     for (let i = 0; i < selectedVolunteers.length; i++) {
       const volunteerId = selectedVolunteers[i];
-      const volunteer = volunteers?.find(v => v.id === volunteerId);
+      const volunteer = volunteersArr.find(v => v.id === volunteerId);
       
       setCurrentBatchIndex(i);
       
@@ -318,12 +344,12 @@ export default function AssignActivityPage() {
 
   // Get selected template details
   const selectedTemplateId = watch('activity_template_id');
-  const selectedTemplate = templates?.find(t => t.id === selectedTemplateId);
+  const selectedTemplate = templatesArr.find(t => t.id === selectedTemplateId);
 
   // Create options with default placeholder option
   const templateOptions = [
     { value: '', label: 'Select a template...' },
-    ...(templates?.map(template => ({
+    ...(templatesArr.map(template => ({
       value: template.id,
       label: template.name,
     })) || [])
@@ -331,7 +357,7 @@ export default function AssignActivityPage() {
 
   const schoolOptions = [
     { value: '', label: 'Select a school...' },
-    ...(schools?.map(school => ({
+    ...(schoolsArr.map(school => ({
       value: school.id,
       label: school.name,
     })) || [])
@@ -358,10 +384,10 @@ export default function AssignActivityPage() {
 
       {/* Debug Info - Remove in production */}
       <div className="hidden">
-        <p>Volunteers count: {volunteers.length}</p>
+        <p>Volunteers count: {volunteersArr.length}</p>
         <p>School ID: {schoolId}</p>
         <p>Filtered Volunteers count: {filteredVolunteers.length}</p>
-        <pre>{JSON.stringify(volunteers.slice(0, 2), null, 2)}</pre>
+        <pre>{JSON.stringify(volunteersArr.slice(0, 2), null, 2)}</pre>
       </div>
 
       {/* Batch Assignment Results */}
@@ -685,7 +711,7 @@ export default function AssignActivityPage() {
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-500">School:</span>
                     <span className="text-sm font-medium text-gray-900">
-                      {schools?.find(s => s.id === schoolId)?.name || 'Not selected'}
+                      {schoolsArr.find(s => s.id === schoolId)?.name || 'Not selected'}
                     </span>
                   </div>
                   <div className="flex justify-between">

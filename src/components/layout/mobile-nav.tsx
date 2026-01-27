@@ -27,7 +27,7 @@ const navigation = {
     { name: 'Approvals', href: '/coordinator/approvals' },
     { name: 'Volunteers', href: '/coordinator/volunteers' },
     { name: 'Schools', href: '/coordinator/schools' },
-    { name: 'Student Surveys', href: '/coordinator/surveys/student' },
+    { name: 'Surveys', href: '/coordinator/surveys' },
     { name: 'Exports', href: '/coordinator/exports' },
   ],
   volunteer: [

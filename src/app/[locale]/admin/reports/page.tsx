@@ -21,6 +21,10 @@ import {
   EyeIcon,
   ClockIcon,
   StarIcon,
+  AcademicCapIcon,
+  PhotoIcon,
+  VideoCameraIcon,
+  DocumentIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useMemo, useEffect } from 'react';
 import { pilotsApi } from '@/lib/api/pilots';
@@ -39,6 +43,8 @@ import {
   LineChart,
   Line,
   Legend,
+  AreaChart,
+  Area,
 } from 'recharts';
 
 // Chart colors
@@ -56,43 +62,73 @@ const normalizeArray = <T,>(data: any): T[] => {
 // Default empty data structure
 const defaultReportData = {
   overview: {
-    totalUsers: 0,
-    activeUsers: 0,
-    totalActivities: 0,
-    activitiesByStatus: [] as Array<{ status: string; count: number }>,
-    totalSurveyResponses: 0,
-    totalPhotos: 0,
+    total_schools: 0,
+    total_volunteers: 0,
+    total_student_submissions: 0,
+    total_volunteer_submissions: 0,
+    submissions_last_7_days: 0,
+    activities_total: 0,
+    activities_by_status: [] as Array<{ status: string; count: number }>,
+    media_total: 0,
+    media_by_type: [] as Array<{ media_type: string; count: number }>,
   },
-  userStats: {
-    byActiveStatus: [] as Array<{ status: string; count: number }>,
-    byPilot: [] as Array<{ pilot: string; count: number }>,
-    newUsersOverTime: [] as Array<{ date: string; count: number }>,
-    totalUsers: 0,
+  schoolSubmissions: [] as Array<{
+    school_id: string;
+    school_name: string;
+    student_submissions: number;
+    volunteer_submissions: number;
+    total_students_sum: number;
+  }>,
+  dailySubmissions: {
+    daily_student_submissions: [] as Array<{ date: string; count: number }>,
+    daily_volunteer_submissions: [] as Array<{ date: string; count: number }>,
   },
-  activityStats: {
-    totalActivities: 0,
-    byStatus: [] as Array<{ status: string; count: number }>,
-    activitiesOverTime: [] as Array<{ date: string; count: number }>,
-    byPilot: [] as Array<{ pilot: string; count: number }>,
-    byVolunteer: [] as Array<{ volunteer: string; count: number }>,
-  },
-  surveyStats: {
-    student: {
-      total: 0,
-      overTime: [] as Array<{ date: string; count: number }>,
-      byTemplate: [] as Array<{ template: string; count: number }>,
-    },
-    volunteer: {
-      total: 0,
-      overTime: [] as Array<{ date: string; count: number }>,
-      byTemplate: [] as Array<{ template: string; count: number }>,
-    },
-    combinedTotal: 0,
+  assignmentFlow: {
+    assignment_status: [] as Array<{ status: string; count: number }>,
+    overdue_count: 0,
   },
 };
 
+// Custom Tooltip for charts
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+        <p className="text-sm font-medium text-gray-900">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// Custom Pie chart label
+const renderCustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: any) => {
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-xs font-medium"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
 export default function AdminReportsPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'activities' | 'surveys'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'schools' | 'daily' | 'assignments'>('overview');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
   const [selectedPilot, setSelectedPilot] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -122,44 +158,43 @@ export default function AdminReportsPage() {
     })
   );
 
-  // User stats data - Now using the actual API endpoint
+  // School submissions data
   const { 
-    data: userStatsData, 
-    isLoading: userStatsLoading, 
-    error: userStatsError,
-    refetch: refetchUserStats
+    data: schoolSubmissionsData, 
+    isLoading: schoolSubmissionsLoading, 
+    error: schoolSubmissionsError,
+    refetch: refetchSchoolSubmissions
   } = useApiQuery(
-    ['reports-user-stats', dateRange, selectedPilot],
-    () => reportsApi.getUserStats({ 
+    ['reports-school-submissions', dateRange, selectedPilot],
+    () => reportsApi.getSchoolSubmissions({ 
       dateRange, 
       pilotId: selectedPilot === 'all' ? undefined : selectedPilot 
     })
   );
 
-  // Activity stats data
+  // Daily submissions data
   const { 
-    data: activityStatsData, 
-    isLoading: activityStatsLoading, 
-    error: activityStatsError,
-    refetch: refetchActivityStats
+    data: dailySubmissionsData, 
+    isLoading: dailySubmissionsLoading, 
+    error: dailySubmissionsError,
+    refetch: refetchDailySubmissions
   } = useApiQuery(
-    ['reports-activity-stats', dateRange, selectedPilot],
-    () => reportsApi.getActivityStats({ 
+    ['reports-daily-submissions', dateRange, selectedPilot],
+    () => reportsApi.getDailySubmissions({ 
       dateRange, 
       pilotId: selectedPilot === 'all' ? undefined : selectedPilot 
     })
   );
 
-  // Survey stats data
+  // Assignment flow data
   const { 
-    data: surveyStatsData, 
-    isLoading: surveyStatsLoading, 
-    error: surveyStatsError,
-    refetch: refetchSurveyStats
+    data: assignmentFlowData, 
+    isLoading: assignmentFlowLoading, 
+    error: assignmentFlowError,
+    refetch: refetchAssignmentFlow
   } = useApiQuery(
-    ['reports-survey-stats', dateRange, selectedPilot],
-    () => reportsApi.getSurveyStats({ 
-      dateRange, 
+    ['reports-assignment-flow', selectedPilot],
+    () => reportsApi.getAssignmentFlow({ 
       pilotId: selectedPilot === 'all' ? undefined : selectedPilot 
     })
   );
@@ -168,95 +203,49 @@ export default function AdminReportsPage() {
   const reportData = useMemo(() => {
     return {
       overview: {
-        totalUsers: overviewData?.data?.totalUsers || 0,
-        activeUsers: overviewData?.data?.activeUsers || 0,
-        totalActivities: overviewData?.data?.totalActivities || 0,
-        activitiesByStatus: normalizeArray<{ status: string; count: number }>(overviewData?.data?.activitiesByStatus),
-        totalSurveyResponses: overviewData?.data?.totalSurveyResponses || 0,
-        totalPhotos: overviewData?.data?.totalPhotos || 0,
+        total_schools: overviewData?.data?.total_schools || 0,
+        total_volunteers: overviewData?.data?.total_volunteers || 0,
+        total_student_submissions: overviewData?.data?.total_student_submissions || 0,
+        total_volunteer_submissions: overviewData?.data?.total_volunteer_submissions || 0,
+        submissions_last_7_days: overviewData?.data?.submissions_last_7_days || 0,
+        activities_total: overviewData?.data?.activities_total || 0,
+        activities_by_status: normalizeArray<{ status: string; count: number }>(overviewData?.data?.activities_by_status),
+        media_total: overviewData?.data?.media_total || 0,
+        media_by_type: normalizeArray<{ media_type: string; count: number }>(overviewData?.data?.media_by_type),
       },
-      userStats: {
-        byActiveStatus: normalizeArray<{ status: string; count: number }>(userStatsData?.data?.byActiveStatus),
-        byPilot: normalizeArray<{ pilot: string; count: number }>(userStatsData?.data?.byPilot),
-        newUsersOverTime: normalizeArray<{ date: string; count: number }>(userStatsData?.data?.newUsersOverTime),
-        totalUsers: userStatsData?.data?.totalUsers || 0,
+      schoolSubmissions: normalizeArray<any>(schoolSubmissionsData?.data) || [],
+      dailySubmissions: {
+        daily_student_submissions: normalizeArray<{ date: string; count: number }>(
+          dailySubmissionsData?.data?.daily_student_submissions
+        ),
+        daily_volunteer_submissions: normalizeArray<{ date: string; count: number }>(
+          dailySubmissionsData?.data?.daily_volunteer_submissions
+        ),
       },
-      activityStats: {
-        totalActivities: activityStatsData?.data?.totalActivities || 0,
-        byStatus: normalizeArray<{ status: string; count: number }>(activityStatsData?.data?.byStatus),
-        activitiesOverTime: normalizeArray<{ date: string; count: number }>(activityStatsData?.data?.activitiesOverTime),
-        byPilot: normalizeArray<{ pilot: string; count: number }>(activityStatsData?.data?.byPilot),
-        byVolunteer: normalizeArray<{ volunteer: string; count: number }>(activityStatsData?.data?.byVolunteer),
-      },
-      surveyStats: {
-        student: {
-          total: surveyStatsData?.data?.student?.total || 0,
-          overTime: normalizeArray<{ date: string; count: number }>(surveyStatsData?.data?.student?.overTime),
-          byTemplate: normalizeArray<{ template: string; count: number }>(surveyStatsData?.data?.student?.byTemplate),
-        },
-        volunteer: {
-          total: surveyStatsData?.data?.volunteer?.total || 0,
-          overTime: normalizeArray<{ date: string; count: number }>(surveyStatsData?.data?.volunteer?.overTime),
-          byTemplate: normalizeArray<{ template: string; count: number }>(surveyStatsData?.data?.volunteer?.byTemplate),
-        },
-        combinedTotal: surveyStatsData?.data?.combinedTotal || 0,
+      assignmentFlow: {
+        assignment_status: normalizeArray<{ status: string; count: number }>(
+          assignmentFlowData?.data?.assignment_status
+        ),
+        overdue_count: assignmentFlowData?.data?.overdue_count || 0,
       },
     };
-  }, [overviewData, userStatsData, activityStatsData, surveyStatsData]);
+  }, [overviewData, schoolSubmissionsData, dailySubmissionsData, assignmentFlowData]);
 
   // Refetch all data when filters change
   useEffect(() => {
     refetchOverview();
-    refetchUserStats();
-    refetchActivityStats();
-    refetchSurveyStats();
+    refetchSchoolSubmissions();
+    refetchDailySubmissions();
+    refetchAssignmentFlow();
   }, [dateRange, selectedPilot]);
 
   // Loading state - check if any query is loading
-  const isLoading = pilotsLoading || overviewLoading || userStatsLoading || 
-                   activityStatsLoading || surveyStatsLoading;
+  const isLoading = pilotsLoading || overviewLoading || schoolSubmissionsLoading || 
+                   dailySubmissionsLoading || assignmentFlowLoading;
 
   // Error state - check if any query has error
-  const hasError = pilotsError || overviewError || userStatsError || 
-                  activityStatsError || surveyStatsError;
-
-  // Custom Tooltip for charts
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="text-sm font-medium text-gray-900">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {entry.value}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Custom Pie chart label
-  const renderCustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: any) => {
-    const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-    return (
-      <text
-        x={x}
-        y={y}
-        fill="white"
-        textAnchor="middle"
-        dominantBaseline="central"
-        className="text-xs font-medium"
-      >
-        {`${(percent * 100).toFixed(0)}%`}
-      </text>
-    );
-  };
+  const hasError = pilotsError || overviewError || schoolSubmissionsError || 
+                  dailySubmissionsError || assignmentFlowError;
 
   const handleSearch = (query: string) => {
     setSearchTerm(query);
@@ -270,6 +259,14 @@ export default function AdminReportsPage() {
       alert('Failed to export report. Please try again.');
     }
   };
+
+  // Filter school submissions by search term
+  const filteredSchoolSubmissions = useMemo(() => {
+    if (!searchTerm) return reportData.schoolSubmissions;
+    return reportData.schoolSubmissions.filter(school =>
+      school.school_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [reportData.schoolSubmissions, searchTerm]);
 
   // Loading state
   if (isLoading) {
@@ -317,15 +314,22 @@ export default function AdminReportsPage() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {reportData.overview.totalUsers}
+                <p className="text-sm font-medium text-gray-500">Total Schools</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">
+                  {reportData.overview.total_schools}
                 </p>
-                <div className="flex items-center mt-2">
-                  <span className="text-xs text-gray-500">
-                    {reportData.overview.activeUsers} active users
-                  </span>
-                </div>
+              </div>
+              <AcademicCapIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Volunteers</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">
+                  {reportData.overview.total_volunteers}
+                </p>
               </div>
               <UserGroupIcon className="h-8 w-8 text-gray-300" />
             </div>
@@ -334,32 +338,10 @@ export default function AdminReportsPage() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Activities</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {reportData.overview.totalActivities}
+                <p className="text-sm font-medium text-gray-500">Student Submissions</p>
+                <p className="text-2xl font-bold text-purple-600 mt-1">
+                  {reportData.overview.total_student_submissions}
                 </p>
-                <div className="flex items-center mt-2">
-                  <span className="text-xs text-gray-500">
-                    {reportData.activityStats.byStatus.length} status types
-                  </span>
-                </div>
-              </div>
-              <CalendarIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Survey Responses</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {reportData.overview.totalSurveyResponses}
-                </p>
-                <div className="flex items-center mt-2">
-                  <span className="text-xs text-gray-500">
-                    {reportData.surveyStats.combinedTotal} combined total
-                  </span>
-                </div>
               </div>
               <DocumentTextIcon className="h-8 w-8 text-gray-300" />
             </div>
@@ -368,9 +350,9 @@ export default function AdminReportsPage() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Photos</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {reportData.overview.totalPhotos}
+                <p className="text-sm font-medium text-gray-500">Volunteer Submissions</p>
+                <p className="text-2xl font-bold text-yellow-600 mt-1">
+                  {reportData.overview.total_volunteer_submissions}
                 </p>
               </div>
               <ChartBarIcon className="h-8 w-8 text-gray-300" />
@@ -378,36 +360,541 @@ export default function AdminReportsPage() {
           </Card>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Last 7 Days Submissions</p>
+                <p className="text-2xl font-bold text-indigo-600 mt-1">
+                  {reportData.overview.submissions_last_7_days}
+                </p>
+              </div>
+              <ArrowTrendingUpIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Activities</p>
+                <p className="text-2xl font-bold text-pink-600 mt-1">
+                  {reportData.overview.activities_total}
+                </p>
+              </div>
+              <CalendarIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Media</p>
+                <p className="text-2xl font-bold text-cyan-600 mt-1">
+                  {reportData.overview.media_total}
+                </p>
+              </div>
+              <PhotoIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+        </div>
+
         {/* Activities by Status */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Activities by Status</h3>
+              <div className="h-64">
+                {reportData.overview.activities_by_status.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={reportData.overview.activities_by_status}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={renderCustomPieLabel}
+                        outerRadius={80}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        dataKey="count"
+                      >
+                        {reportData.overview.activities_by_status.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => <span className="text-sm">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No activity data"
+                    description="No activity data available for the selected period"
+                    icon={<CalendarIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* Media by Type */}
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Media by Type</h3>
+              <div className="h-64">
+                {reportData.overview.media_by_type.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportData.overview.media_by_type}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="media_type" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar 
+                        dataKey="count" 
+                        fill="#8b5cf6" 
+                        name="Media Items"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No media data"
+                    description="No media data available for the selected period"
+                    icon={<PhotoIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    ),
+  };
+
+  // School submissions tab content
+  const schoolsTab = {
+    id: 'schools',
+    label: 'Schools',
+    icon: <AcademicCapIcon className="h-5 w-5" />,
+    content: (
+      <div className="space-y-6">
+        {/* School Stats Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Schools</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">
+                  {filteredSchoolSubmissions.length}
+                </p>
+              </div>
+              <BuildingOfficeIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Students Reported</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">
+                  {filteredSchoolSubmissions.reduce((sum, school) => sum + school.total_students_sum, 0)}
+                </p>
+              </div>
+              <UserGroupIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Submissions</p>
+                <p className="text-2xl font-bold text-purple-600 mt-1">
+                  {filteredSchoolSubmissions.reduce((sum, school) => sum + school.student_submissions + school.volunteer_submissions, 0)}
+                </p>
+              </div>
+              <DocumentTextIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+        </div>
+
+        {/* School Submissions Chart */}
         <Card>
           <div className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Activities by Status</h3>
-            <div className="h-64">
-              {reportData.overview.activitiesByStatus.length > 0 ? (
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Submissions by School</h3>
+            <div className="h-96">
+              {filteredSchoolSubmissions.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={reportData.overview.activitiesByStatus}>
+                  <BarChart
+                    data={filteredSchoolSubmissions.slice(0, 10)} // Show top 10 schools
+                    layout="vertical"
+                    margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis type="number" />
+                    <YAxis 
+                      type="category" 
+                      dataKey="school_name" 
+                      width={90}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Bar 
+                      dataKey="student_submissions" 
+                      name="Student Submissions" 
+                      fill="#10b981" 
+                      radius={[0, 4, 4, 0]}
+                    />
+                    <Bar 
+                      dataKey="volunteer_submissions" 
+                      name="Volunteer Submissions" 
+                      fill="#3b82f6" 
+                      radius={[0, 4, 4, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState
+                  title="No school data"
+                  description="No school submission data available for the selected period"
+                  icon={<AcademicCapIcon className="h-12 w-12 text-gray-400" />}
+                />
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* School List Table */}
+        {filteredSchoolSubmissions.length > 0 && (
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">School Performance Details</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        School Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Student Submissions
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Volunteer Submissions
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Students Reported
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Submissions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredSchoolSubmissions.map((school) => (
+                      <tr key={school.school_id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {school.school_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {school.student_submissions}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {school.volunteer_submissions}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {school.total_students_sum}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                          {school.student_submissions + school.volunteer_submissions}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
+    ),
+  };
+
+  // Daily submissions tab content
+  const dailyTab = {
+    id: 'daily',
+    label: 'Daily Trends',
+    icon: <CalendarIcon className="h-5 w-5" />,
+    content: (
+      <div className="space-y-6">
+        {/* Combined Daily Chart */}
+        <Card>
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Submission Trends</h3>
+            <div className="h-96">
+              {(reportData.dailySubmissions.daily_student_submissions.length > 0 || 
+                reportData.dailySubmissions.daily_volunteer_submissions.length > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={reportData.dailySubmissions.daily_student_submissions.map((item, index) => ({
+                      date: item.date,
+                      'Student Submissions': item.count,
+                      'Volunteer Submissions': reportData.dailySubmissions.daily_volunteer_submissions[index]?.count || 0
+                    }))}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
-                      dataKey="status" 
+                      dataKey="date" 
                       tick={{ fontSize: 12 }}
                     />
                     <YAxis 
                       tick={{ fontSize: 12 }}
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar 
-                      dataKey="count" 
+                    <Legend />
+                    <Area 
+                      type="monotone" 
+                      dataKey="Student Submissions" 
+                      stackId="1"
+                      stroke="#10b981" 
                       fill="#10b981" 
-                      name="Activities"
-                      radius={[4, 4, 0, 0]}
+                      fillOpacity={0.6}
                     />
-                  </BarChart>
+                    <Area 
+                      type="monotone" 
+                      dataKey="Volunteer Submissions" 
+                      stackId="1"
+                      stroke="#3b82f6" 
+                      fill="#3b82f6" 
+                      fillOpacity={0.6}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               ) : (
                 <EmptyState
-                  title="No activity data"
-                  description="No activity data available for the selected period"
+                  title="No daily data"
+                  description="No daily submission data available for the selected period"
                   icon={<CalendarIcon className="h-12 w-12 text-gray-400" />}
+                />
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Separate Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Student Daily Submissions */}
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Student Submissions Daily</h3>
+              <div className="h-64">
+                {reportData.dailySubmissions.daily_student_submissions.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={reportData.dailySubmissions.daily_student_submissions}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="#10b981" 
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                        name="Student Submissions"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No student data"
+                    description="No student submission data available"
+                    icon={<UserGroupIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* Volunteer Daily Submissions */}
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Volunteer Submissions Daily</h3>
+              <div className="h-64">
+                {reportData.dailySubmissions.daily_volunteer_submissions.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={reportData.dailySubmissions.daily_volunteer_submissions}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                        name="Volunteer Submissions"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState
+                    title="No volunteer data"
+                    description="No volunteer submission data available"
+                    icon={<ChartBarIcon className="h-12 w-12 text-gray-400" />}
+                  />
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    ),
+  };
+
+  // Assignment flow tab content
+  const assignmentsTab = {
+    id: 'assignments',
+    label: 'Assignments',
+    icon: <ArrowTrendingUpIcon className="h-5 w-5" />,
+    content: (
+      <div className="space-y-6">
+        {/* Assignment Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Assignments</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">
+                  {reportData.assignmentFlow.assignment_status.reduce((sum, item) => sum + item.count, 0)}
+                </p>
+              </div>
+              <DocumentTextIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Overdue Assignments</p>
+                <p className="text-2xl font-bold text-red-600 mt-1">
+                  {reportData.assignmentFlow.overdue_count}
+                </p>
+              </div>
+              <ClockIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Completion Rate</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">
+                  {(() => {
+                    const total = reportData.assignmentFlow.assignment_status.reduce((sum, item) => sum + item.count, 0);
+                    const completed = reportData.assignmentFlow.assignment_status.find(item => item.status === 'completed')?.count || 0;
+                    return total > 0 ? `${Math.round((completed / total) * 100)}%` : '0%';
+                  })()}
+                </p>
+              </div>
+              <ArrowTrendingUpIcon className="h-8 w-8 text-gray-300" />
+            </div>
+          </Card>
+        </div>
+
+        {/* Assignment Status Distribution */}
+        <Card>
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Assignment Status Distribution</h3>
+            <div className="h-96">
+              {reportData.assignmentFlow.assignment_status.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <div className="flex h-full">
+                    <div className="w-1/2 h-full">
+                      <PieChart>
+                        <Pie
+                          data={reportData.assignmentFlow.assignment_status}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={renderCustomPieLabel}
+                          outerRadius={100}
+                          innerRadius={60}
+                          paddingAngle={2}
+                          dataKey="count"
+                        >
+                          {reportData.assignmentFlow.assignment_status.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomTooltip />} />
+                      </PieChart>
+                    </div>
+                    <div className="w-1/2 pl-6">
+                      <div className="h-full flex flex-col justify-center">
+                        <div className="space-y-4">
+                          {reportData.assignmentFlow.assignment_status.map((item, index) => (
+                            <div key={item.status} className="flex items-center">
+                              <div 
+                                className="w-4 h-4 rounded-full mr-3"
+                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                              />
+                              <span className="text-sm font-medium text-gray-700">
+                                {item.status.charAt(0).toUpperCase() + item.status.slice(1)}:
+                              </span>
+                              <span className="text-sm font-bold text-gray-900 ml-2">
+                                {item.count}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="pt-4 mt-4 border-t border-gray-200">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-700">Total Assignments:</span>
+                              <span className="text-lg font-bold text-gray-900">
+                                {reportData.assignmentFlow.assignment_status.reduce((sum, item) => sum + item.count, 0)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="text-sm font-medium text-red-600">Overdue Assignments:</span>
+                              <span className="text-lg font-bold text-red-600">
+                                {reportData.assignmentFlow.overdue_count}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState
+                  title="No assignment data"
+                  description="No assignment flow data available"
+                  icon={<ArrowTrendingUpIcon className="h-12 w-12 text-gray-400" />}
                 />
               )}
             </div>
@@ -417,494 +904,11 @@ export default function AdminReportsPage() {
     ),
   };
 
-  // User statistics tab
-  const usersTab = {
-    id: 'users',
-    label: 'Users',
-    icon: <UserGroupIcon className="h-5 w-5" />,
-    content: (
-      <div className="space-y-6">
-        {/* User Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Users</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {reportData.userStats.totalUsers}
-                </p>
-              </div>
-              <UserGroupIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Active Users</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {reportData.userStats.byActiveStatus.find(s => s.status === 'active')?.count || 0}
-                </p>
-              </div>
-              <ArrowTrendingUpIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Pilots</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {reportData.userStats.byPilot.length}
-                </p>
-              </div>
-              <BuildingOfficeIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-        </div>
-
-        {/* User Distribution Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Users by Active Status - Pie Chart */}
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Users by Status</h3>
-              <div className="h-64">
-                {reportData.userStats.byActiveStatus.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={reportData.userStats.byActiveStatus}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={renderCustomPieLabel}
-                        outerRadius={80}
-                        innerRadius={40}
-                        paddingAngle={2}
-                        dataKey="count"
-                      >
-                        {reportData.userStats.byActiveStatus.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend 
-                        verticalAlign="bottom" 
-                        height={36}
-                        formatter={(value) => <span className="text-sm">{value}</span>}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    title="No user status data"
-                    description="No user status data available"
-                    icon={<UserGroupIcon className="h-12 w-12 text-gray-400" />}
-                  />
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* Users by Pilot - Bar Chart */}
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Users by Pilot</h3>
-              <div className="h-64">
-                {reportData.userStats.byPilot.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={reportData.userStats.byPilot}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="pilot" 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar 
-                        dataKey="count" 
-                        fill="#8b5cf6" 
-                        name="Users"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    title="No pilot data"
-                    description="No user data by pilot available"
-                    icon={<BuildingOfficeIcon className="h-12 w-12 text-gray-400" />}
-                  />
-                )}
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* New Users Over Time - Line Chart */}
-        {reportData.userStats.newUsersOverTime.length > 0 && (
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">New Users Over Time</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={reportData.userStats.newUsersOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="date" 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="count" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="New Users"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </Card>
-        )}
-      </div>
-    ),
-  };
-
-  // Activity statistics tab
-  const activitiesTab = {
-    id: 'activities',
-    label: 'Activities',
-    icon: <CalendarIcon className="h-5 w-5" />,
-    content: (
-      <div className="space-y-6">
-        {/* Activity Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Activities</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {reportData.activityStats.totalActivities}
-                </p>
-              </div>
-              <CalendarIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Status Types</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {reportData.activityStats.byStatus.length}
-                </p>
-              </div>
-              <ChartBarIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Pilots</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {reportData.activityStats.byPilot.length}
-                </p>
-              </div>
-              <BuildingOfficeIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-        </div>
-
-        {/* Activity Distribution Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Activities by Status - Pie Chart */}
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Activities by Status</h3>
-              <div className="h-64">
-                {reportData.activityStats.byStatus.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={reportData.activityStats.byStatus}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={renderCustomPieLabel}
-                        outerRadius={80}
-                        innerRadius={40}
-                        paddingAngle={2}
-                        dataKey="count"
-                      >
-                        {reportData.activityStats.byStatus.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend 
-                        verticalAlign="bottom" 
-                        height={36}
-                        formatter={(value) => <span className="text-sm">{value}</span>}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    title="No status data"
-                    description="No activity status data available"
-                    icon={<CalendarIcon className="h-12 w-12 text-gray-400" />}
-                  />
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* Activities by Pilot - Bar Chart */}
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Activities by Pilot</h3>
-              <div className="h-64">
-                {reportData.activityStats.byPilot.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={reportData.activityStats.byPilot}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="pilot" 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar 
-                        dataKey="count" 
-                        fill="#8b5cf6" 
-                        name="Activities"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    title="No pilot data"
-                    description="No activity data by pilot available"
-                    icon={<BuildingOfficeIcon className="h-12 w-12 text-gray-400" />}
-                  />
-                )}
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Monthly Activity Trends - Line Chart */}
-        {reportData.activityStats.activitiesOverTime.length > 0 && (
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Activity Trends Over Time</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={reportData.activityStats.activitiesOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="date" 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="count" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="Activities"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </Card>
-        )}
-      </div>
-    ),
-  };
-
-  // Survey statistics tab
-  const surveysTab = {
-    id: 'surveys',
-    label: 'Surveys',
-    icon: <DocumentTextIcon className="h-5 w-5" />,
-    content: (
-      <div className="space-y-6">
-        {/* Survey Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Student Surveys</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {reportData.surveyStats.student.total}
-                </p>
-              </div>
-              <UserGroupIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Volunteer Surveys</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {reportData.surveyStats.volunteer.total}
-                </p>
-              </div>
-              <ChartBarIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Surveys</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {reportData.surveyStats.combinedTotal}
-                </p>
-              </div>
-              <ArrowTrendingUpIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-        </div>
-
-        {/* Survey Distribution Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Student Surveys by Template */}
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Student Surveys by Template</h3>
-              <div className="h-64">
-                {reportData.surveyStats.student.byTemplate.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={reportData.surveyStats.student.byTemplate}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="template" 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar 
-                        dataKey="count" 
-                        fill="#10b981" 
-                        name="Surveys"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    title="No template data"
-                    description="No student survey template data available"
-                    icon={<DocumentTextIcon className="h-12 w-12 text-gray-400" />}
-                  />
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* Volunteer Surveys by Template */}
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Volunteer Surveys by Template</h3>
-              <div className="h-64">
-                {reportData.surveyStats.volunteer.byTemplate.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={reportData.surveyStats.volunteer.byTemplate}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="template" 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12 }}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar 
-                        dataKey="count" 
-                        fill="#3b82f6" 
-                        name="Surveys"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    title="No template data"
-                    description="No volunteer survey template data available"
-                    icon={<DocumentTextIcon className="h-12 w-12 text-gray-400" />}
-                  />
-                )}
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Student Survey Trends - Line Chart */}
-        {reportData.surveyStats.student.overTime.length > 0 && (
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Student Survey Trends</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={reportData.surveyStats.student.overTime}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="date" 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="count" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="Student Surveys"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </Card>
-        )}
-      </div>
-    ),
-  };
-
   const tabs = [
     overviewTab,
-    usersTab,
-    activitiesTab,
-    surveysTab,
+    schoolsTab,
+    dailyTab,
+    assignmentsTab,
   ];
 
   return (
@@ -958,7 +962,8 @@ export default function AdminReportsPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Report Summary</h2>
             <Alert type="info">
-              All features now available with backend fixes
+              Showing data for {selectedPilot === 'all' ? 'all pilots' : 
+                normalizeArray<any>(pilotsData?.data).find((p: any) => p.id === selectedPilot)?.name || 'selected pilot'}
             </Alert>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -974,15 +979,15 @@ export default function AdminReportsPage() {
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-500">Total Activities</p>
+              <p className="text-sm font-medium text-gray-500">Total Schools</p>
               <p className="text-lg font-semibold text-gray-900 mt-1">
-                {reportData.overview.totalActivities}
+                {reportData.overview.total_schools}
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-500">Total Surveys</p>
+              <p className="text-sm font-medium text-gray-500">Total Submissions</p>
               <p className="text-lg font-semibold text-gray-900 mt-1">
-                {reportData.overview.totalSurveyResponses}
+                {reportData.overview.total_student_submissions + reportData.overview.total_volunteer_submissions}
               </p>
             </div>
           </div>
@@ -994,7 +999,7 @@ export default function AdminReportsPage() {
         <div className="p-4">
           <SearchFilter
             onSearch={handleSearch}
-            placeholder="Search reports..."
+            placeholder="Search schools..."
           />
         </div>
       </Card>
