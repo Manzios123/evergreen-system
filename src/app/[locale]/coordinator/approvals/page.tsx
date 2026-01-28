@@ -137,6 +137,14 @@ const FeedbackModal = ({
   );
 };
 
+// Define the response structure for activities
+interface ActivitiesResponse {
+  success: boolean;
+  data: Activity[];
+  count: number;
+  message: string;
+}
+
 export default function CoordinatorApprovalsPage() {
   const [selectedTab, setSelectedTab] = useState<'activities' | 'media'>('activities');
   const [searchTerm, setSearchTerm] = useState('');
@@ -155,16 +163,19 @@ export default function CoordinatorApprovalsPage() {
     title: string;
   } | null>(null);
 
-  // Fetch pending activities
+  // Fetch pending activities - FIXED: status should be 'pending' not 'pending_approval'
   const { 
-    data: pendingActivities, 
+    data: activitiesResponse, 
     isLoading: activitiesLoading, 
     error: activitiesError,
     refetch: refetchActivities 
-  } = useApiQuery<Activity[]>(
+  } = useApiQuery<ActivitiesResponse>(
     ['activities', 'pending'],
-    () => api.get<Activity[]>('/activities', { params: { status: 'pending' } })
+    () => api.get<ActivitiesResponse>('/activities', { params: { status: 'pending' } })
   );
+
+  // Extract activities from response
+  const pendingActivities = activitiesResponse?.data || [];
 
   // Fetch pending media (photos + videos)
   const { 
@@ -180,19 +191,19 @@ export default function CoordinatorApprovalsPage() {
   // Get pending media data from response
   const pendingMedia = pendingMediaResponse?.data || [];
 
-  // Approval mutations
+  // Approval mutations - FIXED: Updated to use correct endpoints
   const approveActivityMutation = useApiMutation(
-    (id: string) => api.post(`/activities/${id}/approve`)
+    (id: string) => api.post(`/approvals/${id}/approve`)
   );
 
   const rejectActivityMutation = useApiMutation(
     (data: { id: string; feedback: string }) => 
-      api.post(`/activities/${data.id}/reject`, { feedback: data.feedback })
+      api.post(`/approvals/${data.id}/reject`, { feedback: data.feedback })
   );
 
   const requestEditActivityMutation = useApiMutation(
     (data: { id: string; feedback: string }) => 
-      api.post(`/activities/${data.id}/request-edit`, { feedback: data.feedback })
+      api.post(`/approvals/${data.id}/request-edit`, { feedback: data.feedback })
   );
 
   const approveMediaMutation = useApiMutation(
@@ -291,7 +302,7 @@ export default function CoordinatorApprovalsPage() {
       activity.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.school?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.volunteer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      (activity.volunteer_name && activity.volunteer_name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [pendingActivities, searchTerm]);
 
@@ -324,11 +335,11 @@ export default function CoordinatorApprovalsPage() {
             <div className="flex flex-wrap gap-2 mt-1">
               <div className="flex items-center text-sm text-gray-500">
                 <Building className="h-3 w-3 mr-1" />
-                {activity.school?.name}
+                {activity.school_name || activity.school?.name}
               </div>
               <div className="flex items-center text-sm text-gray-500">
                 <User className="h-3 w-3 mr-1" />
-                {activity.volunteer?.full_name}
+                {activity.volunteer_name || activity.volunteer?.full_name}
               </div>
             </div>
           </div>
@@ -341,7 +352,11 @@ export default function CoordinatorApprovalsPage() {
       sortable: true,
       render: (activity: Activity) => (
         <div className="text-sm text-gray-900">
-          {new Date(activity.scheduled_date).toLocaleDateString()}
+          {activity.actual_date 
+            ? new Date(activity.actual_date).toLocaleDateString() 
+            : activity.scheduled_date 
+              ? new Date(activity.scheduled_date).toLocaleDateString()
+              : 'No date'}
         </div>
       ),
     },
@@ -644,7 +659,7 @@ export default function CoordinatorApprovalsPage() {
     );
   }
 
-  const totalPending = (Array.isArray(pendingActivities) ? pendingActivities.length : 0) + filteredMedia.length;
+  const totalPending = pendingActivities.length + filteredMedia.length;
 
   return (
     <div className="space-y-6">
@@ -685,7 +700,7 @@ export default function CoordinatorApprovalsPage() {
             <div>
               <p className="text-sm font-medium text-gray-500">Pending Activities</p>
               <p className="text-2xl font-bold text-yellow-600 mt-1">
-                {Array.isArray(pendingActivities) ? pendingActivities.length : 0}
+                {pendingActivities.length}
               </p>
             </div>
             <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
