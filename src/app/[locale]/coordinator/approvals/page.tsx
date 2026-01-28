@@ -65,6 +65,7 @@ export default function CoordinatorApprovalsPage() {
     id: string;
     action: 'approve' | 'reject' | 'request-edit';
     title: string;
+    feedback?: string;
   } | null>(null);
 
   // Fetch pending activities
@@ -80,14 +81,17 @@ export default function CoordinatorApprovalsPage() {
 
   // Fetch pending media (photos + videos)
   const { 
-    data: pendingMedia, 
+    data: pendingMediaResponse, 
     isLoading: mediaLoading, 
     error: mediaError,
     refetch: refetchMedia 
-  } = useApiQuery<Media[]>(
+  } = useApiQuery<{ success: boolean; data: Media[] }>(
     ['media', 'pending'],
-    () => api.get<Media[]>('/approvals/media', { params: { status: 'pending' } })
+    () => api.get<{ success: boolean; data: Media[] }>('/approvals/media', { params: { status: 'pending' } })
   );
+
+  // Get pending media data from response
+  const pendingMedia = pendingMediaResponse?.data || [];
 
   // Approval mutations
   const approveActivityMutation = useApiMutation(
@@ -152,26 +156,26 @@ export default function CoordinatorApprovalsPage() {
 
   // Filter activities and media based on search
   const filteredActivities = useMemo(() => {
-    if (!pendingActivities) return [];
-    if (!searchTerm) return pendingActivities;
+    const activities = Array.isArray(pendingActivities) ? pendingActivities : [];
+    if (!searchTerm) return activities;
     
-    return pendingActivities.filter(activity =>
-      activity.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    return activities.filter(activity =>
+      activity.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.school?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.volunteer?.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+      activity.school?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.volunteer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [pendingActivities, searchTerm]);
 
   const filteredMedia = useMemo(() => {
-    if (!pendingMedia) return [];
-    if (!searchTerm) return pendingMedia;
+    const media = Array.isArray(pendingMedia) ? pendingMedia : [];
+    if (!searchTerm) return media;
     
-    return pendingMedia.filter(media =>
-      media.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      media.filename?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      media.activity?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      media.volunteer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    return media.filter(mediaItem =>
+      mediaItem.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mediaItem.filename?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mediaItem.activity?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mediaItem.volunteer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [pendingMedia, searchTerm]);
 
@@ -500,7 +504,19 @@ export default function CoordinatorApprovalsPage() {
     );
   }
 
-  const totalPending = (pendingActivities?.length || 0) + (pendingMedia?.length || 0);
+  const totalPending = (Array.isArray(pendingActivities) ? pendingActivities.length : 0) + filteredMedia.length;
+
+  // Calculate urgent count safely
+  const urgentCount = useMemo(() => {
+    const activities = Array.isArray(pendingActivities) ? pendingActivities : [];
+    return activities.filter(a => {
+      if (!a?.created_at) return false;
+      const daysAgo = Math.floor(
+        (new Date().getTime() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return daysAgo > 7;
+    }).length;
+  }, [pendingActivities]);
 
   return (
     <div className="space-y-6">
@@ -541,7 +557,7 @@ export default function CoordinatorApprovalsPage() {
             <div>
               <p className="text-sm font-medium text-gray-500">Pending Activities</p>
               <p className="text-2xl font-bold text-yellow-600 mt-1">
-                {pendingActivities?.length || 0}
+                {Array.isArray(pendingActivities) ? pendingActivities.length : 0}
               </p>
             </div>
             <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
@@ -555,7 +571,7 @@ export default function CoordinatorApprovalsPage() {
             <div>
               <p className="text-sm font-medium text-gray-500">Pending Media</p>
               <p className="text-2xl font-bold text-blue-600 mt-1">
-                {pendingMedia?.length || 0}
+                {filteredMedia.length}
               </p>
             </div>
             <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
@@ -569,12 +585,7 @@ export default function CoordinatorApprovalsPage() {
             <div>
               <p className="text-sm font-medium text-gray-500">Urgent</p>
               <p className="text-2xl font-bold text-red-600 mt-1">
-                {(pendingActivities?.filter(a => {
-                  const daysAgo = Math.floor(
-                    (new Date().getTime() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24)
-                  );
-                  return daysAgo > 7;
-                }).length || 0)}
+                {urgentCount}
               </p>
             </div>
             <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
@@ -597,7 +608,7 @@ export default function CoordinatorApprovalsPage() {
         <ConfirmationDialog
           open={approvalDialog.open}
           onClose={() => setApprovalDialog(null)}
-          onConfirm={() => handleApproval()}
+          onConfirm={() => handleApproval(approvalDialog.feedback)}
           title={
             approvalDialog.action === 'approve'
               ? `Approve ${approvalDialog.type}`
@@ -633,6 +644,11 @@ export default function CoordinatorApprovalsPage() {
             approveMediaMutation.isPending ||
             rejectMediaMutation.isPending
           }
+          // Add input field for feedback when rejecting or requesting edits
+          showInput={approvalDialog.action === 'reject' || approvalDialog.action === 'request-edit'}
+          inputLabel="Feedback"
+          inputPlaceholder="Provide feedback..."
+          onInputChange={(value) => setApprovalDialog({...approvalDialog, feedback: value})}
         />
       )}
     </div>
