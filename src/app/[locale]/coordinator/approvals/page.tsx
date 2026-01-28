@@ -17,43 +17,21 @@ import {
   Check,
   X,
   Pencil,
-  Image as MediaIcon,
-  Video,
   Calendar,
   Building,
   User,
   Filter,
   Clock,
 } from 'lucide-react';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { api } from '@/lib/api/api';
 
-// Define Media type locally since it's not in @/lib/types
-interface Media {
-  id: string;
-  activityId: string | null;
-  volunteerId: string;
-  filename?: string;
-  url: string;
-  thumbnailUrl: string | null;
-  caption?: string;
-  status: string;
-  mediaType: string;
-  fileType?: string;
-  uploadedAt: string;
-  activity?: {
-    id: string;
-    title: string;
-    status: string;
-    school: {
-      id: string;
-      name: string;
-    } | null;
-  } | null;
-  volunteer: {
-    id: string;
-    full_name: string;
-  };
+// Define the response structure for activities
+interface ActivitiesResponse {
+  success: boolean;
+  data: Activity[];
+  count: number;
+  message: string;
 }
 
 // Create a separate FeedbackModal component to isolate its Hooks
@@ -137,33 +115,39 @@ const FeedbackModal = ({
   );
 };
 
-// Define the response structure for activities
-interface ActivitiesResponse {
-  success: boolean;
-  data: Activity[];
-  count: number;
-  message: string;
-}
-
 export default function CoordinatorApprovalsPage() {
-  const [selectedTab, setSelectedTab] = useState<'activities' | 'media'>('activities');
   const [searchTerm, setSearchTerm] = useState('');
   const [approvalDialog, setApprovalDialog] = useState<{
     open: boolean;
-    type: 'activity' | 'media';
+    type: 'activity';
     id: string;
     action: 'approve' | 'reject' | 'request-edit';
     title: string;
   } | null>(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [pendingFeedbackAction, setPendingFeedbackAction] = useState<{
-    type: 'activity' | 'media';
+    type: 'activity';
     id: string;
     action: 'reject' | 'request-edit';
     title: string;
   } | null>(null);
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    title: string;
+  } | null>(null);
 
-  // Fetch pending activities - FIXED: status should be 'pending' not 'pending_approval'
+  // Clear notification after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  // Fetch pending activities - status is 'pending' (not 'pending_approval')
   const { 
     data: activitiesResponse, 
     isLoading: activitiesLoading, 
@@ -177,21 +161,7 @@ export default function CoordinatorApprovalsPage() {
   // Extract activities from response
   const pendingActivities = activitiesResponse?.data || [];
 
-  // Fetch pending media (photos + videos)
-  const { 
-    data: pendingMediaResponse, 
-    isLoading: mediaLoading, 
-    error: mediaError,
-    refetch: refetchMedia 
-  } = useApiQuery<{ success: boolean; data: Media[] }>(
-    ['media', 'pending'],
-    () => api.get<{ success: boolean; data: Media[] }>('/approvals/media', { params: { status: 'active' } })
-  );
-
-  // Get pending media data from response
-  const pendingMedia = pendingMediaResponse?.data || [];
-
-  // Approval mutations - FIXED: Updated to use correct endpoints
+  // Approval mutations for activities
   const approveActivityMutation = useApiMutation(
     (id: string) => api.post(`/approvals/${id}/approve`)
   );
@@ -206,15 +176,6 @@ export default function CoordinatorApprovalsPage() {
       api.post(`/approvals/${data.id}/request-edit`, { feedback: data.feedback })
   );
 
-  const approveMediaMutation = useApiMutation(
-    (id: string) => api.post(`/approvals/media/${id}/approve`)
-  );
-
-  const rejectMediaMutation = useApiMutation(
-    (data: { id: string; feedback: string }) => 
-      api.post(`/approvals/media/${data.id}/reject`, { feedback: data.feedback })
-  );
-
   const handleApproval = useCallback(async (feedback?: string) => {
     if (!pendingFeedbackAction && !approvalDialog) return;
 
@@ -222,38 +183,41 @@ export default function CoordinatorApprovalsPage() {
     if (!actionData) return;
 
     try {
-      if (actionData.type === 'activity') {
-        if (actionData.action === 'approve') {
-          await approveActivityMutation.mutateAsync(actionData.id);
-        } else if (actionData.action === 'reject') {
-          await rejectActivityMutation.mutateAsync({ 
-            id: actionData.id, 
-            feedback: feedback || 'No feedback provided' 
-          });
-        } else if (actionData.action === 'request-edit') {
-          await requestEditActivityMutation.mutateAsync({ 
-            id: actionData.id, 
-            feedback: feedback || 'Please make the requested edits' 
-          });
-        }
-        refetchActivities();
-      } else {
-        if (actionData.action === 'approve') {
-          await approveMediaMutation.mutateAsync(actionData.id);
-        } else if (actionData.action === 'reject') {
-          await rejectMediaMutation.mutateAsync({ 
-            id: actionData.id, 
-            feedback: feedback || 'No feedback provided' 
-          });
-        }
-        refetchMedia();
+      if (actionData.action === 'approve') {
+        await approveActivityMutation.mutateAsync(actionData.id);
+      } else if (actionData.action === 'reject') {
+        await rejectActivityMutation.mutateAsync({ 
+          id: actionData.id, 
+          feedback: feedback || 'No feedback provided' 
+        });
+      } else if (actionData.action === 'request-edit') {
+        await requestEditActivityMutation.mutateAsync({ 
+          id: actionData.id, 
+          feedback: feedback || 'Please make the requested edits' 
+        });
       }
+      
+      refetchActivities();
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        title: 'Success',
+        message: `Activity ${actionData.action === 'approve' ? 'approved' : actionData.action === 'reject' ? 'rejected' : 'edit requested'} successfully`
+      });
       
       setApprovalDialog(null);
       setPendingFeedbackAction(null);
       setShowFeedbackModal(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to process approval:', error);
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        title: 'Error',
+        message: error.message || "Failed to process approval"
+      });
     }
   }, [
     pendingFeedbackAction, 
@@ -261,15 +225,12 @@ export default function CoordinatorApprovalsPage() {
     approveActivityMutation, 
     rejectActivityMutation, 
     requestEditActivityMutation,
-    approveMediaMutation,
-    rejectMediaMutation,
-    refetchActivities,
-    refetchMedia
+    refetchActivities
   ]);
 
   const handleApprovalAction = useCallback((dialog: {
     open: boolean;
-    type: 'activity' | 'media';
+    type: 'activity';
     id: string;
     action: 'approve' | 'reject' | 'request-edit';
     title: string;
@@ -293,7 +254,7 @@ export default function CoordinatorApprovalsPage() {
     }
   }, [approvalDialog, handleApproval]);
 
-  // Filter activities and media based on search
+  // Filter activities based on search
   const filteredActivities = useMemo(() => {
     const activities = Array.isArray(pendingActivities) ? pendingActivities : [];
     if (!searchTerm) return activities;
@@ -301,22 +262,12 @@ export default function CoordinatorApprovalsPage() {
     return activities.filter(activity =>
       activity.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.school_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.volunteer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.school?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (activity.volunteer_name && activity.volunteer_name.toLowerCase().includes(searchTerm.toLowerCase()))
+      activity.volunteer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [pendingActivities, searchTerm]);
-
-  const filteredMedia = useMemo(() => {
-    const media = Array.isArray(pendingMedia) ? pendingMedia : [];
-    if (!searchTerm) return media;
-    
-    return media.filter(mediaItem =>
-      mediaItem.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mediaItem.filename?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mediaItem.activity?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mediaItem.volunteer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [pendingMedia, searchTerm]);
 
   const activityColumns = useMemo(() => [
     {
@@ -434,118 +385,7 @@ export default function CoordinatorApprovalsPage() {
     },
   ], [handleApprovalAction]);
 
-  const mediaColumns = useMemo(() => [
-    {
-      key: 'media',
-      header: 'Media',
-      render: (media: Media) => (
-        <div className="flex items-start space-x-3">
-          <div className="shrink-0">
-            <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
-              {media.mediaType === 'video' ? (
-                <Video className="h-6 w-6 text-red-500" />
-              ) : (
-                <MediaIcon className="h-6 w-6 text-blue-500" />
-              )}
-            </div>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="font-medium text-gray-900 truncate">
-                {media.filename || `media_${media.id.substring(0, 8)}`}
-              </p>
-              <span className={`px-2 py-1 text-xs rounded-full ${
-                media.mediaType === 'video' 
-                  ? 'bg-red-100 text-red-800' 
-                  : 'bg-blue-100 text-blue-800'
-              }`}>
-                {media.mediaType}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {media.caption && (
-                <p className="text-sm text-gray-500 truncate">
-                  {media.caption}
-                </p>
-              )}
-              {media.activity && (
-                <div className="flex items-center text-sm text-gray-500">
-                  <Calendar className="h-3 w-3 mr-1" />
-                  {media.activity.title}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'activity',
-      header: 'Activity',
-      render: (media: Media) => (
-        <div className="text-sm text-gray-900">
-          {media.activity?.title || 'Not linked to activity'}
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (media: Media) => (
-        <StatusBadge status={media.status} />
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (media: Media) => (
-        <div className="flex space-x-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => window.open(media.url, '_blank')}
-          >
-            View
-          </Button>
-          <Button
-            size="sm"
-            variant="default"
-            className="bg-green-600 hover:bg-green-700 text-white"
-            icon={<Check className="h-4 w-4" />}
-            onClick={() =>
-              handleApprovalAction({
-                open: true,
-                type: 'media',
-                id: media.id,
-                action: 'approve',
-                title: 'Media',
-              })
-            }
-          >
-            Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            icon={<X className="h-4 w-4" />}
-            onClick={() =>
-              handleApprovalAction({
-                open: true,
-                type: 'media',
-                id: media.id,
-                action: 'reject',
-                title: 'Media',
-              })
-            }
-          >
-            Reject
-          </Button>
-        </div>
-      ),
-    },
-  ], [handleApprovalAction]);
-
-  const tabs = useMemo(() => [
+  const tabs = [
     {
       id: 'activities',
       label: 'Activities',
@@ -584,48 +424,10 @@ export default function CoordinatorApprovalsPage() {
         </div>
       ),
     },
-    {
-      id: 'media',
-      label: 'Media',
-      icon: <MediaIcon className="h-5 w-5" />,
-      count: filteredMedia.length,
-      content: (
-        <div className="space-y-4">
-          {filteredMedia.length > 0 ? (
-            <Card>
-              <DataTable
-                data={filteredMedia}
-                columns={mediaColumns}
-              />
-            </Card>
-          ) : (
-            <EmptyState
-              icon={<MediaIcon className="h-12 w-12 text-gray-400" />}
-              title={
-                searchTerm ? "No matching media found" : "No media pending approval"
-              }
-              description={
-                searchTerm
-                  ? "Try adjusting your search to find pending media."
-                  : "All media have been reviewed and approved."
-              }
-              action={
-                searchTerm
-                  ? {
-                      label: 'Clear Search',
-                      onClick: () => setSearchTerm(''),
-                    }
-                  : undefined
-              }
-            />
-          )}
-        </div>
-      ),
-    },
-  ], [filteredActivities, filteredMedia, searchTerm, activityColumns, mediaColumns]);
+  ];
 
-  const isLoading = activitiesLoading || mediaLoading;
-  const error = activitiesError || mediaError;
+  const isLoading = activitiesLoading;
+  const error = activitiesError;
 
   // Calculate urgent count safely
   const urgentCount = useMemo(() => {
@@ -659,10 +461,21 @@ export default function CoordinatorApprovalsPage() {
     );
   }
 
-  const totalPending = pendingActivities.length + filteredMedia.length;
+  const totalPending = pendingActivities.length;
 
   return (
     <div className="space-y-6">
+      {/* Notification Alert */}
+      {notification && (
+        <Alert
+          type={notification.type}
+          title={notification.title}
+          onClose={() => setNotification(null)}
+        >
+          {notification.message}
+        </Alert>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -680,7 +493,7 @@ export default function CoordinatorApprovalsPage() {
           <div className="w-full sm:w-64">
             <SearchFilter
               onSearch={setSearchTerm}
-              placeholder="Search activities, media, volunteers..."
+              placeholder="Search activities, volunteers, schools..."
             />
           </div>
           <Button
@@ -694,7 +507,7 @@ export default function CoordinatorApprovalsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -705,20 +518,6 @@ export default function CoordinatorApprovalsPage() {
             </div>
             <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
               <Calendar className="h-5 w-5 text-yellow-600" />
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Pending Media</p>
-              <p className="text-2xl font-bold text-blue-600 mt-1">
-                {filteredMedia.length}
-              </p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <MediaIcon className="h-5 w-5 text-blue-600" />
             </div>
           </div>
         </Card>
@@ -738,11 +537,11 @@ export default function CoordinatorApprovalsPage() {
         </Card>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Only activities */}
       <Tabs
         tabs={tabs}
-        activeTab={selectedTab}
-        onTabChange={(tabId) => setSelectedTab(tabId as 'activities' | 'media')}
+        activeTab="activities"
+        onTabChange={() => {}} // No-op since only one tab
         variant="underline"
       />
 
@@ -759,9 +558,7 @@ export default function CoordinatorApprovalsPage() {
           loading={
             approveActivityMutation.isPending ||
             rejectActivityMutation.isPending ||
-            requestEditActivityMutation.isPending ||
-            approveMediaMutation.isPending ||
-            rejectMediaMutation.isPending
+            requestEditActivityMutation.isPending
           }
         />
       )}
@@ -778,8 +575,7 @@ export default function CoordinatorApprovalsPage() {
         action={pendingFeedbackAction?.action || 'reject'}
         loading={
           rejectActivityMutation.isPending ||
-          requestEditActivityMutation.isPending ||
-          rejectMediaMutation.isPending
+          requestEditActivityMutation.isPending
         }
       />
     </div>

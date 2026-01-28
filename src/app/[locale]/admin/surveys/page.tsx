@@ -350,7 +350,7 @@ export default function AdminSurveysPage() {
         </div>
         
         <div className="flex gap-3">
-          <Link href="/admin/surveys/template">
+          <Link href="/admin/surveys/templates">
             <Button variant="outline">
               <DocumentTextIcon className="h-4 w-4 mr-2" />
               Manage Templates
