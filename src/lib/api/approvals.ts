@@ -37,4 +37,10 @@ export const approvalsApi = {
       method: 'POST',
       body: JSON.stringify({ feedback }),
     }),
+
+  // Pending counts
+  getPendingCounts: () =>
+    apiRequest(`/api/approvals/pending-counts`, {
+      method: 'GET',
+    }),
 };
