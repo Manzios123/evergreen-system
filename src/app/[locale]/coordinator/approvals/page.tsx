@@ -185,7 +185,7 @@ export default function CoordinatorApprovalsPage() {
     refetch: refetchMedia 
   } = useApiQuery<{ success: boolean; data: Media[] }>(
     ['media', 'pending'],
-    () => api.get<{ success: boolean; data: Media[] }>('/approvals/media', { params: { status: 'pending' } })
+    () => api.get<{ success: boolean; data: Media[] }>('/approvals/media', { params: { status: 'active' } })
   );
 
   // Get pending media data from response
