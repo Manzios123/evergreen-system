@@ -1,501 +1,312 @@
 // app/[locale]/coordinator/activities/[id]/page.tsx
+'use client';
 
-'use client'
-
-import { Card } from '@/components/ui/card';
-import Button from '@/components/ui/button'; // Changed to default import
-import StatusBadge from '@/components/ui/status-badge'; // Changed to default import
-import Alert from '@/components/ui/alert'; // Changed to default import
-import Tabs from '@/components/ui/tabs'; // Changed to default import
-import SkeletonLoader from '@/components/ui/skeleton-loader'; // Changed to default import
-import ConfirmationDialog from '@/components/ui/confirmation-dialog'; // Changed to default import
-import { useApiQuery, useApiMutation } from '@/lib/hooks/use-api';
-import { Activity, Photo, Survey, ActivityStatus } from '@/lib/types'; // Fixed import path
-import { api } from '@/lib/api/api'; // Added missing api import
-import {
-  ArrowLeftIcon,
-  CalendarIcon,
-  UserIcon,
-  BuildingOfficeIcon,
-  UserGroupIcon,
-  DocumentTextIcon,
-  PhotoIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  PencilIcon,
-  ClockIcon,
-  MapPinIcon,
-} from '@heroicons/react/24/outline';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
+import { activitiesApi } from '@/lib/api/activities';
+import { apiRequest } from '@/lib/api/api';
+import type { Activity as ActivityType } from '@/lib/types';
 
-interface ActivityDetailPageProps {
-  params: {
-    id: string;
-  };
+interface MediaItem {
+  id: string;
+  url: string;
+  thumbnailUrl?: string;
+  mediaType: 'photo' | 'video' | 'document';
+  caption?: string;
+  filename?: string;
+  uploadedAt: string;
+  size: number;
+  displayOrder: number;
+  duration?: number;
+  width?: number;
+  height?: number;
 }
 
-export default function CoordinatorActivityDetailPage({ params }: ActivityDetailPageProps) {
-  const [activeTab, setActiveTab] = useState<string>('details'); // Changed to string to match Tabs component
-  const [showApproveDialog, setShowApproveDialog] = useState(false);
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [rejectFeedback, setRejectFeedback] = useState('');
+export default function ActivityViewPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
+  const locale = params.locale as string;
 
-  const { data: activity, isLoading, error, refetch } = useApiQuery<Activity>(
-    ['activity', params.id],
-    () => api.get<Activity>(`/activities/${params.id}`) // Fixed API call
-  );
+  const [activity, setActivity] = useState<ActivityType | null>(null);
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: photos } = useApiQuery<Photo[]>(
-    ['activity-photos', params.id],
-    () => api.get<Photo[]>('/photos', { activityId: params.id }) // Fixed API call
-  );
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const { data: surveys } = useApiQuery<Survey[]>(
-    ['activity-surveys', params.id],
-    () => api.get<Survey[]>('/surveys', { activityId: params.id }) // Fixed API call
-  );
+        // Fetch activity
+        const activityResponse = await activitiesApi.get(id);
+        if (!activityResponse.success) {
+          throw new Error('Failed to fetch activity');
+        }
+        setActivity(activityResponse.data);
 
-  const approveMutation = useApiMutation(
-    () => api.patch<Activity>(`/activities/${params.id}/approve`) // Fixed API call
-  );
-
-  const rejectMutation = useApiMutation(
-    (feedback: string) => api.patch<Activity>(`/activities/${params.id}/reject`, { feedback }) // Fixed API call
-  );
-
-  const handleApprove = async () => {
-    try {
-      await approveMutation.mutateAsync({} as any); // Need to pass empty object since mutation expects variables
-      refetch();
-      setShowApproveDialog(false);
-    } catch (error) {
-      console.error('Failed to approve activity:', error);
+        // Fetch media
+        const mediaResponse = await apiRequest<{ data: MediaItem[] }>(`/activities/${id}/media`, { method: 'GET' });
+        if (mediaResponse.data) {
+          setMedia(mediaResponse.data);
+        }
+      } catch (err: any) {
+        setError(err.message || 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
     }
-  };
 
-  const handleReject = async () => {
-    try {
-      await rejectMutation.mutateAsync(rejectFeedback);
-      refetch();
-      setShowRejectDialog(false);
-      setRejectFeedback('');
-    } catch (error) {
-      console.error('Failed to reject activity:', error);
-    }
-  };
+    fetchData();
+  }, [id]);
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="space-y-6">
-        <SkeletonLoader type="card" />
-        <div className="h-12 bg-gray-100 rounded animate-pulse"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-lg font-medium text-gray-700">Loading...</div>
       </div>
     );
   }
 
-  if (error || !activity) {
+  if (error) {
     return (
-      <div className="max-w-3xl mx-auto">
-        <Alert 
-          type="error" 
-          title="Activity not found"
-        >
-          <p className="text-sm text-red-700 mt-1">
-            The requested activity could not be loaded.
-          </p>
-          <div className="mt-4">
-            <Link href="/coordinator/activities">
-              <Button variant="outline">
-                <ArrowLeftIcon className="h-4 w-4 mr-2" />
-                Back to Activities
-              </Button>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+          <p className="text-gray-700 mb-4">{error}</p>
+          <button
+            onClick={() => router.back()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!activity) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Activity Not Found</h1>
+          <Link
+            href={`/${locale}/coordinator/activities`}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            View All Activities
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <Link
+            href={`/${locale}/coordinator/activities`}
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            ← Back to Activities
+          </Link>
+        </div>
+
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{activity.title}</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Activity ID: {activity.id}
+              </p>
+            </div>
+            <Link
+              href={`/${locale}/coordinator/activities/${id}/edit`}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Edit Activity
             </Link>
           </div>
-        </Alert>
-      </div>
-    );
-  }
 
-  // Fix status checks based on actual ActivityStatus type
-  const canApprove = activity.status === 'pending';
-  const canEdit = ['draft', 'pending'].includes(activity.status);
-
-  const tabs = [
-    {
-      id: 'details',
-      label: 'Activity Details',
-      icon: <DocumentTextIcon className="h-5 w-5" />,
-      content: (
-        <div className="space-y-6">
-          {/* Basic Info */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Activity Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Title</h4>
-                <p className="text-gray-900">{activity.title}</p>
+          <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
+            <dl className="sm:divide-y sm:divide-gray-200">
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Status</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    activity.status === 'approved' ? 'bg-green-100 text-green-800' :
+                    activity.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                    activity.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {activity.status}
+                  </span>
+                </dd>
               </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Status</h4>
-                <StatusBadge status={activity.status} />
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Description</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {activity.description}
+                </dd>
               </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
-                <p className="text-gray-900">{activity.description}</p>
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Scheduled Date</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {new Date(activity.scheduled_date).toLocaleDateString()}
+                </dd>
               </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Type</h4>
-                <p className="text-gray-900">{activity.type || 'Not specified'}</p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Schedule & Location */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Schedule & Location
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <div className="flex items-center mb-3">
-                  <CalendarIcon className="h-5 w-5 text-gray-400 mr-2" />
-                  <h4 className="text-sm font-medium text-gray-500">Date</h4>
+              {activity.actual_date && (
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Actual Date</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {new Date(activity.actual_date).toLocaleDateString()}
+                  </dd>
                 </div>
-                <p className="text-gray-900">
-                  {new Date(activity.scheduled_date).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </p>
+              )}
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">School</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {activity.school_name || 'Not specified'}
+                </dd>
               </div>
-              <div>
-                <div className="flex items-center mb-3">
-                  <ClockIcon className="h-5 w-5 text-gray-400 mr-2" />
-                  <h4 className="text-sm font-medium text-gray-500">Duration</h4>
-                </div>
-                <p className="text-gray-900">{activity.engagement_level || 'N/A'} hours</p>
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Pilot</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {activity.pilot_name || 'Not specified'}
+                </dd>
               </div>
-              <div>
-                <div className="flex items-center mb-3">
-                  <MapPinIcon className="h-5 w-5 text-gray-400 mr-2" />
-                  <h4 className="text-sm font-medium text-gray-500">School</h4>
-                </div>
-                <p className="text-gray-900">{activity.school?.name}</p>
-                {activity.school?.address && (
-                  <p className="text-sm text-gray-500">{activity.school.address}</p>
-                )}
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Volunteer</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {activity.volunteer_name || 'Not specified'}
+                </dd>
               </div>
-              <div>
-                <div className="flex items-center mb-3">
-                  <UserGroupIcon className="h-5 w-5 text-gray-400 mr-2" />
-                  <h4 className="text-sm font-medium text-gray-500">Participants</h4>
-                </div>
-                <p className="text-gray-900">
-                  {activity.number_of_participants || 0} participants
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Volunteer Information */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Volunteer Information
-            </h3>
-            <div className="flex items-start space-x-4">
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                <span className="text-green-600 font-semibold">
-                  {activity.volunteer?.full_name?.charAt(0) || 'V'}
-                </span>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900">
-                  {activity.volunteer?.full_name || 'Unassigned'}
-                </h4>
-                <p className="text-sm text-gray-500">
-                  {activity.volunteer?.email || 'No email available'}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Joined {activity.volunteer?.created_at 
-                    ? new Date(activity.volunteer.created_at).toLocaleDateString()
-                    : 'Unknown date'}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Notes & Feedback */}
-          {(activity.volunteer_notes || activity.coordinator_feedback) && (
-            <Card>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Additional Information
-              </h3>
               {activity.volunteer_notes && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">
-                    Volunteer Notes
-                  </h4>
-                  <p className="text-gray-900">{activity.volunteer_notes}</p>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Volunteer Notes</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {activity.volunteer_notes}
+                  </dd>
+                </div>
+              )}
+              {activity.student_quotes && (
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Student Quotes</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {activity.student_quotes}
+                  </dd>
+                </div>
+              )}
+              {activity.engagement_level !== undefined && (
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Engagement Level</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {typeof activity.engagement_level === 'number' 
+                      ? `${activity.engagement_level}/10`
+                      : activity.engagement_level}
+                  </dd>
+                </div>
+              )}
+              {activity.number_of_participants !== undefined && (
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Number of Participants</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {activity.number_of_participants}
+                  </dd>
                 </div>
               )}
               {activity.coordinator_feedback && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">
-                    Coordinator Feedback
-                  </h4>
-                  <p className="text-gray-900">{activity.coordinator_feedback}</p>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Coordinator Feedback</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {activity.coordinator_feedback}
+                  </dd>
                 </div>
               )}
-            </Card>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 'photos',
-      label: 'Photos',
-      icon: <PhotoIcon className="h-5 w-5" />,
-      count: photos?.length || 0,
-      content: (
-        <div>
-          {photos && photos.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {photos.map((photo) => (
-                <div key={photo.id} className="relative group">
-                  <img
-                    src={photo.thumbnailUrl || photo.url}
-                    alt={photo.description || 'Activity photo'}
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => window.open(photo.url, '_blank')}
-                      className="bg-white"
-                    >
-                      View
-                    </Button>
-                  </div>
-                  {photo.description && (
-                    <p className="text-sm text-gray-500 mt-2 truncate">
-                      {photo.description}
-                    </p>
-                  )}
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Assigned By</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {activity.assigned_by_name || 'Not specified'}
+                </dd>
+              </div>
+              {activity.assigned_at && (
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Assigned At</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {new Date(activity.assigned_at).toLocaleString()}
+                  </dd>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <PhotoIcon className="h-12 w-12 text-gray-300 mx-auto" />
-              <h3 className="mt-4 text-sm font-medium text-gray-900">
-                No photos yet
-              </h3>
-              <p className="mt-2 text-sm text-gray-500">
-                Photos will appear here once uploaded by the volunteer
-              </p>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 'surveys',
-      label: 'Surveys',
-      icon: <DocumentTextIcon className="h-5 w-5" />,
-      count: surveys?.length || 0,
-      content: (
-        <div>
-          {surveys && surveys.length > 0 ? (
-            <div className="space-y-4">
-              {surveys.map((survey) => (
-                <Card key={survey.id}>
-                  <div className="flex items-center justify-between p-4">
-                    <div>
-                      <h4 className="font-medium text-gray-900">
-                        {survey.title || `${survey.template?.type || 'Activity'} Survey`}
-                      </h4>
-                      <div className="flex items-center mt-1 space-x-4">
-                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                          {survey.status}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {survey.template?.type === 'activity' ? 'Activity Survey' : 'Volunteer Feedback'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      {survey.status === 'completed' && (
-                        <Link href={`/coordinator/surveys/${survey.id}`}>
-                          <Button size="sm" variant="outline">
-                            View Responses
-                          </Button>
-                        </Link>
-                      )}
-                      {survey.status === 'pending' && (
-                        <Button size="sm" variant="outline" disabled>
-                          Awaiting Completion
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <DocumentTextIcon className="h-12 w-12 text-gray-300 mx-auto" />
-              <h3 className="mt-4 text-sm font-medium text-gray-900">
-                No surveys yet
-              </h3>
-              <p className="mt-2 text-sm text-gray-500">
-                Surveys will appear here once completed by the volunteer
-              </p>
-            </div>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <Link
-            href="/coordinator/activities"
-            className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
-          >
-            <ArrowLeftIcon className="h-4 w-4 mr-1" />
-            Back to Activities
-          </Link>
-          <div className="flex items-center space-x-3">
-            <h1 className="text-2xl font-bold text-gray-900">
-              {activity.title}
-            </h1>
-            <StatusBadge status={activity.status} />
+              )}
+            </dl>
           </div>
-          <p className="mt-2 text-gray-600">{activity.description}</p>
         </div>
-        
-        <div className="flex space-x-3">
-          {canEdit && (
-            <Link href={`/coordinator/activities/${activity.id}/edit`}>
-              <Button
-                variant="outline"
-                icon={<PencilIcon className="h-4 w-4" />}
-              >
-                Edit
-              </Button>
-            </Link>
-          )}
-          
-          {canApprove && (
-            <>
-              <Button
-                variant="default"
-                icon={<CheckCircleIcon className="h-4 w-4" />}
-                onClick={() => setShowApproveDialog(true)}
-                loading={approveMutation.isPending}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="default"
-                icon={<XCircleIcon className="h-4 w-4" />}
-                onClick={() => setShowRejectDialog(true)}
-                loading={rejectMutation.isPending}
-              >
-                Reject
-              </Button>
-            </>
-          )}
+
+        {/* Media Section */}
+        <div className="mt-8 bg-white shadow sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h2 className="text-lg font-medium text-gray-900">Media</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Photos, videos, and documents from this activity
+            </p>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+            {media.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No media uploaded yet</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {media.map((item) => (
+                  <div key={item.id} className="border rounded-lg overflow-hidden">
+                    {item.mediaType === 'photo' ? (
+                      <div className="relative aspect-square">
+                        <img
+                          src={item.url}
+                          alt={item.caption || item.filename || 'Activity photo'}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : item.mediaType === 'video' ? (
+                      <div className="relative aspect-square">
+                        <video
+                          src={item.url}
+                          controls
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-4">
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+                        >
+                          Open document
+                        </a>
+                        <p className="mt-2 text-sm text-gray-600 truncate">
+                          {item.caption || item.filename}
+                        </p>
+                      </div>
+                    )}
+                    {(item.caption || item.filename) && (
+                      <div className="p-3 border-t">
+                        <p className="text-sm text-gray-700 truncate">
+                          {item.caption || item.filename}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(item.uploadedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {/* Tabs */}
-      <Tabs
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        variant="underline"
-      />
-
-      {/* Approval Dialog */}
-      <ConfirmationDialog
-        open={showApproveDialog}
-        onClose={() => setShowApproveDialog(false)}
-        onConfirm={handleApprove}
-        title="Approve Activity"
-        message="Are you sure you want to approve this activity? This will mark it as completed and notify the volunteer."
-        confirmText="Approve Activity"
-        cancelText="Cancel"
-        type="info"
-        loading={approveMutation.isPending}
-      />
-
-      {/* Reject Dialog - Custom implementation */}
-      {showRejectDialog && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-            <div className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
-              <div className="sm:flex sm:items-start">
-                <div className="mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                  <XCircleIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
-                </div>
-                <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
-                  <h3 className="text-base font-semibold leading-6 text-gray-900">
-                    Reject Activity
-                  </h3>
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-500">
-                      Please provide feedback for why you are rejecting this activity:
-                    </p>
-                    <textarea
-                      value={rejectFeedback}
-                      onChange={(e) => setRejectFeedback(e.target.value)}
-                      placeholder="Provide constructive feedback for the volunteer..."
-                      className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-green-500"
-                      rows={4}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                <Button
-                  onClick={handleReject}
-                  loading={rejectMutation.isPending}
-                  className="bg-red-600 hover:bg-red-700 sm:ml-3 sm:w-auto"
-                >
-                  Reject Activity
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowRejectDialog(false);
-                    setRejectFeedback('');
-                  }}
-                  disabled={rejectMutation.isPending}
-                  className="mt-3 sm:mt-0 sm:w-auto"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
