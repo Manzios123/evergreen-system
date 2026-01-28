@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   VideoCameraIcon,
+  DocumentIcon,
 } from '@heroicons/react/24/outline';
 
 type MediaType = 'photo' | 'video' | 'document' | string;
@@ -35,12 +36,137 @@ type MediaApiItem = {
   uploadedAt?: string;
   displayOrder?: number;
   media_type?: MediaType; // backend may return snake_case
-  mediaType?: MediaType;  // or camelCase
+  mediaType?: MediaType; // or camelCase
   file_type?: string;
   fileType?: string;
   original_filename?: string;
   originalFilename?: string;
 };
+
+function normalizeMediaType(item: MediaApiItem): string {
+  return (item.mediaType ?? item.media_type ?? 'photo').toString();
+}
+
+/**
+ * Generate thumbnails for videos client-side (first usable frame).
+ * Works when your backend does not provide thumbnailUrl/thumbnail_key.
+ */
+function useVideoThumbnails() {
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [inFlight, setInFlight] = useState<Set<string>>(new Set());
+
+  const getThumb = async (id: string, url: string): Promise<string> => {
+    if (!id || !url) return '';
+    if (thumbs[id]) return thumbs[id];
+    if (inFlight.has(id)) return '';
+
+    setInFlight((prev) => new Set(prev).add(id));
+
+    const result = await new Promise<string>((resolve) => {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+
+      // If your media endpoint is same-origin (recommended), this is fine.
+      // If it becomes cross-origin, thumbnail capture may be blocked by CORS/tainting.
+      video.crossOrigin = 'anonymous';
+
+      const cleanup = () => {
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch {
+          // ignore
+        }
+      };
+
+      const onError = () => {
+        cleanup();
+        resolve('');
+      };
+
+      const capture = () => {
+        try {
+          const w = video.videoWidth || 320;
+          const h = video.videoHeight || 180;
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('No canvas context');
+
+          ctx.drawImage(video, 0, 0, w, h);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          cleanup();
+          resolve(dataUrl);
+        } catch {
+          cleanup();
+          resolve('');
+        }
+      };
+
+      video.addEventListener('error', onError);
+
+      // Wait for metadata, then seek a tiny bit to avoid black first frame.
+      video.addEventListener('loadedmetadata', () => {
+        const target = Math.min(0.25, Math.max(0, (video.duration || 0) / 10));
+        // If duration is unknown, just try 0.1s
+        try {
+          video.currentTime = isFinite(target) ? target : 0.1;
+        } catch {
+          // Some browsers disallow seeking before data; fallback
+          // We'll capture on loadeddata
+        }
+      });
+
+      // Capture when data is available at current time.
+      video.addEventListener('seeked', capture);
+      video.addEventListener('loadeddata', () => {
+        // If seeking didn't happen, capture now.
+        if (video.currentTime === 0) {
+          try {
+            video.currentTime = 0.1;
+          } catch {
+            capture();
+          }
+        }
+      });
+
+      // If we set currentTime but seeked never fires, still capture after a moment
+      const fallback = window.setTimeout(() => capture(), 1200);
+
+      const originalCapture = capture;
+      const wrappedCapture = () => {
+        window.clearTimeout(fallback);
+        originalCapture();
+      };
+
+      // Replace capture function handlers to clear fallback timeout
+      video.removeEventListener('seeked', capture);
+      video.addEventListener('seeked', wrappedCapture);
+
+      // Start
+      video.src = url;
+    });
+
+    setInFlight((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+
+    if (result) {
+      setThumbs((prev) => ({ ...prev, [id]: result }));
+    }
+
+    return result;
+  };
+
+  return { thumbs, getThumb };
+}
 
 export default function ActivityReportPage() {
   const params = useParams();
@@ -48,7 +174,6 @@ export default function ActivityReportPage() {
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  // Fetch activity details
   const {
     data: activityResponse,
     isLoading: isLoadingActivity,
@@ -56,30 +181,52 @@ export default function ActivityReportPage() {
     refetch: refetchActivity,
   } = useApiQuery<ApiResponse<Activity>>(['activity', id], () => api.get(`/activities/${id}`));
 
-  // Fetch media for this activity (photos + videos)
   const {
     data: mediaResponse,
     isLoading: isLoadingMedia,
     error: mediaError,
     refetch: refetchMedia,
-  } = useApiQuery<ApiResponse<MediaApiItem[]>>(['activity-media', id], () =>
-    api.get(`/activities/${id}/media`)
-  );
+  } = useApiQuery<ApiResponse<MediaApiItem[]>>(['activity-media', id], () => api.get(`/activities/${id}/media`));
 
   const activity = activityResponse?.data;
 
   const mediaItems: MediaApiItem[] = useMemo(() => {
     const items = mediaResponse?.data || [];
-    // Sort by displayOrder if present; otherwise keep backend order
     return [...items].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
   }, [mediaResponse]);
 
   const counts = useMemo(() => {
-    const normType = (m: MediaApiItem) => (m.mediaType ?? m.media_type ?? 'photo').toString();
-    const photos = mediaItems.filter((m) => normType(m) === 'photo');
-    const videos = mediaItems.filter((m) => normType(m) === 'video');
-    const docs = mediaItems.filter((m) => normType(m) === 'document');
+    const photos = mediaItems.filter((m) => normalizeMediaType(m) === 'photo');
+    const videos = mediaItems.filter((m) => normalizeMediaType(m) === 'video');
+    const docs = mediaItems.filter((m) => normalizeMediaType(m) === 'document');
     return { photos: photos.length, videos: videos.length, docs: docs.length, total: mediaItems.length };
+  }, [mediaItems]);
+
+  const { thumbs, getThumb } = useVideoThumbnails();
+
+  // Proactively generate thumbnails for the first few videos (so the grid looks good fast)
+  useEffect(() => {
+    const videoItems = mediaItems
+      .filter((m) => normalizeMediaType(m) === 'video')
+      .filter((m) => !m.thumbnailUrl)
+      .slice(0, 6);
+
+    let cancelled = false;
+
+    (async () => {
+      for (const v of videoItems) {
+        if (cancelled) return;
+        if (!thumbs[v.id]) {
+          // Best-effort; ignore failures
+          await getThumb(v.id, v.url);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaItems]);
 
   const handlePrevious = () => {
@@ -127,8 +274,6 @@ export default function ActivityReportPage() {
     );
   }
 
-  const getMediaType = (m: MediaApiItem): string => (m.mediaType ?? m.media_type ?? 'photo').toString();
-
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
@@ -162,45 +307,45 @@ export default function ActivityReportPage() {
       {/* Activity Details */}
       <Card className="p-6">
         <div className="space-y-6">
-          {/* Title and Description */}
           <div className="border-b pb-6">
             <h2 className="text-xl font-semibold text-gray-900">{activity.title}</h2>
             <p className="mt-2 text-gray-600">{activity.description}</p>
           </div>
 
-          {/* Details Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Volunteer */}
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
                 <UserIcon className="h-4 w-4" />
                 Volunteer
               </h3>
               <p className="text-gray-900">
-                {activity.volunteer_name || activity.volunteer?.full_name || activity.volunteer_id || '—'}
+                {activity.volunteer_name || (activity as any).volunteer?.full_name || activity.volunteer_id || '—'}
               </p>
-              {activity.volunteer?.email && <p className="text-sm text-gray-500 mt-1">{activity.volunteer.email}</p>}
+              {(activity as any).volunteer?.email && (
+                <p className="text-sm text-gray-500 mt-1">{(activity as any).volunteer.email}</p>
+              )}
             </div>
 
-            {/* School */}
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
                 <BuildingOfficeIcon className="h-4 w-4" />
                 School
               </h3>
-              <p className="text-gray-900">{activity.school_name || activity.school?.name || activity.school_id || '—'}</p>
+              <p className="text-gray-900">
+                {(activity as any).school_name || (activity as any).school?.name || activity.school_id || '—'}
+              </p>
             </div>
 
-            {/* Pilot */}
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
                 <ChartBarIcon className="h-4 w-4" />
                 Pilot
               </h3>
-              <p className="text-gray-900">{activity.pilot_name || activity.pilot?.name || activity.pilot_id || '—'}</p>
+              <p className="text-gray-900">
+                {(activity as any).pilot_name || (activity as any).pilot?.name || activity.pilot_id || '—'}
+              </p>
             </div>
 
-            {/* Dates */}
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4" />
@@ -215,7 +360,6 @@ export default function ActivityReportPage() {
               )}
             </div>
 
-            {/* Participants */}
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
                 <UsersIcon className="h-4 w-4" />
@@ -224,26 +368,25 @@ export default function ActivityReportPage() {
               <p className="text-gray-900">{activity.number_of_participants || '—'}</p>
             </div>
 
-            {/* Engagement Level */}
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2">Engagement Level</h3>
-              {activity.engagement_level ? (
+              {(activity as any).engagement_level ? (
                 <span
                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    activity.engagement_level === 'high' || activity.engagement_level === 3
+                    (activity as any).engagement_level === 'high' || (activity as any).engagement_level === 3
                       ? 'bg-green-100 text-green-800'
-                      : activity.engagement_level === 'medium' || activity.engagement_level === 2
+                      : (activity as any).engagement_level === 'medium' || (activity as any).engagement_level === 2
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-red-100 text-red-800'
                   }`}
                 >
-                  {activity.engagement_level === 'high'
+                  {(activity as any).engagement_level === 'high'
                     ? 'High'
-                    : activity.engagement_level === 'medium'
+                    : (activity as any).engagement_level === 'medium'
                       ? 'Medium'
-                      : activity.engagement_level === 'low'
+                      : (activity as any).engagement_level === 'low'
                         ? 'Low'
-                        : (activity.engagement_level as any)}
+                        : String((activity as any).engagement_level)}
                 </span>
               ) : (
                 <span className="text-gray-400">—</span>
@@ -251,8 +394,7 @@ export default function ActivityReportPage() {
             </div>
           </div>
 
-          {/* Narrative Sections */}
-          {(activity.volunteer_notes || activity.student_quotes || activity.coordinator_feedback) && (
+          {(activity.volunteer_notes || (activity as any).student_quotes || (activity as any).coordinator_feedback) && (
             <div className="pt-6 border-t space-y-6">
               {activity.volunteer_notes && (
                 <div>
@@ -263,20 +405,20 @@ export default function ActivityReportPage() {
                 </div>
               )}
 
-              {activity.student_quotes && (
+              {(activity as any).student_quotes && (
                 <div>
                   <h3 className="text-sm font-medium text-gray-900 mb-2">Student Quotes</h3>
                   <div className="bg-blue-50 rounded-lg p-4">
-                    <p className="text-gray-700 whitespace-pre-wrap">{activity.student_quotes}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">{(activity as any).student_quotes}</p>
                   </div>
                 </div>
               )}
 
-              {activity.coordinator_feedback && (
+              {(activity as any).coordinator_feedback && (
                 <div>
                   <h3 className="text-sm font-medium text-gray-900 mb-2">Coordinator Feedback</h3>
                   <div className="bg-green-50 rounded-lg p-4">
-                    <p className="text-gray-700 whitespace-pre-wrap">{activity.coordinator_feedback}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">{(activity as any).coordinator_feedback}</p>
                   </div>
                 </div>
               )}
@@ -285,7 +427,7 @@ export default function ActivityReportPage() {
         </div>
       </Card>
 
-      {/* Media Section (photos + videos) */}
+      {/* Media Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -325,8 +467,15 @@ export default function ActivityReportPage() {
           <Card className="p-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {mediaItems.map((item, index) => {
-                const type = getMediaType(item);
-                const thumb = item.thumbnailUrl || item.url;
+                const type = normalizeMediaType(item);
+                const hasServerThumb = Boolean(item.thumbnailUrl);
+                const hasGeneratedThumb = Boolean(thumbs[item.id]);
+
+                const showThumbSrc = hasServerThumb
+                  ? item.thumbnailUrl!
+                  : hasGeneratedThumb
+                    ? thumbs[item.id]
+                    : '';
 
                 return (
                   <button
@@ -337,21 +486,33 @@ export default function ActivityReportPage() {
                   >
                     {type === 'video' ? (
                       <>
-                        {/* Use thumbnail if available; otherwise still show a video element */}
-                        {item.thumbnailUrl ? (
+                        {showThumbSrc ? (
                           <img
-                            src={thumb}
+                            src={showThumbSrc}
                             alt={item.caption || `Video ${index + 1}`}
                             className="h-full w-full object-cover transition-transform group-hover:scale-105"
                           />
                         ) : (
-                          <video
-                            src={item.url}
-                            className="h-full w-full object-cover"
-                            muted
-                            preload="metadata"
-                          />
+                          <div className="h-full w-full flex items-center justify-center bg-gray-900/30">
+                            <VideoCameraIcon className="h-10 w-10 text-white" />
+                          </div>
                         )}
+
+                        {/* Trigger thumbnail generation if needed */}
+                        {!hasServerThumb && !hasGeneratedThumb && (
+                          <span className="absolute inset-0">
+                            {/*
+                              We use a tiny side-effect: attempt generation once when tile is painted.
+                              No UI blocking.
+                            */}
+                            {(() => {
+                              void getThumb(item.id, item.url);
+                              return null;
+                            })()}
+                          </span>
+                        )}
+
+                        {/* Play badge */}
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="rounded-full bg-black/50 p-2">
                             <VideoCameraIcon className="h-6 w-6 text-white" />
@@ -361,15 +522,18 @@ export default function ActivityReportPage() {
                     ) : type === 'document' ? (
                       <div className="h-full w-full flex flex-col items-center justify-center p-3 text-center">
                         <div className="rounded-full bg-gray-200 p-2 mb-2">
-                          <VideoCameraIcon className="h-5 w-5 text-gray-700" />
+                          <DocumentIcon className="h-5 w-5 text-gray-700" />
                         </div>
                         <p className="text-xs text-gray-700 line-clamp-3">
-                          {item.caption || item.originalFilename || item.original_filename || 'Open document'}
+                          {item.caption ||
+                            item.originalFilename ||
+                            item.original_filename ||
+                            'Open document'}
                         </p>
                       </div>
                     ) : (
                       <img
-                        src={thumb}
+                        src={item.url}
                         alt={item.caption || `Photo ${index + 1}`}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105"
                       />
@@ -388,7 +552,7 @@ export default function ActivityReportPage() {
         )}
       </div>
 
-      {/* Lightbox Overlay (photo or video) */}
+      {/* Lightbox Overlay */}
       {selectedIndex !== null && mediaItems[selectedIndex] && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
           <button onClick={() => setSelectedIndex(null)} className="absolute top-4 right-4 text-white hover:text-gray-300">
@@ -412,14 +576,14 @@ export default function ActivityReportPage() {
           </button>
 
           <div className="max-w-4xl w-full max-h-[80vh]">
-            {getMediaType(mediaItems[selectedIndex]) === 'video' ? (
+            {normalizeMediaType(mediaItems[selectedIndex]) === 'video' ? (
               <video
                 src={mediaItems[selectedIndex].url}
                 controls
                 autoPlay
                 className="max-h-[80vh] w-full object-contain bg-black rounded"
               />
-            ) : getMediaType(mediaItems[selectedIndex]) === 'document' ? (
+            ) : normalizeMediaType(mediaItems[selectedIndex]) === 'document' ? (
               <div className="bg-white rounded p-6">
                 <p className="text-gray-900 font-medium mb-2">Document</p>
                 <a
@@ -442,7 +606,7 @@ export default function ActivityReportPage() {
               />
             )}
 
-            {mediaItems[selectedIndex].caption && getMediaType(mediaItems[selectedIndex]) !== 'document' && (
+            {mediaItems[selectedIndex].caption && normalizeMediaType(mediaItems[selectedIndex]) !== 'document' && (
               <div className="mt-4 text-center text-white">
                 <p className="text-lg">{mediaItems[selectedIndex].caption}</p>
               </div>
