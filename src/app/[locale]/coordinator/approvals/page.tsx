@@ -12,12 +12,13 @@ import EmptyState from '@/components/ui/empty-state';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import Alert from '@/components/ui/alert';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/use-api';
-import { Activity, Photo } from '@/lib/types';
+import { Activity } from '@/lib/types';
 import {
   Check,
   X,
   Pencil,
-  Image as PhotoIcon,
+  Image as MediaIcon,
+  Video,
   Calendar,
   Building,
   User,
@@ -27,12 +28,40 @@ import {
 import { useState, useMemo } from 'react';
 import { api } from '@/lib/api/api';
 
+// Define Media type locally since it's not in @/lib/types
+interface Media {
+  id: string;
+  activityId: string | null;
+  volunteerId: string;
+  filename?: string;
+  url: string;
+  thumbnailUrl: string | null;
+  caption?: string;
+  status: string;
+  mediaType: string;
+  fileType?: string;
+  uploadedAt: string;
+  activity?: {
+    id: string;
+    title: string;
+    status: string;
+    school: {
+      id: string;
+      name: string;
+    } | null;
+  } | null;
+  volunteer: {
+    id: string;
+    full_name: string;
+  };
+}
+
 export default function CoordinatorApprovalsPage() {
-  const [selectedTab, setSelectedTab] = useState<'activities' | 'photos'>('activities');
+  const [selectedTab, setSelectedTab] = useState<'activities' | 'media'>('activities');
   const [searchTerm, setSearchTerm] = useState('');
   const [approvalDialog, setApprovalDialog] = useState<{
     open: boolean;
-    type: 'activity' | 'photo';
+    type: 'activity' | 'media';
     id: string;
     action: 'approve' | 'reject' | 'request-edit';
     title: string;
@@ -46,18 +75,18 @@ export default function CoordinatorApprovalsPage() {
     refetch: refetchActivities 
   } = useApiQuery<Activity[]>(
     ['activities', 'pending'],
-    () => api.get<Activity[]>('/activities', { status: 'pending_approval' })
+    () => api.get<Activity[]>('/activities', { params: { status: 'pending_approval' } })
   );
 
-  // Fetch pending photos
+  // Fetch pending media (photos + videos)
   const { 
-    data: pendingPhotos, 
-    isLoading: photosLoading, 
-    error: photosError,
-    refetch: refetchPhotos 
-  } = useApiQuery<Photo[]>(
-    ['photos', 'pending'],
-    () => api.get<Photo[]>('/photos', { status: 'pending' })
+    data: pendingMedia, 
+    isLoading: mediaLoading, 
+    error: mediaError,
+    refetch: refetchMedia 
+  } = useApiQuery<Media[]>(
+    ['media', 'pending'],
+    () => api.get<Media[]>('/approvals/media', { params: { status: 'pending' } })
   );
 
   // Approval mutations
@@ -75,13 +104,13 @@ export default function CoordinatorApprovalsPage() {
       api.post(`/activities/${data.id}/request-edit`, { feedback: data.feedback })
   );
 
-  const approvePhotoMutation = useApiMutation(
-    (id: string) => api.post(`/photos/${id}/approve`)
+  const approveMediaMutation = useApiMutation(
+    (id: string) => api.post(`/approvals/media/${id}/approve`)
   );
 
-  const rejectPhotoMutation = useApiMutation(
+  const rejectMediaMutation = useApiMutation(
     (data: { id: string; feedback: string }) => 
-      api.post(`/photos/${data.id}/reject`, { feedback: data.feedback })
+      api.post(`/approvals/media/${data.id}/reject`, { feedback: data.feedback })
   );
 
   const handleApproval = async (feedback?: string) => {
@@ -105,14 +134,14 @@ export default function CoordinatorApprovalsPage() {
         refetchActivities();
       } else {
         if (approvalDialog.action === 'approve') {
-          await approvePhotoMutation.mutateAsync(approvalDialog.id);
+          await approveMediaMutation.mutateAsync(approvalDialog.id);
         } else if (approvalDialog.action === 'reject') {
-          await rejectPhotoMutation.mutateAsync({ 
+          await rejectMediaMutation.mutateAsync({ 
             id: approvalDialog.id, 
             feedback: feedback || 'No feedback provided' 
           });
         }
-        refetchPhotos();
+        refetchMedia();
       }
       
       setApprovalDialog(null);
@@ -121,7 +150,7 @@ export default function CoordinatorApprovalsPage() {
     }
   };
 
-  // Filter activities and photos based on search
+  // Filter activities and media based on search
   const filteredActivities = useMemo(() => {
     if (!pendingActivities) return [];
     if (!searchTerm) return pendingActivities;
@@ -134,15 +163,17 @@ export default function CoordinatorApprovalsPage() {
     );
   }, [pendingActivities, searchTerm]);
 
-  const filteredPhotos = useMemo(() => {
-    if (!pendingPhotos) return [];
-    if (!searchTerm) return pendingPhotos;
+  const filteredMedia = useMemo(() => {
+    if (!pendingMedia) return [];
+    if (!searchTerm) return pendingMedia;
     
-    return pendingPhotos.filter(photo =>
-      photo.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      photo.filename.toLowerCase().includes(searchTerm.toLowerCase())
+    return pendingMedia.filter(media =>
+      media.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      media.filename?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      media.activity?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      media.volunteer?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [pendingPhotos, searchTerm]);
+  }, [pendingMedia, searchTerm]);
 
   const activityColumns = [
     {
@@ -256,28 +287,45 @@ export default function CoordinatorApprovalsPage() {
     },
   ];
 
-  const photoColumns = [
+  const mediaColumns = [
     {
-      key: 'photo',
-      header: 'Photo',
-      render: (photo: Photo) => (
+      key: 'media',
+      header: 'Media',
+      render: (media: Media) => (
         <div className="flex items-start space-x-3">
           <div className="shrink-0">
-            <img
-              src={photo.thumbnailUrl || photo.url}
-              alt={photo.description || 'Activity photo'}
-              className="h-12 w-12 rounded object-cover"
-            />
+            <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
+              {media.mediaType === 'video' ? (
+                <Video className="h-6 w-6 text-red-500" />
+              ) : (
+                <MediaIcon className="h-6 w-6 text-blue-500" />
+              )}
+            </div>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-gray-900 truncate">
-              {photo.filename}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-gray-900 truncate">
+                {media.filename || `media_${media.id.substring(0, 8)}`}
+              </p>
+              <span className={`px-2 py-1 text-xs rounded-full ${
+                media.mediaType === 'video' 
+                  ? 'bg-red-100 text-red-800' 
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {media.mediaType}
+              </span>
+            </div>
             <div className="flex flex-wrap gap-2 mt-1">
-              {photo.description && (
+              {media.caption && (
                 <p className="text-sm text-gray-500 truncate">
-                  {photo.description}
+                  {media.caption}
                 </p>
+              )}
+              {media.activity && (
+                <div className="flex items-center text-sm text-gray-500">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  {media.activity.title}
+                </div>
               )}
             </div>
           </div>
@@ -285,30 +333,30 @@ export default function CoordinatorApprovalsPage() {
       ),
     },
     {
-      key: 'activityId',
-      header: 'Activity ID',
-      render: (photo: Photo) => (
+      key: 'activity',
+      header: 'Activity',
+      render: (media: Media) => (
         <div className="text-sm text-gray-900">
-          {photo.activityId || 'Not linked to activity'}
+          {media.activity?.title || 'Not linked to activity'}
         </div>
       ),
     },
     {
       key: 'status',
       header: 'Status',
-      render: (photo: Photo) => (
-        <StatusBadge status={photo.status} />
+      render: (media: Media) => (
+        <StatusBadge status={media.status} />
       ),
     },
     {
       key: 'actions',
       header: 'Actions',
-      render: (photo: Photo) => (
+      render: (media: Media) => (
         <div className="flex space-x-2">
           <Button
             size="sm"
             variant="outline"
-            onClick={() => window.open(photo.url, '_blank')}
+            onClick={() => window.open(media.url, '_blank')}
           >
             View
           </Button>
@@ -320,10 +368,10 @@ export default function CoordinatorApprovalsPage() {
             onClick={() =>
               setApprovalDialog({
                 open: true,
-                type: 'photo',
-                id: photo.id,
+                type: 'media',
+                id: media.id,
                 action: 'approve',
-                title: 'Photo',
+                title: 'Media',
               })
             }
           >
@@ -336,10 +384,10 @@ export default function CoordinatorApprovalsPage() {
             onClick={() =>
               setApprovalDialog({
                 open: true,
-                type: 'photo',
-                id: photo.id,
+                type: 'media',
+                id: media.id,
                 action: 'reject',
-                title: 'Photo',
+                title: 'Media',
               })
             }
           >
@@ -390,29 +438,29 @@ export default function CoordinatorApprovalsPage() {
       ),
     },
     {
-      id: 'photos',
-      label: 'Photos',
-      icon: <PhotoIcon className="h-5 w-5" />,
-      count: filteredPhotos.length,
+      id: 'media',
+      label: 'Media',
+      icon: <MediaIcon className="h-5 w-5" />,
+      count: filteredMedia.length,
       content: (
         <div className="space-y-4">
-          {filteredPhotos.length > 0 ? (
+          {filteredMedia.length > 0 ? (
             <Card>
               <DataTable
-                data={filteredPhotos}
-                columns={photoColumns}
+                data={filteredMedia}
+                columns={mediaColumns}
               />
             </Card>
           ) : (
             <EmptyState
-              icon={<PhotoIcon className="h-12 w-12 text-gray-400" />}
+              icon={<MediaIcon className="h-12 w-12 text-gray-400" />}
               title={
-                searchTerm ? "No matching photos found" : "No photos pending approval"
+                searchTerm ? "No matching media found" : "No media pending approval"
               }
               description={
                 searchTerm
-                  ? "Try adjusting your search to find pending photos."
-                  : "All photos have been reviewed and approved."
+                  ? "Try adjusting your search to find pending media."
+                  : "All media have been reviewed and approved."
               }
               action={
                 searchTerm
@@ -429,8 +477,8 @@ export default function CoordinatorApprovalsPage() {
     },
   ];
 
-  const isLoading = activitiesLoading || photosLoading;
-  const error = activitiesError || photosError;
+  const isLoading = activitiesLoading || mediaLoading;
+  const error = activitiesError || mediaError;
 
   if (isLoading) {
     return (
@@ -452,7 +500,7 @@ export default function CoordinatorApprovalsPage() {
     );
   }
 
-  const totalPending = (pendingActivities?.length || 0) + (pendingPhotos?.length || 0);
+  const totalPending = (pendingActivities?.length || 0) + (pendingMedia?.length || 0);
 
   return (
     <div className="space-y-6">
@@ -473,7 +521,7 @@ export default function CoordinatorApprovalsPage() {
           <div className="w-full sm:w-64">
             <SearchFilter
               onSearch={setSearchTerm}
-              placeholder="Search activities, photos, volunteers..."
+              placeholder="Search activities, media, volunteers..."
             />
           </div>
           <Button
@@ -505,13 +553,13 @@ export default function CoordinatorApprovalsPage() {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Pending Photos</p>
+              <p className="text-sm font-medium text-gray-500">Pending Media</p>
               <p className="text-2xl font-bold text-blue-600 mt-1">
-                {pendingPhotos?.length || 0}
+                {pendingMedia?.length || 0}
               </p>
             </div>
             <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <PhotoIcon className="h-5 w-5 text-blue-600" />
+              <MediaIcon className="h-5 w-5 text-blue-600" />
             </div>
           </div>
         </Card>
@@ -540,7 +588,7 @@ export default function CoordinatorApprovalsPage() {
       <Tabs
         tabs={tabs}
         activeTab={selectedTab}
-        onTabChange={(tabId) => setSelectedTab(tabId as 'activities' | 'photos')}
+        onTabChange={(tabId) => setSelectedTab(tabId as 'activities' | 'media')}
         variant="underline"
       />
 
@@ -582,8 +630,8 @@ export default function CoordinatorApprovalsPage() {
             approveActivityMutation.isPending ||
             rejectActivityMutation.isPending ||
             requestEditActivityMutation.isPending ||
-            approvePhotoMutation.isPending ||
-            rejectPhotoMutation.isPending
+            approveMediaMutation.isPending ||
+            rejectMediaMutation.isPending
           }
         />
       )}
