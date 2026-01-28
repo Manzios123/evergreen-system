@@ -163,7 +163,7 @@ export default function CoordinatorApprovalsPage() {
     refetch: refetchActivities 
   } = useApiQuery<Activity[]>(
     ['activities', 'pending'],
-    () => api.get<Activity[]>('/activities', { params: { status: 'pending_approval' } })
+    () => api.get<Activity[]>('/activities', { params: { status: 'pending' } })
   );
 
   // Fetch pending media (photos + videos)
