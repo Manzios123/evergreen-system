@@ -25,7 +25,7 @@ import {
   Filter,
   Clock,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { api } from '@/lib/api/api';
 
 // Define Media type locally since it's not in @/lib/types
@@ -56,6 +56,87 @@ interface Media {
   };
 }
 
+// Create a separate FeedbackModal component to isolate its Hooks
+const FeedbackModal = ({ 
+  isOpen, 
+  onClose, 
+  onSubmit, 
+  title, 
+  action,
+  loading 
+}: { 
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (feedback: string) => void;
+  title: string;
+  action: 'reject' | 'request-edit';
+  loading: boolean;
+}) => {
+  const [feedback, setFeedback] = useState('');
+
+  const handleSubmit = useCallback(() => {
+    onSubmit(feedback);
+    setFeedback('');
+  }, [feedback, onSubmit]);
+
+  const handleClose = useCallback(() => {
+    onClose();
+    setFeedback('');
+  }, [onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" aria-hidden="true"></div>
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div className="inline-block overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="px-4 pt-5 pb-4 bg-white sm:p-6 sm:pb-4">
+            <div className="sm:flex sm:items-start">
+              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                <h3 className="text-lg font-medium leading-6 text-gray-900">
+                  {action === 'reject' ? 'Reject' : 'Request Edit'} Feedback
+                </h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500 mb-4">
+                    Please provide feedback for {action === 'reject' ? 'rejecting' : 'requesting edits to'} "{title}":
+                  </p>
+                  <textarea
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    rows={4}
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    placeholder="Enter your feedback here..."
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="px-4 py-3 bg-gray-50 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button
+              type="button"
+              className="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {action === 'reject' ? 'Reject' : 'Request Edit'}
+            </button>
+            <button
+              type="button"
+              className="inline-flex justify-center w-full px-4 py-2 mt-3 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              onClick={handleClose}
+              disabled={loading}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function CoordinatorApprovalsPage() {
   const [selectedTab, setSelectedTab] = useState<'activities' | 'media'>('activities');
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,7 +147,13 @@ export default function CoordinatorApprovalsPage() {
     action: 'approve' | 'reject' | 'request-edit';
     title: string;
   } | null>(null);
-  const [feedback, setFeedback] = useState('');
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [pendingFeedbackAction, setPendingFeedbackAction] = useState<{
+    type: 'activity' | 'media';
+    id: string;
+    action: 'reject' | 'request-edit';
+    title: string;
+  } | null>(null);
 
   // Fetch pending activities
   const { 
@@ -117,31 +204,34 @@ export default function CoordinatorApprovalsPage() {
       api.post(`/approvals/media/${data.id}/reject`, { feedback: data.feedback })
   );
 
-  const handleApproval = async () => {
-    if (!approvalDialog) return;
+  const handleApproval = useCallback(async (feedback?: string) => {
+    if (!pendingFeedbackAction && !approvalDialog) return;
+
+    const actionData = pendingFeedbackAction || approvalDialog;
+    if (!actionData) return;
 
     try {
-      if (approvalDialog.type === 'activity') {
-        if (approvalDialog.action === 'approve') {
-          await approveActivityMutation.mutateAsync(approvalDialog.id);
-        } else if (approvalDialog.action === 'reject') {
+      if (actionData.type === 'activity') {
+        if (actionData.action === 'approve') {
+          await approveActivityMutation.mutateAsync(actionData.id);
+        } else if (actionData.action === 'reject') {
           await rejectActivityMutation.mutateAsync({ 
-            id: approvalDialog.id, 
+            id: actionData.id, 
             feedback: feedback || 'No feedback provided' 
           });
-        } else if (approvalDialog.action === 'request-edit') {
+        } else if (actionData.action === 'request-edit') {
           await requestEditActivityMutation.mutateAsync({ 
-            id: approvalDialog.id, 
+            id: actionData.id, 
             feedback: feedback || 'Please make the requested edits' 
           });
         }
         refetchActivities();
       } else {
-        if (approvalDialog.action === 'approve') {
-          await approveMediaMutation.mutateAsync(approvalDialog.id);
-        } else if (approvalDialog.action === 'reject') {
+        if (actionData.action === 'approve') {
+          await approveMediaMutation.mutateAsync(actionData.id);
+        } else if (actionData.action === 'reject') {
           await rejectMediaMutation.mutateAsync({ 
-            id: approvalDialog.id, 
+            id: actionData.id, 
             feedback: feedback || 'No feedback provided' 
           });
         }
@@ -149,11 +239,48 @@ export default function CoordinatorApprovalsPage() {
       }
       
       setApprovalDialog(null);
-      setFeedback(''); // Reset feedback
+      setPendingFeedbackAction(null);
+      setShowFeedbackModal(false);
     } catch (error) {
       console.error('Failed to process approval:', error);
     }
-  };
+  }, [
+    pendingFeedbackAction, 
+    approvalDialog, 
+    approveActivityMutation, 
+    rejectActivityMutation, 
+    requestEditActivityMutation,
+    approveMediaMutation,
+    rejectMediaMutation,
+    refetchActivities,
+    refetchMedia
+  ]);
+
+  const handleApprovalAction = useCallback((dialog: {
+    open: boolean;
+    type: 'activity' | 'media';
+    id: string;
+    action: 'approve' | 'reject' | 'request-edit';
+    title: string;
+  }) => {
+    if (dialog.action === 'approve') {
+      setApprovalDialog(dialog);
+    } else {
+      setPendingFeedbackAction({
+        type: dialog.type,
+        id: dialog.id,
+        action: dialog.action,
+        title: dialog.title
+      });
+      setShowFeedbackModal(true);
+    }
+  }, []);
+
+  const handleConfirmationDialogConfirm = useCallback(() => {
+    if (approvalDialog?.action === 'approve') {
+      handleApproval();
+    }
+  }, [approvalDialog, handleApproval]);
 
   // Filter activities and media based on search
   const filteredActivities = useMemo(() => {
@@ -180,7 +307,7 @@ export default function CoordinatorApprovalsPage() {
     );
   }, [pendingMedia, searchTerm]);
 
-  const activityColumns = [
+  const activityColumns = useMemo(() => [
     {
       key: 'activity',
       header: 'Activity',
@@ -243,7 +370,7 @@ export default function CoordinatorApprovalsPage() {
             className="bg-green-600 hover:bg-green-700 text-white"
             icon={<Check className="h-4 w-4" />}
             onClick={() =>
-              setApprovalDialog({
+              handleApprovalAction({
                 open: true,
                 type: 'activity',
                 id: activity.id,
@@ -260,7 +387,7 @@ export default function CoordinatorApprovalsPage() {
             className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
             icon={<Pencil className="h-4 w-4" />}
             onClick={() =>
-              setApprovalDialog({
+              handleApprovalAction({
                 open: true,
                 type: 'activity',
                 id: activity.id,
@@ -276,7 +403,7 @@ export default function CoordinatorApprovalsPage() {
             variant="destructive"
             icon={<X className="h-4 w-4" />}
             onClick={() =>
-              setApprovalDialog({
+              handleApprovalAction({
                 open: true,
                 type: 'activity',
                 id: activity.id,
@@ -290,9 +417,9 @@ export default function CoordinatorApprovalsPage() {
         </div>
       ),
     },
-  ];
+  ], [handleApprovalAction]);
 
-  const mediaColumns = [
+  const mediaColumns = useMemo(() => [
     {
       key: 'media',
       header: 'Media',
@@ -371,7 +498,7 @@ export default function CoordinatorApprovalsPage() {
             className="bg-green-600 hover:bg-green-700 text-white"
             icon={<Check className="h-4 w-4" />}
             onClick={() =>
-              setApprovalDialog({
+              handleApprovalAction({
                 open: true,
                 type: 'media',
                 id: media.id,
@@ -387,7 +514,7 @@ export default function CoordinatorApprovalsPage() {
             variant="destructive"
             icon={<X className="h-4 w-4" />}
             onClick={() =>
-              setApprovalDialog({
+              handleApprovalAction({
                 open: true,
                 type: 'media',
                 id: media.id,
@@ -401,9 +528,9 @@ export default function CoordinatorApprovalsPage() {
         </div>
       ),
     },
-  ];
+  ], [handleApprovalAction]);
 
-  const tabs = [
+  const tabs = useMemo(() => [
     {
       id: 'activities',
       label: 'Activities',
@@ -480,10 +607,22 @@ export default function CoordinatorApprovalsPage() {
         </div>
       ),
     },
-  ];
+  ], [filteredActivities, filteredMedia, searchTerm, activityColumns, mediaColumns]);
 
   const isLoading = activitiesLoading || mediaLoading;
   const error = activitiesError || mediaError;
+
+  // Calculate urgent count safely
+  const urgentCount = useMemo(() => {
+    const activities = Array.isArray(pendingActivities) ? pendingActivities : [];
+    return activities.filter(a => {
+      if (!a?.created_at) return false;
+      const daysAgo = Math.floor(
+        (new Date().getTime() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return daysAgo > 7;
+    }).length;
+  }, [pendingActivities]);
 
   if (isLoading) {
     return (
@@ -506,18 +645,6 @@ export default function CoordinatorApprovalsPage() {
   }
 
   const totalPending = (Array.isArray(pendingActivities) ? pendingActivities.length : 0) + filteredMedia.length;
-
-  // Calculate urgent count safely
-  const urgentCount = useMemo(() => {
-    const activities = Array.isArray(pendingActivities) ? pendingActivities : [];
-    return activities.filter(a => {
-      if (!a?.created_at) return false;
-      const daysAgo = Math.floor(
-        (new Date().getTime() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      return daysAgo > 7;
-    }).length;
-  }, [pendingActivities]);
 
   return (
     <div className="space-y-6">
@@ -604,111 +731,42 @@ export default function CoordinatorApprovalsPage() {
         variant="underline"
       />
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog for Approve actions */}
       {approvalDialog && (
-        <div>
-          <ConfirmationDialog
-            open={approvalDialog.open}
-            onClose={() => {
-              setApprovalDialog(null);
-              setFeedback('');
-            }}
-            onConfirm={handleApproval}
-            title={
-              approvalDialog.action === 'approve'
-                ? `Approve ${approvalDialog.type}`
-                : approvalDialog.action === 'reject'
-                ? `Reject ${approvalDialog.type}`
-                : `Request Edit for ${approvalDialog.type}`
-            }
-            message={
-              approvalDialog.action === 'approve'
-                ? `Are you sure you want to approve "${approvalDialog.title}"?`
-                : `Please provide feedback for ${approvalDialog.action === 'reject' ? 'rejecting' : 'requesting edits to'} "${approvalDialog.title}":`
-            }
-            confirmText={
-              approvalDialog.action === 'approve'
-                ? 'Approve'
-                : approvalDialog.action === 'reject'
-                ? 'Reject'
-                : 'Request Edit'
-            }
-            type={
-              approvalDialog.action === 'approve'
-                ? 'info'
-                : approvalDialog.action === 'reject'
-                ? 'danger'
-                : 'warning'
-            }
-            loading={
-              approveActivityMutation.isPending ||
-              rejectActivityMutation.isPending ||
-              requestEditActivityMutation.isPending ||
-              approveMediaMutation.isPending ||
-              rejectMediaMutation.isPending
-            }
-          />
-          
-          {/* Custom feedback input for reject and request-edit actions */}
-          {(approvalDialog.action === 'reject' || approvalDialog.action === 'request-edit') && (
-            <div className="fixed inset-0 z-50 overflow-y-auto">
-              <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" aria-hidden="true"></div>
-                <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-                <div className="inline-block overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                  <div className="px-4 pt-5 pb-4 bg-white sm:p-6 sm:pb-4">
-                    <div className="sm:flex sm:items-start">
-                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-lg font-medium leading-6 text-gray-900">
-                          {approvalDialog.action === 'reject' ? 'Reject' : 'Request Edit'} Feedback
-                        </h3>
-                        <div className="mt-2">
-                          <p className="text-sm text-gray-500 mb-4">
-                            Please provide feedback for {approvalDialog.action === 'reject' ? 'rejecting' : 'requesting edits to'} "{approvalDialog.title}":
-                          </p>
-                          <textarea
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            rows={4}
-                            value={feedback}
-                            onChange={(e) => setFeedback(e.target.value)}
-                            placeholder="Enter your feedback here..."
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="px-4 py-3 bg-gray-50 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button
-                      type="button"
-                      className="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
-                      onClick={handleApproval}
-                      disabled={
-                        approveActivityMutation.isPending ||
-                        rejectActivityMutation.isPending ||
-                        requestEditActivityMutation.isPending ||
-                        approveMediaMutation.isPending ||
-                        rejectMediaMutation.isPending
-                      }
-                    >
-                      {approvalDialog.action === 'reject' ? 'Reject' : 'Request Edit'}
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex justify-center w-full px-4 py-2 mt-3 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                      onClick={() => {
-                        setApprovalDialog(null);
-                        setFeedback('');
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <ConfirmationDialog
+          open={approvalDialog.open}
+          onClose={() => setApprovalDialog(null)}
+          onConfirm={handleConfirmationDialogConfirm}
+          title={`Approve ${approvalDialog.type}`}
+          message={`Are you sure you want to approve "${approvalDialog.title}"?`}
+          confirmText="Approve"
+          type="info"
+          loading={
+            approveActivityMutation.isPending ||
+            rejectActivityMutation.isPending ||
+            requestEditActivityMutation.isPending ||
+            approveMediaMutation.isPending ||
+            rejectMediaMutation.isPending
+          }
+        />
       )}
+
+      {/* Feedback Modal for Reject/Request Edit actions */}
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => {
+          setShowFeedbackModal(false);
+          setPendingFeedbackAction(null);
+        }}
+        onSubmit={handleApproval}
+        title={pendingFeedbackAction?.title || ''}
+        action={pendingFeedbackAction?.action || 'reject'}
+        loading={
+          rejectActivityMutation.isPending ||
+          requestEditActivityMutation.isPending ||
+          rejectMediaMutation.isPending
+        }
+      />
     </div>
   );
 }
