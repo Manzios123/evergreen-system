@@ -491,8 +491,8 @@ export default function AdminReportsPage() {
     icon: <AcademicCapIcon className="h-5 w-5" />,
     content: (
       <div className="space-y-6">
-        {/* School Stats Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* School Stats Summary - Total Students Reported card removed */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -502,18 +502,6 @@ export default function AdminReportsPage() {
                 </p>
               </div>
               <BuildingOfficeIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Students Reported</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {filteredSchoolSubmissions.reduce((sum, school) => sum + school.total_students_sum, 0)}
-                </p>
-              </div>
-              <UserGroupIcon className="h-8 w-8 text-gray-300" />
             </div>
           </Card>
           
@@ -577,7 +565,7 @@ export default function AdminReportsPage() {
           </div>
         </Card>
 
-        {/* School List Table */}
+        {/* School List Table - Total Students Reported column removed */}
         {filteredSchoolSubmissions.length > 0 && (
           <Card>
             <div className="p-6">
