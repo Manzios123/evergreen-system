@@ -417,7 +417,7 @@ export default function AdminReportsPage() {
                         innerRadius={40}
                         paddingAngle={2}
                         dataKey="count"
-                        nameKey="status" // Fix: use status field for legend labels
+                        nameKey="status"
                       >
                         {reportData.overview.activities_by_status.map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -428,7 +428,6 @@ export default function AdminReportsPage() {
                         verticalAlign="bottom" 
                         height={36}
                         formatter={(value, entry) => {
-                          // Ensure we display the status string, not "count"
                           return <span className="text-sm">{value}</span>;
                         }}
                       />
@@ -597,9 +596,6 @@ export default function AdminReportsPage() {
                         Volunteer Submissions
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total Students Reported
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Total Submissions
                       </th>
                     </tr>
@@ -615,9 +611,6 @@ export default function AdminReportsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {school.volunteer_submissions}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {school.total_students_sum}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
                           {school.student_submissions + school.volunteer_submissions}
@@ -830,14 +823,13 @@ export default function AdminReportsPage() {
           </Card>
         </div>
 
-        {/* Assignment Status Distribution - FIXED LAYOUT */}
+        {/* Assignment Status Distribution */}
         <Card>
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Assignment Status Distribution</h3>
-            <div className="h-96 overflow-hidden"> {/* Added overflow-hidden to contain any potential overflow */}
+            <div className="h-96 overflow-hidden">
               {reportData.assignmentFlow.assignment_status.length > 0 ? (
                 <div className="flex h-full gap-6">
-                  {/* Chart container - left half */}
                   <div className="w-1/2 h-full min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -861,7 +853,6 @@ export default function AdminReportsPage() {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  {/* Legend/stats - right half */}
                   <div className="w-1/2 flex flex-col justify-center">
                     <div className="space-y-4">
                       {reportData.assignmentFlow.assignment_status.map((item, index) => (
