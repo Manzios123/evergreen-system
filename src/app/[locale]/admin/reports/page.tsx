@@ -417,6 +417,7 @@ export default function AdminReportsPage() {
                         innerRadius={40}
                         paddingAngle={2}
                         dataKey="count"
+                        nameKey="status" // Fix: use status field for legend labels
                       >
                         {reportData.overview.activities_by_status.map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -426,7 +427,10 @@ export default function AdminReportsPage() {
                       <Legend 
                         verticalAlign="bottom" 
                         height={36}
-                        formatter={(value) => <span className="text-sm">{value}</span>}
+                        formatter={(value, entry) => {
+                          // Ensure we display the status string, not "count"
+                          return <span className="text-sm">{value}</span>;
+                        }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -826,15 +830,16 @@ export default function AdminReportsPage() {
           </Card>
         </div>
 
-        {/* Assignment Status Distribution */}
+        {/* Assignment Status Distribution - FIXED LAYOUT */}
         <Card>
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Assignment Status Distribution</h3>
-            <div className="h-96">
+            <div className="h-96 overflow-hidden"> {/* Added overflow-hidden to contain any potential overflow */}
               {reportData.assignmentFlow.assignment_status.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <div className="flex h-full">
-                    <div className="w-1/2 h-full">
+                <div className="flex h-full gap-6">
+                  {/* Chart container - left half */}
+                  <div className="w-1/2 h-full min-w-0">
+                    <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={reportData.assignmentFlow.assignment_status}
@@ -846,6 +851,7 @@ export default function AdminReportsPage() {
                           innerRadius={60}
                           paddingAngle={2}
                           dataKey="count"
+                          nameKey="status"
                         >
                           {reportData.assignmentFlow.assignment_status.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -853,43 +859,42 @@ export default function AdminReportsPage() {
                         </Pie>
                         <Tooltip content={<CustomTooltip />} />
                       </PieChart>
-                    </div>
-                    <div className="w-1/2 pl-6">
-                      <div className="h-full flex flex-col justify-center">
-                        <div className="space-y-4">
-                          {reportData.assignmentFlow.assignment_status.map((item, index) => (
-                            <div key={item.status} className="flex items-center">
-                              <div 
-                                className="w-4 h-4 rounded-full mr-3"
-                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                              />
-                              <span className="text-sm font-medium text-gray-700">
-                                {item.status.charAt(0).toUpperCase() + item.status.slice(1)}:
-                              </span>
-                              <span className="text-sm font-bold text-gray-900 ml-2">
-                                {item.count}
-                              </span>
-                            </div>
-                          ))}
-                          <div className="pt-4 mt-4 border-t border-gray-200">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-gray-700">Total Assignments:</span>
-                              <span className="text-lg font-bold text-gray-900">
-                                {reportData.assignmentFlow.assignment_status.reduce((sum, item) => sum + item.count, 0)}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-sm font-medium text-red-600">Overdue Assignments:</span>
-                              <span className="text-lg font-bold text-red-600">
-                                {reportData.assignmentFlow.overdue_count}
-                              </span>
-                            </div>
-                          </div>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Legend/stats - right half */}
+                  <div className="w-1/2 flex flex-col justify-center">
+                    <div className="space-y-4">
+                      {reportData.assignmentFlow.assignment_status.map((item, index) => (
+                        <div key={item.status} className="flex items-center">
+                          <div 
+                            className="w-4 h-4 rounded-full mr-3 shrink-0"
+                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                          />
+                          <span className="text-sm font-medium text-gray-700">
+                            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}:
+                          </span>
+                          <span className="text-sm font-bold text-gray-900 ml-2">
+                            {item.count}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="pt-4 mt-4 border-t border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700">Total Assignments:</span>
+                          <span className="text-lg font-bold text-gray-900">
+                            {reportData.assignmentFlow.assignment_status.reduce((sum, item) => sum + item.count, 0)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-sm font-medium text-red-600">Overdue Assignments:</span>
+                          <span className="text-lg font-bold text-red-600">
+                            {reportData.assignmentFlow.overdue_count}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
-                </ResponsiveContainer>
+                </div>
               ) : (
                 <EmptyState
                   title="No assignment data"
