@@ -129,7 +129,7 @@ const renderCustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, perc
 
 export default function AdminReportsPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'schools' | 'daily' | 'assignments'>('overview');
-  const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+  const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter' | 'year'>('year');
   const [selectedPilot, setSelectedPilot] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
