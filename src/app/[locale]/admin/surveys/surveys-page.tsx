@@ -339,13 +339,13 @@ export default function AdminSurveysPage() {
     )) : [];
 
   // Helper function to generate pagination items
-  const getPaginationItems = () => {
+  const getPaginationItems = (): (number | string)[] => {
     const total = pagination.totalPages;
     const current = pagination.page;
     const delta = 2; // Number of pages to show on each side of current
-    const range = [];
-    const rangeWithDots = [];
-    let l;
+    const range: number[] = [];
+    const rangeWithDots: (number | string)[] = [];
+    let l: number | undefined;
 
     for (let i = 1; i <= total; i++) {
       if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
