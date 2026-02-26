@@ -6,7 +6,7 @@ import Button from '@/components/ui/button';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import Alert from '@/components/ui/alert';
 import { api } from '@/lib/api/api';
-import { 
+import {
   DocumentTextIcon,
   UserGroupIcon,
   UsersIcon,
@@ -87,7 +87,7 @@ export default function AdminSurveysPage() {
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Filters
   const [pilotId, setPilotId] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
@@ -95,7 +95,7 @@ export default function AdminSurveysPage() {
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  
+
   // Data
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [stats, setStats] = useState<SurveyStats | null>(null);
@@ -107,7 +107,7 @@ export default function AdminSurveysPage() {
     total: 0,
     totalPages: 1
   });
-  
+
   // Admin survey state
   const [adminAssignment, setAdminAssignment] = useState<any>(null);
   const [showAdminForm, setShowAdminForm] = useState(false);
@@ -172,27 +172,27 @@ export default function AdminSurveysPage() {
         page: pagination.page,
         limit: pagination.limit
       };
-      
+
       // Map frontend tab to backend type
       let backendType = activeTab;
       if (activeTab === 'admin') {
         backendType = 'volunteer'; // Admin/coordinator surveys are stored in volunteer tables
       }
       params.type = backendType;
-      
+
       if (pilotId) params.pilot_id = pilotId;
       if (templateId) params.template_id = templateId;
       if (surveyPeriod) params.survey_period = surveyPeriod;
       if (dateFrom) params.from = dateFrom;
       if (dateTo) params.to = dateTo;
       if (searchQuery && searchQuery.trim()) params.search = searchQuery;
-      
+
       const response = await api.get<any>('/admin/surveys/responses', params);
-      
+
       // Handle different response formats
       let responseData: SurveyResponse[] = [];
       let total = 0;
-      
+
       if (response && response.success) {
         // New format with success flag
         if (Array.isArray(response.data)) {
@@ -214,7 +214,7 @@ export default function AdminSurveysPage() {
       } else {
         console.warn('Unexpected response format:', response);
       }
-      
+
       setResponses(responseData);
       setPagination(prev => ({
         ...prev,
@@ -234,22 +234,22 @@ export default function AdminSurveysPage() {
     setStatsLoading(true);
     try {
       const params: Record<string, any> = {};
-      
+
       // Map frontend tab to backend type
       let backendType = activeTab;
       if (activeTab === 'admin') {
         backendType = 'volunteer';
       }
       params.type = backendType;
-      
+
       if (pilotId) params.pilot_id = pilotId;
       if (templateId) params.template_id = templateId;
       if (surveyPeriod) params.survey_period = surveyPeriod;
       if (dateFrom) params.from = dateFrom;
       if (dateTo) params.to = dateTo;
-      
+
       const response = await api.get<any>('/admin/surveys/stats', params);
-      
+
       // Handle different response formats
       if (response && response.success && response.data) {
         setStats(response.data);
@@ -287,15 +287,15 @@ export default function AdminSurveysPage() {
         type: activeTab === 'admin' ? 'volunteer' : activeTab,
         format: 'csv'
       };
-      
+
       if (pilotId) params.pilot_id = pilotId;
       if (templateId) params.template_id = templateId;
       if (surveyPeriod) params.survey_period = surveyPeriod;
       if (dateFrom) params.from = dateFrom;
       if (dateTo) params.to = dateTo;
-      
+
       const blob = await api.get<Blob>('/admin/surveys/export', params);
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -324,19 +324,49 @@ export default function AdminSurveysPage() {
   };
 
   // Fix: Ensure filteredTemplates is always an array
-  const filteredTemplates = Array.isArray(templates) ? templates.filter(t => 
-    t.survey_type === activeTab && 
+  const filteredTemplates = Array.isArray(templates) ? templates.filter(t =>
+    t.survey_type === activeTab &&
     (!pilotId || t.pilot_id === pilotId)
   ) : [];
 
   // Fix: Ensure surveyPeriods is always an array
-  const surveyPeriods = Array.isArray(templates) ? 
+  const surveyPeriods = Array.isArray(templates) ?
     Array.from(new Set(
       templates
         .filter(t => t.survey_type === activeTab)
         .map(t => t.survey_period)
         .filter(Boolean)
     )) : [];
+
+  // Helper function to generate pagination items
+  const getPaginationItems = () => {
+    const total = pagination.totalPages;
+    const current = pagination.page;
+    const delta = 2; // Number of pages to show on each side of current
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+
+    range.forEach((i) => {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l !== 1) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    });
+
+    return rangeWithDots;
+  };
 
   return (
     <div className="space-y-6">
@@ -348,7 +378,7 @@ export default function AdminSurveysPage() {
             View and analyze survey submissions across all pilots
           </p>
         </div>
-        
+
         <div className="flex gap-3">
           <Link href="/admin/surveys/templates">
             <Button variant="outline">
@@ -419,7 +449,7 @@ export default function AdminSurveysPage() {
                 Complete Your Staff Survey
               </h2>
               <p className="text-gray-600 mb-6">
-                As an administrator or coordinator, please complete this survey to provide 
+                As an administrator or coordinator, please complete this survey to provide
                 your feedback. Your responses will help improve the program.
               </p>
               <Button
@@ -463,15 +493,15 @@ export default function AdminSurveysPage() {
             <Card className="p-6">
               <h3 className="font-medium text-gray-900 mb-4">Quick Links</h3>
               <div className="space-y-3">
-                <Link 
-                  href="/admin/surveys?tab=volunteer" 
+                <Link
+                  href="/admin/surveys?tab=volunteer"
                   className="flex items-center text-blue-600 hover:text-blue-800"
                 >
                   <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                   View all staff survey submissions
                 </Link>
-                <Link 
-                  href="/admin/surveys/templates" 
+                <Link
+                  href="/admin/surveys/templates"
                   className="flex items-center text-blue-600 hover:text-blue-800"
                 >
                   <DocumentTextIcon className="h-4 w-4 mr-2" />
@@ -499,7 +529,7 @@ export default function AdminSurveysPage() {
                 Clear All
               </Button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -518,7 +548,7 @@ export default function AdminSurveysPage() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Survey Template
@@ -536,7 +566,7 @@ export default function AdminSurveysPage() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Survey Period
@@ -554,7 +584,7 @@ export default function AdminSurveysPage() {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Date Range
@@ -577,7 +607,7 @@ export default function AdminSurveysPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Search {activeTab === 'student' ? 'by Volunteer' : 'by Email/Name'}
@@ -623,7 +653,7 @@ export default function AdminSurveysPage() {
                   <DocumentTextIcon className="h-8 w-8 text-blue-500" />
                 </div>
               </Card>
-              
+
               <Card className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -633,7 +663,7 @@ export default function AdminSurveysPage() {
                   <CalendarIcon className="h-8 w-8 text-green-500" />
                 </div>
               </Card>
-              
+
               <Card className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -641,7 +671,7 @@ export default function AdminSurveysPage() {
                       {activeTab === 'student' ? 'Total Students' : 'Active Volunteers'}
                     </p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {activeTab === 'student' 
+                      {activeTab === 'student'
                         ? stats.studentTotalStudentsSum || 0
                         : stats.totalSubmissions
                       }
@@ -666,20 +696,20 @@ export default function AdminSurveysPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={stats.submissionsOverTime}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="date" 
+                      <XAxis
+                        dataKey="date"
                         tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       />
                       <YAxis />
-                      <Tooltip 
+                      <Tooltip
                         labelFormatter={(date) => new Date(date).toLocaleDateString()}
                         formatter={(value) => [`${value} submissions`, 'Count']}
                       />
                       <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke="#8884d8" 
+                      <Line
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#8884d8"
                         activeDot={{ r: 8 }}
                         name="Submissions"
                       />
@@ -687,15 +717,15 @@ export default function AdminSurveysPage() {
                   </ResponsiveContainer>
                 </div>
               </Card>
-              
+
               <Card className="p-6">
                 <h3 className="font-medium text-gray-900 mb-4">Submissions by Template</h3>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={stats.submissionsPerTemplate}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="template_name" 
+                      <XAxis
+                        dataKey="template_name"
                         angle={-45}
                         textAnchor="end"
                         height={80}
@@ -731,7 +761,7 @@ export default function AdminSurveysPage() {
                 </Button>
               </div>
             </div>
-            
+
             {loading ? (
               <div className="space-y-3">
                 <SkeletonLoader type="table" />
@@ -846,47 +876,43 @@ export default function AdminSurveysPage() {
                     </tbody>
                   </table>
                 </div>
-                
+
                 {/* Pagination */}
                 {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6 mt-6">
-                    <div className="flex-1 flex justify-between sm:hidden">
-                      <Button
-                        variant="outline"
-                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                        disabled={pagination.page === 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                        disabled={pagination.page === pagination.totalPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm text-gray-700">
-                          Page <span className="font-medium">{pagination.page}</span> of{' '}
-                          <span className="font-medium">{pagination.totalPages}</span>
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(pageNum => (
-                          <Button
-                            key={pageNum}
-                            variant={pagination.page === pageNum ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
-                            className="min-w-10"
-                          >
-                            {pageNum}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2 justify-center border-t border-gray-200 px-4 py-3 sm:px-6 mt-6">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                      disabled={pagination.page === 1}
+                    >
+                      Previous
+                    </Button>
+
+                    {getPaginationItems().map((item, index) => (
+                      item === '...' ? (
+                        <span key={`ellipsis-${index}`} className="px-2 py-1 text-sm text-gray-500">...</span>
+                      ) : (
+                        <Button
+                          key={`page-${item}`}
+                          variant={pagination.page === item ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPagination(prev => ({ ...prev, page: item as number }))}
+                          className="min-w-10"
+                        >
+                          {item}
+                        </Button>
+                      )
+                    ))}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                      disabled={pagination.page === pagination.totalPages}
+                    >
+                      Next
+                    </Button>
                   </div>
                 )}
               </>
