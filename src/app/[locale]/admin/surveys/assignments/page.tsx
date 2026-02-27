@@ -41,6 +41,17 @@ interface SurveyAssignment {
   volunteer_name: string | null;
 }
 
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export default function AdminSurveyAssignmentsPage() {
   const [filters, setFilters] = useState({
     status: '',
@@ -51,10 +62,13 @@ export default function AdminSurveyAssignmentsPage() {
   });
 
   // Fetch all survey assignments for admin
-  const { data: assignments, isLoading, error, refetch } = useApiQuery<SurveyAssignment[]>(
+  const { data: assignmentsResponse, isLoading, error, refetch } = useApiQuery<ApiResponse<SurveyAssignment[]>>(
     ['survey-assignments', 'admin', filters],
-    () => api.get<SurveyAssignment[]>('/survey-assignments', { params: filters })
+    () => api.get<ApiResponse<SurveyAssignment[]>>('/survey-assignments', { params: filters })
   );
+
+  // Extract data array (fallback to empty array)
+  const assignments = assignmentsResponse?.data ?? [];
 
   // Fetch pilots for filter
   const { data: pilots } = useApiQuery<any[]>(
@@ -374,6 +388,33 @@ export default function AdminSurveyAssignmentsPage() {
           />
         </div>
       </Card>
+
+      {/* Pagination */}
+      {assignmentsResponse?.pagination && assignmentsResponse.pagination.totalPages > 1 && (
+        <div className="flex justify-center mt-4">
+          <nav className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={filters.page === 1}
+              onClick={() => setFilters({...filters, page: filters.page - 1})}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-700">
+              Page {filters.page} of {assignmentsResponse.pagination.totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={filters.page === assignmentsResponse.pagination.totalPages}
+              onClick={() => setFilters({...filters, page: filters.page + 1})}
+            >
+              Next
+            </Button>
+          </nav>
+        </div>
+      )}
 
       {/* Instructions */}
       <Alert type="info" title="How to use this page">

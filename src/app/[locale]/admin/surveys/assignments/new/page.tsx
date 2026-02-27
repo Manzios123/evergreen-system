@@ -45,7 +45,7 @@ export default function CreateAssignmentPage() {
     volunteer_id: '',
     survey_template_id: '',
     due_date: '',
-    assignment_type: 'pre_pilot', // pre_pilot or post_pilot
+    survey_period: 'pre_activity', // aligned with template enum: pre_activity, post_activity, mid_pilot, end_pilot
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export default function CreateAssignmentPage() {
       params: {
         pilot_id: formData.pilot_id,
         survey_type: formData.survey_type,
-        survey_period: formData.assignment_type
+        survey_period: formData.survey_period // now using the correct enum
       }
     }),
     { enabled: !!formData.pilot_id }
@@ -77,7 +77,7 @@ export default function CreateAssignmentPage() {
     if (name === 'survey_type' || name === 'pilot_id') {
       setFormData(prev => ({ ...prev, volunteer_id: '', survey_template_id: '' }));
     }
-    if (name === 'assignment_type') {
+    if (name === 'survey_period') {
       setFormData(prev => ({ ...prev, survey_template_id: '' }));
     }
   };
@@ -99,9 +99,14 @@ export default function CreateAssignmentPage() {
       if (formData.survey_type === 'volunteer') {
         if (!formData.volunteer_id) throw new Error('Please select a volunteer');
         
-        endpoint = formData.assignment_type === 'pre_pilot' 
-          ? '/survey-assignments/auto-assign-pre'
-          : '/survey-assignments/manual-assign-post';
+        // Choose endpoint based on survey period (pre_activity or post_activity)
+        if (formData.survey_period === 'pre_activity') {
+          endpoint = '/survey-assignments/auto-assign-pre';
+        } else if (formData.survey_period === 'post_activity') {
+          endpoint = '/survey-assignments/manual-assign-post';
+        } else {
+          throw new Error('For volunteer surveys, survey period must be pre_activity or post_activity');
+        }
         
         payload = {
           volunteer_id: formData.volunteer_id,
@@ -169,33 +174,38 @@ export default function CreateAssignmentPage() {
               </div>
             </div>
 
-            <div className="mt-6">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">Survey Period</h3>
-              <div className="flex space-x-4">
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    name="assignment_type"
-                    value="pre_pilot"
-                    checked={formData.assignment_type === 'pre_pilot'}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2">Pre-Pilot Survey</span>
-                </label>
-                <label className="inline-flex items-center">
-                  <input
-                    type="radio"
-                    name="assignment_type"
-                    value="post_pilot"
-                    checked={formData.assignment_type === 'post_pilot'}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2">Post-Pilot Survey</span>
-                </label>
+            {formData.survey_type === 'volunteer' && (
+              <div className="mt-6">
+                <h3 className="text-sm font-medium text-gray-900 mb-2">Survey Period</h3>
+                <div className="flex space-x-4">
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      name="survey_period"
+                      value="pre_activity"
+                      checked={formData.survey_period === 'pre_activity'}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <span className="ml-2">Pre-Pilot Survey</span>
+                  </label>
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      name="survey_period"
+                      value="post_activity"
+                      checked={formData.survey_period === 'post_activity'}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <span className="ml-2">Post-Pilot Survey</span>
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Note: For volunteer surveys, only pre and post periods are supported.
+                </p>
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end pt-6 border-t">
               <Button onClick={() => setStep(2)} disabled={!formData.survey_type}>
@@ -269,7 +279,7 @@ export default function CreateAssignmentPage() {
                   </select>
                 ) : (
                   <p className="text-sm text-gray-500">
-                    No templates found for this pilot and survey type. Please create a survey template first.
+                    No templates found for this pilot and survey type/period. Please create a survey template first.
                   </p>
                 )}
               </div>
@@ -332,7 +342,7 @@ export default function CreateAssignmentPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Survey Period:</span>
-                  <span className="font-medium capitalize">{formData.assignment_type.replace('_', ' ')}</span>
+                  <span className="font-medium capitalize">{formData.survey_period.replace('_', ' ')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Pilot:</span>
