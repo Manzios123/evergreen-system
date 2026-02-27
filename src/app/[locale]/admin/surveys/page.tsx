@@ -877,7 +877,7 @@ export default function AdminSurveysPage() {
                   </table>
                 </div>
 
-                {/* Pagination */}
+                {/* Paginaton */}
                 {pagination.totalPages > 1 && (
                   <div className="flex flex-wrap items-center gap-2 justify-center border-t border-gray-200 px-4 py-3 sm:px-6 mt-6">
                     <Button
