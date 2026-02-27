@@ -29,6 +29,11 @@ interface Question {
   component_id?: string | null;
 }
 
+interface TemplateResponse {
+  id: string;
+  [key: string]: any;
+}
+
 export default function CreateSurveyTemplatePage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -100,7 +105,7 @@ export default function CreateSurveyTemplatePage() {
         version: 1
       };
 
-      const response = await api.post('/survey-templates', payload);
+      const response = await api.post<TemplateResponse>('/survey-templates', payload);
       
       alert('Template created successfully!');
       router.push(`/admin/surveys/templates/${response.id}`);
@@ -246,7 +251,7 @@ export default function CreateSurveyTemplatePage() {
               ) : (
                 <div className="space-y-4">
                   {formData.questions.map((question, index) => (
-                    <Card key={index} variant="outline">
+                    <Card key={index} className="border">
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-3">
                           <h3 className="text-sm font-medium text-gray-700">Question {index + 1}</h3>
