@@ -64,6 +64,9 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
       
       <div className="lg:pl-72">
         <Header />
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 sm:px-6 lg:px-8">
+          The system is currently under maintenance. Some features may be temporarily unavailable while improvements are being completed.
+        </div>
         
         <main className="py-8">
           <div className="px-4 sm:px-6 lg:px-8">

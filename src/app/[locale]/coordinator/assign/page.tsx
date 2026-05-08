@@ -139,6 +139,24 @@ export default function AssignActivityPage() {
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
   const [currentBatchIndex, setCurrentBatchIndex] = useState(0);
   const [numberOfParticipants, setNumberOfParticipants] = useState<number>(25);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    watch,
+    setValue,
+    trigger,
+  } = useForm<AssignActivityFormData>({
+    resolver: zodResolver(assignActivitySchema),
+    defaultValues: {
+      number_of_participants: 25,
+    },
+  });
+
+  // Watch form values for pilot-scoped facilitator lookup and scheduling.
+  const schoolId = watch('school_id');
+  const scheduledDate = watch('scheduled_date');
   
   // Fetch data for dropdowns
   const { data: templatesResponse, isLoading: templatesLoading } = useApiQuery<unknown>(
@@ -146,10 +164,11 @@ export default function AssignActivityPage() {
     () => api.get('/activity-templates')
   );
 
-  // Fetch facilitators for report/activity assignment. The API field remains volunteer_id for now.
+  // Fetch facilitators for the selected school's pilot. The API field remains volunteer_id for now.
   const { data: usersResponse, isLoading: volunteersLoading } = useApiQuery<unknown>(
-    ['facilitators'],
-    () => api.get('/users?role=facilitator')
+    ['facilitators', schoolId],
+    () => api.get(`/users?role=facilitator&school_id=${encodeURIComponent(schoolId)}`),
+    { enabled: Boolean(schoolId) }
   );
 
   const { data: schoolsResponse, isLoading: schoolsLoading } = useApiQuery<unknown>(
@@ -174,33 +193,10 @@ export default function AssignActivityPage() {
     return toArray<Volunteer>(usersResponse);
   }, [usersResponse]);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    watch,
-    setValue,
-    trigger,
-  } = useForm<AssignActivityFormData>({
-    resolver: zodResolver(assignActivitySchema),
-    defaultValues: {
-      number_of_participants: 25,
-    },
-  });
-
-  // Watch form values for filtering
-  const schoolId = watch('school_id');
-  const scheduledDate = watch('scheduled_date');
-  
-  // Filter facilitators by selected school
+  // The backend already scopes this list by selected school -> pilot -> user_pilots.
   const filteredVolunteers = useMemo(() => {
-    if (!volunteersArr || !schoolId) return volunteersArr || [];
-    
-    return volunteersArr.filter(volunteer =>
-      volunteer.school_ids && 
-      volunteer.school_ids.length > 0 && 
-      volunteer.school_ids.includes(schoolId)
-    );
+    if (!schoolId) return [];
+    return volunteersArr || [];
   }, [volunteersArr, schoolId]);
 
   // Update selected facilitators when school changes
@@ -613,11 +609,11 @@ export default function AssignActivityPage() {
                     <p className="text-gray-500">
                       {volunteersLoading
                         ? 'Loading facilitators...'
-                        : 'No facilitators found. Add or migrate facilitators before assigning reports.'}
+                        : "No facilitators found for this school's pilot."}
                     </p>
                     {!volunteersLoading && (
                       <p className="text-sm text-gray-500 mt-2">
-                        Facilitators need to be assigned to this school in their profile.
+                        Confirm the user has the facilitator role and is linked to the correct pilot.
                       </p>
                     )}
                     <Button
