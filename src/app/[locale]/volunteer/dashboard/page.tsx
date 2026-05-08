@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation'; // Add this import
 import { dashboardApi } from '@/lib/api/dashboard';
 import { useAuth } from '@/components/providers/AuthProvider';
+import DashboardGreeting from '@/components/dashboard/dashboard-greeting';
 import StatsCard from '@/components/ui/stats-card';
 import ActivityCard from '@/components/activities/activity-card';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
@@ -53,9 +54,11 @@ export default function VolunteerDashboardPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-          Welcome back, {user?.full_name || ''}
-        </h1>
+        <DashboardGreeting
+          name={user?.full_name}
+          fallback={user?.role === 'facilitator' ? 'Facilitator' : 'Volunteer'}
+          className="text-2xl font-bold text-gray-900 sm:text-3xl"
+        />
         <p className="mt-2 text-gray-600">
           {dashboard?.summary?.message || 'Manage your volunteering activities'}
         </p>

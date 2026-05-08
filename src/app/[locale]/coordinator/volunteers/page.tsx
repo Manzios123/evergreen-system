@@ -1,4 +1,4 @@
-// app/[locale]/coordinator/users/page.tsx
+// app/[locale]/coordinator/volunteers/page.tsx
 'use client';
 
 import { Card } from '@/components/ui/card';
@@ -25,7 +25,7 @@ import {
   KeyIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 // Define Column interface for DataTable
 interface Column<T> {
@@ -53,6 +53,8 @@ interface UsersApiResponse {
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -60,11 +62,11 @@ export default function AdminUsersPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch users - Updated to expect UsersApiResponse type
-  const { 
-    data: usersData, 
-    isLoading, 
-    error, 
-    refetch 
+  const {
+    data: usersData,
+    isLoading,
+    error,
+    refetch
   } = useApiQuery<UsersApiResponse>(
     ['users', searchTerm, roleFilter, statusFilter],
     () => api.get('/users', {
@@ -86,7 +88,7 @@ export default function AdminUsersPage() {
 
   const handleDelete = async () => {
     if (!selectedUser) return;
-    
+
     try {
       await deleteMutation.mutateAsync(selectedUser.id);
       refetch();
@@ -100,10 +102,10 @@ export default function AdminUsersPage() {
   const handleResetPassword = async (userId: string) => {
     try {
       await resetPasswordMutation.mutateAsync(userId);
-      // Show success message
-      alert('Password reset email sent successfully');
-    } catch (error) {
+      alert('Password reset successfully. Initial password is evergreen1234.');
+    } catch (error: any) {
       console.error('Failed to reset password:', error);
+      alert(error?.message || 'Failed to reset password');
     }
   };
 
@@ -186,27 +188,29 @@ export default function AdminUsersPage() {
       render: (user: UserWithPilot) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => router.push(`/coordinator/users/${user.id}`)}
+            onClick={() => router.push(`/${locale}/coordinator/volunteers/${user.id}`)}
             className="inline-flex items-center justify-center rounded-md h-8 px-3 text-xs hover:bg-gray-100 hover:text-gray-900 text-gray-700"
           >
             <EyeIcon className="h-4 w-4 mr-1" />
             View
           </button>
           <button
-            onClick={() => router.push(`/coordinator/users/${user.id}/edit`)}
+            onClick={() => router.push(`/${locale}/coordinator/volunteers/${user.id}/edit`)}
             className="inline-flex items-center justify-center rounded-md h-8 px-3 text-xs hover:bg-gray-100 hover:text-gray-900 text-gray-700"
           >
             <PencilIcon className="h-4 w-4 mr-1" />
             Edit
           </button>
-          <button
-            onClick={() => handleResetPassword(user.id)}
-            className="inline-flex items-center justify-center rounded-md h-8 px-3 text-xs hover:bg-gray-100 hover:text-gray-900 text-gray-700"
-            disabled={resetPasswordMutation.isPending}
-          >
-            <KeyIcon className="h-4 w-4 mr-1" />
-            Reset PW
-          </button>
+          {user.role !== 'admin' && (
+            <button
+              onClick={() => handleResetPassword(user.id)}
+              className="inline-flex items-center justify-center rounded-md h-8 px-3 text-xs hover:bg-gray-100 hover:text-gray-900 text-gray-700"
+              disabled={resetPasswordMutation.isPending}
+            >
+              <KeyIcon className="h-4 w-4 mr-1" />
+              Reset PW
+            </button>
+          )}
           {user.role !== 'admin' && (
             <button
               onClick={() => {
@@ -226,15 +230,16 @@ export default function AdminUsersPage() {
 
   // Updated to use usersData?.users instead of usersData?.data
   const filteredUsers = useMemo(() => {
-    return usersData?.users || [];
+    return (usersData?.users || []).filter(user =>
+      user.role === 'volunteer' || user.role === 'facilitator'
+    );
   }, [usersData]);
 
   // Role options
   const roleOptions = [
     { value: 'all', label: 'All Roles' },
-    { value: 'admin', label: 'Administrator' },
-    { value: 'coordinator', label: 'Coordinator' },
     { value: 'volunteer', label: 'Volunteer' },
+    { value: 'facilitator', label: 'Facilitator' },
   ];
 
   // Status options
@@ -251,16 +256,14 @@ export default function AdminUsersPage() {
 
     const totalUsers = filteredUsers.length;
     const activeUsers = filteredUsers.filter(u => u.status === 'active' || !u.status).length;
-    const admins = filteredUsers.filter(u => u.role === 'admin').length;
-    const coordinators = filteredUsers.filter(u => u.role === 'coordinator').length;
     const volunteers = filteredUsers.filter(u => u.role === 'volunteer').length;
+    const facilitators = filteredUsers.filter(u => u.role === 'facilitator').length;
 
     return {
       totalUsers,
       activeUsers,
-      admins,
-      coordinators,
       volunteers,
+      facilitators,
     };
   }, [filteredUsers]);
 
@@ -308,13 +311,13 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Volunteers & Facilitators</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage all system users and permissions
+            Manage volunteers, facilitators, and their permissions
           </p>
         </div>
         <button
-          onClick={() => router.push('/coordinator/users/new')}
+          onClick={() => router.push(`/${locale}/coordinator/volunteers/new`)}
           className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
@@ -328,7 +331,7 @@ export default function AdminUsersPage() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Users</p>
+                <p className="text-sm font-medium text-gray-500">Total People</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
                   {stats.totalUsers}
                 </p>
@@ -336,13 +339,13 @@ export default function AdminUsersPage() {
               <UserIcon className="h-8 w-8 text-gray-300" />
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Admins</p>
+                <p className="text-sm font-medium text-gray-500">Active People</p>
                 <p className="text-2xl font-bold text-red-600 mt-1">
-                  {stats.admins}
+                  {stats.activeUsers}
                 </p>
               </div>
               <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
@@ -350,21 +353,21 @@ export default function AdminUsersPage() {
               </div>
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Coordinators</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {stats.coordinators}
+                <p className="text-sm font-medium text-gray-500">Facilitators</p>
+                <p className="text-2xl font-bold text-emerald-600 mt-1">
+                  {stats.facilitators}
                 </p>
               </div>
-              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <UserGroupIcon className="h-4 w-4 text-blue-600" />
+              <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                <UserGroupIcon className="h-4 w-4 text-emerald-600" />
               </div>
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -378,7 +381,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -438,29 +441,29 @@ export default function AdminUsersPage() {
         </div>
       </Card>
 
-      {/* Users Table */}
+      {/* Volunteers and facilitators table */}
       {filteredUsers.length > 0 ? (
         <Card>
           <DataTable
             data={filteredUsers}
             columns={columns}
-            emptyMessage="No users found"
+            emptyMessage="No volunteers or facilitators found"
           />
         </Card>
       ) : (
         <EmptyState
           icon={<UserIcon className="h-12 w-12 text-gray-400" />}
-          title={searchTerm || roleFilter !== 'all' || statusFilter !== 'all' ? "No users found" : "No users yet"}
+          title={searchTerm || roleFilter !== 'all' || statusFilter !== 'all' ? "No people found" : "No volunteers or facilitators yet"}
           description={
             searchTerm || roleFilter !== 'all' || statusFilter !== 'all'
-              ? "Try adjusting your filters to find users."
-              : "You haven't added any users to the system yet."
+              ? "Try adjusting your filters to find volunteers or facilitators."
+              : "You haven't added any volunteers or facilitators yet."
           }
           action={
             !searchTerm && roleFilter === 'all' && statusFilter === 'all'
               ? {
                   label: 'Add Your First User',
-                  onClick: () => router.push('/coordinator/users/new'),
+                  onClick: () => router.push(`/${locale}/coordinator/volunteers/new`),
                 }
               : {
                   label: 'Clear Filters',

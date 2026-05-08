@@ -38,6 +38,7 @@ export const ACTIVITY_STATUSES = {
     admin: { label: 'Administrator', color: 'red' },
     coordinator: { label: 'Coordinator', color: 'blue' },
     volunteer: { label: 'Volunteer', color: 'green' },
+    facilitator: { label: 'Facilitator', color: 'emerald' },
   } as const;
   
   // Export formats

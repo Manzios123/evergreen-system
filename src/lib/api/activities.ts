@@ -76,7 +76,7 @@ export const activitiesApi = {
     body: JSON.stringify(data),
   }),
 
-  // Assign activity (coordinator/admin assigning to volunteer)
+  // Assign activity (coordinator/admin assigning to facilitator through legacy volunteer_id)
   assign: (data: {
     activity_template_id: string;
     school_id: string;

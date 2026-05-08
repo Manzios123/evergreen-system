@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const roleSegment = segments[startIndex];
       
       // If trying to access role-specific routes with wrong role
-      if (roleSegment && ['admin', 'coordinator', 'volunteer'].includes(roleSegment) && roleSegment !== userRole) {
+      if (roleSegment && ['admin', 'coordinator', 'volunteer', 'facilitator'].includes(roleSegment) && roleSegment !== userRole) {
         const locale = getCurrentLocale();
         console.log('🔐 Role mismatch, redirecting to:', `/${locale}/${userRole}/dashboard`);
         router.push(`/${locale}/${userRole}/dashboard`);

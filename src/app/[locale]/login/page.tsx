@@ -35,6 +35,9 @@ export default function LoginPage() {
       case 'volunteer':
         router.push('/volunteer/dashboard');
         break;
+      case 'facilitator':
+        router.push('/volunteer/dashboard');
+        break;
       default:
         router.push('/dashboard');
     }

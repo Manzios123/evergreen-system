@@ -25,7 +25,7 @@ import {
   KeyIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 // Define Column interface for DataTable
 interface Column<T> {
@@ -53,6 +53,8 @@ interface UsersApiResponse {
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -100,10 +102,10 @@ export default function AdminUsersPage() {
   const handleResetPassword = async (userId: string) => {
     try {
       await resetPasswordMutation.mutateAsync(userId);
-      // Show success message
-      alert('Password reset email sent successfully');
-    } catch (error) {
+      alert('Password reset successfully. Initial password is evergreen1234.');
+    } catch (error: any) {
       console.error('Failed to reset password:', error);
+      alert(error?.message || 'Failed to reset password');
     }
   };
 
@@ -186,14 +188,14 @@ export default function AdminUsersPage() {
       render: (user: UserWithPilot) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => router.push(`/admin/users/${user.id}`)}
+            onClick={() => router.push(`/${locale}/admin/users/${user.id}`)}
             className="inline-flex items-center justify-center rounded-md h-8 px-3 text-xs hover:bg-gray-100 hover:text-gray-900 text-gray-700"
           >
             <EyeIcon className="h-4 w-4 mr-1" />
             View
           </button>
           <button
-            onClick={() => router.push(`/admin/users/${user.id}/edit`)}
+            onClick={() => router.push(`/${locale}/admin/users/${user.id}/edit`)}
             className="inline-flex items-center justify-center rounded-md h-8 px-3 text-xs hover:bg-gray-100 hover:text-gray-900 text-gray-700"
           >
             <PencilIcon className="h-4 w-4 mr-1" />
@@ -235,6 +237,7 @@ export default function AdminUsersPage() {
     { value: 'admin', label: 'Administrator' },
     { value: 'coordinator', label: 'Coordinator' },
     { value: 'volunteer', label: 'Volunteer' },
+    { value: 'facilitator', label: 'Facilitator' },
   ];
 
   // Status options
@@ -314,7 +317,7 @@ export default function AdminUsersPage() {
           </p>
         </div>
         <button
-          onClick={() => router.push('/admin/users/new')}
+          onClick={() => router.push(`/${locale}/admin/users/new`)}
           className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
@@ -460,7 +463,7 @@ export default function AdminUsersPage() {
             !searchTerm && roleFilter === 'all' && statusFilter === 'all'
               ? {
                   label: 'Add Your First User',
-                  onClick: () => router.push('/admin/users/new'),
+                  onClick: () => router.push(`/${locale}/admin/users/new`),
                 }
               : {
                   label: 'Clear Filters',

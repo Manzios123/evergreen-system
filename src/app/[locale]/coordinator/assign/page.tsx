@@ -32,7 +32,7 @@ import { useState, useEffect, useMemo } from 'react';
 // Helper function to normalize API responses to arrays
 function toArray<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
-  
+
   // Handle common API response shapes
   const v = value as any;
   if (Array.isArray(v?.data)) return v.data;
@@ -40,7 +40,7 @@ function toArray<T>(value: unknown): T[] {
   if (Array.isArray(v?.results)) return v.results;
   if (Array.isArray(v?.users)) return v.users;
   if (Array.isArray(v?.schools)) return v.schools;
-  
+
   return [];
 }
 
@@ -146,10 +146,10 @@ export default function AssignActivityPage() {
     () => api.get('/activity-templates')
   );
 
-  // Fetch volunteers using the correct endpoint: /api/users?role=volunteer
+  // Fetch facilitators for report/activity assignment. The API field remains volunteer_id for now.
   const { data: usersResponse, isLoading: volunteersLoading } = useApiQuery<unknown>(
-    ['volunteers'],
-    () => api.get('/users?role=volunteer')
+    ['facilitators'],
+    () => api.get('/users?role=facilitator')
   );
 
   const { data: schoolsResponse, isLoading: schoolsLoading } = useApiQuery<unknown>(
@@ -160,17 +160,17 @@ export default function AssignActivityPage() {
   // Normalize API responses to arrays
   const templatesArr = useMemo(() => toArray<ActivityTemplate>(templatesResponse), [templatesResponse]);
   const schoolsArr = useMemo(() => toArray<School>(schoolsResponse), [schoolsResponse]);
-  
+
   // Normalize volunteers response - extract users array from response
   const volunteersArr = useMemo(() => {
     if (Array.isArray(usersResponse)) return usersResponse as Volunteer[];
-    
+
     // Handle nested structure like { users: [...], total: number }
     const response = usersResponse as any;
     if (response && Array.isArray(response.users)) {
       return response.users as Volunteer[];
     }
-    
+
     return toArray<Volunteer>(usersResponse);
   }, [usersResponse]);
 
@@ -192,18 +192,18 @@ export default function AssignActivityPage() {
   const schoolId = watch('school_id');
   const scheduledDate = watch('scheduled_date');
   
-  // Filter volunteers by selected school
+  // Filter facilitators by selected school
   const filteredVolunteers = useMemo(() => {
     if (!volunteersArr || !schoolId) return volunteersArr || [];
     
-    return volunteersArr.filter(volunteer => 
+    return volunteersArr.filter(volunteer =>
       volunteer.school_ids && 
       volunteer.school_ids.length > 0 && 
       volunteer.school_ids.includes(schoolId)
     );
   }, [volunteersArr, schoolId]);
 
-  // Update selected volunteers when school changes
+  // Update selected facilitators when school changes
   useEffect(() => {
     if (schoolId) {
       setSelectedVolunteers([]);
@@ -227,7 +227,7 @@ export default function AssignActivityPage() {
     }
   };
 
-  // Handle individual volunteer selection
+  // Handle individual facilitator selection
   const handleVolunteerToggle = (volunteerId: string) => {
     let newSelectedVolunteers;
     
@@ -268,7 +268,7 @@ export default function AssignActivityPage() {
         const payload = {
           ...formData,
           volunteer_id: volunteerId,
-          volunteer_ids: undefined, // Remove array for single assignment
+          volunteer_ids: undefined, // Remove array for single assignment; legacy API field name
           number_of_participants: numberOfParticipants,
         };
         
@@ -314,9 +314,9 @@ export default function AssignActivityPage() {
   };
 
   const onSubmit = async (data: AssignActivityFormData) => {
-    // Validate at least one volunteer is selected
+    // Validate at least one facilitator is selected
     if (!selectedVolunteers.length && !data.volunteer_id) {
-      alert('Please select at least one volunteer');
+      alert('Please select at least one facilitator');
       return;
     }
     
@@ -326,7 +326,7 @@ export default function AssignActivityPage() {
       number_of_participants: numberOfParticipants,
     };
     
-    // Single volunteer assignment (backward compatibility)
+    // Single facilitator assignment through the legacy volunteer_id field
     if (data.volunteer_id && !selectedVolunteers.length) {
       try {
         await singleAssignMutation.mutateAsync(formData);
@@ -378,15 +378,15 @@ export default function AssignActivityPage() {
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Assign New Activity</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Assign a volunteering activity to one or multiple volunteers
+          Assign a reporting activity to one or multiple facilitators
         </p>
       </div>
 
       {/* Debug Info - Remove in production */}
       <div className="hidden">
-        <p>Volunteers count: {volunteersArr.length}</p>
+        <p>Facilitators count: {volunteersArr.length}</p>
         <p>School ID: {schoolId}</p>
-        <p>Filtered Volunteers count: {filteredVolunteers.length}</p>
+        <p>Filtered Facilitators count: {filteredVolunteers.length}</p>
         <pre>{JSON.stringify(volunteersArr.slice(0, 2), null, 2)}</pre>
       </div>
 
@@ -579,13 +579,13 @@ export default function AssignActivityPage() {
             </Card>
           </div>
 
-          {/* Right Column - Volunteers & Assignment Notes */}
+          {/* Right Column - Facilitators & Assignment Notes */}
           <div className="space-y-6">
             <Card>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">
-                    Assign to Volunteers
+                    Assign to Facilitators
                   </h2>
                   {schoolId && filteredVolunteers.length > 0 && (
                     <div className="flex items-center space-x-2">
@@ -605,23 +605,27 @@ export default function AssignActivityPage() {
                 {!schoolId ? (
                   <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                     <Building className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">Select a school to see available volunteers</p>
+                    <p className="text-gray-500">Select a school to see available facilitators</p>
                   </div>
                 ) : filteredVolunteers.length === 0 ? (
                   <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                     <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-gray-500">
-                      {volunteersLoading ? 'Loading volunteers...' : 'No volunteers assigned to this school'}
+                      {volunteersLoading
+                        ? 'Loading facilitators...'
+                        : 'No facilitators found. Add or migrate facilitators before assigning reports.'}
                     </p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Volunteers need to be assigned to this school in their profile.
-                    </p>
+                    {!volunteersLoading && (
+                      <p className="text-sm text-gray-500 mt-2">
+                        Facilitators need to be assigned to this school in their profile.
+                      </p>
+                    )}
                     <Button
                       variant="link"
                       className="mt-2"
                       onClick={() => router.push(`/${locale}/coordinator/volunteers`)}
                     >
-                      Manage Volunteers
+                      Manage Facilitators
                     </Button>
                   </div>
                 ) : (
@@ -673,12 +677,12 @@ export default function AssignActivityPage() {
                 </h2>
                 
                 <Textarea
-                  label="Notes for Volunteer"
+                  label="Notes for Facilitator"
                   {...register('assignment_notes')}
-                  placeholder="Add any specific instructions or expectations for the volunteer..."
+                  placeholder="Add any specific instructions or expectations for the facilitator..."
                   rows={4}
                   error={errors.assignment_notes?.message}
-                  helpText="These notes will be visible to the volunteer"
+                  helpText="These notes will be visible to the facilitator"
                 />
               </div>
             </Card>
@@ -715,7 +719,7 @@ export default function AssignActivityPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-500">Volunteers:</span>
+                    <span className="text-sm text-gray-500">Facilitators:</span>
                     <span className="text-sm font-medium text-gray-900">
                       {selectedVolunteers.length > 0 
                         ? `${selectedVolunteers.length} selected` 
@@ -776,7 +780,7 @@ export default function AssignActivityPage() {
                       }
                     >
                       {selectedVolunteers.length > 1 
-                        ? `Assign to ${selectedVolunteers.length} Volunteers`
+                        ? `Assign to ${selectedVolunteers.length} Facilitators`
                         : 'Assign Activity'}
                     </Button>
                   )}

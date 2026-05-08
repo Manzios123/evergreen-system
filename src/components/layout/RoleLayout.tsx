@@ -5,15 +5,17 @@ import { useAuth } from '@/components/providers/AuthProvider'; // Changed import
 import Sidebar from './Sidebar';
 import Header from './Header';
 import MobileNav from './mobile-nav';
-import { useRouter } from 'next/navigation'; // Add this
+import { useParams, useRouter } from 'next/navigation'; // Add this
 
 interface RoleLayoutProps {
   children: React.ReactNode;
-  role: 'admin' | 'coordinator' | 'volunteer';
+  role: 'admin' | 'coordinator' | 'volunteer' | 'facilitator';
 }
 
 export default function RoleLayout({ children, role }: RoleLayoutProps) {
   const router = useRouter(); // Initialize router
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -24,26 +26,31 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
     );
   }
 
-  if (!user || user.role !== role) {
+  const canUseLayout = user?.role === role || (role === 'volunteer' && user?.role === 'facilitator');
+
+  if (!user || !canUseLayout) {
     // Redirect to appropriate page based on user role or to login
     if (user) {
       // User exists but wrong role - redirect to their dashboard
       switch(user.role) {
         case 'admin':
-          router.push('/admin/dashboard');
+          router.push(`/${locale}/admin/dashboard`);
           break;
         case 'coordinator':
-          router.push('/coordinator/dashboard');
+          router.push(`/${locale}/coordinator/dashboard`);
           break;
         case 'volunteer':
-          router.push('/volunteer/dashboard');
+          router.push(`/${locale}/volunteer/dashboard`);
+          break;
+        case 'facilitator':
+          router.push(`/${locale}/volunteer/dashboard`);
           break;
         default:
-          router.push('/dashboard');
+          router.push(`/${locale}/dashboard`);
       }
     } else {
       // No user - redirect to login
-      router.push('/login');
+      router.push(`/${locale}/login`);
     }
     return null;
   }
@@ -52,7 +59,7 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
     <div className="min-h-screen bg-gray-50">
       <MobileNav />
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <Sidebar role={role} />
+        <Sidebar role={user.role === 'facilitator' && role === 'volunteer' ? 'facilitator' : role} />
       </div>
       
       <div className="lg:pl-72">

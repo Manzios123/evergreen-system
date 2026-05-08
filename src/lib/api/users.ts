@@ -11,6 +11,7 @@ export interface User {
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+  is_active?: boolean;
   role: string;
   pilot_names?: string[];
   pilot_ids?: string[];
@@ -22,7 +23,7 @@ export interface CreateUserData {
   email: string;
   full_name: string;
   password: string;
-  role: 'admin' | 'coordinator' | 'volunteer';
+  role: 'admin' | 'coordinator' | 'volunteer' | 'facilitator';
   pilot_ids?: string[];
   school_ids?: string[];
 }
@@ -39,6 +40,11 @@ export interface UpdateUserData {
 
 export const usersApi = {
   getMe: () => apiRequest<{ user: User }>('/users/me'),
+
+  updateMe: (data: { full_name?: string; email?: string }) => apiRequest<{ message: string; user: User }>('/users/me', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
   
   list: (filters?: { role?: string; pilot_id?: string; search?: string }) => {
     const params = new URLSearchParams();
@@ -66,6 +72,10 @@ export const usersApi = {
   }),
   
   delete: (id: string) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
+
+  resetPassword: (id: string) => apiRequest<{ message: string; user_id: string }>(`/users/${id}/reset-password`, {
+    method: 'POST',
+  }),
   
   changePassword: (data: { current_password: string; new_password: string }) => 
     apiRequest('/users/me/change-password', {

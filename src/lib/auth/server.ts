@@ -6,7 +6,7 @@ interface UserPayload {
   id: string;
   email: string;
   full_name: string;
-  role: 'volunteer' | 'coordinator' | 'admin';
+  role: 'volunteer' | 'facilitator' | 'coordinator' | 'admin';
 }
 
 export async function getServerUser(): Promise<UserPayload | null> {
@@ -23,7 +23,7 @@ export async function getServerUser(): Promise<UserPayload | null> {
   }
 }
 
-export async function requireRole(role: 'volunteer' | 'coordinator' | 'admin', locale: string = 'en') {
+export async function requireRole(role: 'volunteer' | 'facilitator' | 'coordinator' | 'admin', locale: string = 'en') {
   const user = await getServerUser();
   
   if (!user) {

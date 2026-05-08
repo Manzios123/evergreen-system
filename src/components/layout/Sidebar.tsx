@@ -1,8 +1,9 @@
-// components/layout/sidebar.tsx
+// components/layout/Sidebar.tsx
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
+import Image from 'next/image';
+import { usePathname, useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import {
   HomeIcon,
@@ -10,7 +11,6 @@ import {
   DocumentTextIcon,
   UserGroupIcon,
   ChartBarIcon,
-  PhotoIcon,
   ArrowRightOnRectangleIcon,
   PlusCircleIcon,
   ChatBubbleLeftIcon,
@@ -20,12 +20,14 @@ import {
   ArrowDownTrayIcon,
   UsersIcon,
   BuildingLibraryIcon,
+  UserCircleIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
 
 interface SidebarProps {
-  role: 'admin' | 'coordinator' | 'volunteer';
+  role: 'admin' | 'coordinator' | 'volunteer' | 'facilitator';
 }
 
 interface NavigationItem {
@@ -36,18 +38,58 @@ interface NavigationItem {
   badge?: 'pending' | 'count';
 }
 
+// Avatar component — shows profile picture or initials
+function UserAvatar({ user, size = 'md' }: { user: any; size?: 'sm' | 'md' }) {
+  const sizeClasses = size === 'sm'
+    ? 'h-7 w-7 text-xs'
+    : 'h-10 w-10 text-sm';
+
+  if (user?.profile_picture) {
+    return (
+      <div className={`${sizeClasses} rounded-full overflow-hidden ring-2 ring-green-200 shrink-0`}>
+        <Image
+          src={user.profile_picture}
+          alt={user.full_name || 'Profile'}
+          width={40}
+          height={40}
+          className="object-cover w-full h-full"
+        />
+      </div>
+    );
+  }
+
+  // Initials fallback
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+    : 'U';
+
+  const colors: Record<string, string> = {
+    admin: 'bg-rose-100 text-rose-700 ring-rose-200',
+    coordinator: 'bg-blue-100 text-blue-700 ring-blue-200',
+    volunteer: 'bg-green-100 text-green-700 ring-green-200',
+    facilitator: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+  };
+  const colorClass = colors[user?.role] || colors.volunteer;
+
+  return (
+    <div className={`${sizeClasses} rounded-full flex items-center justify-center ring-2 font-bold shrink-0 ${colorClass}`}>
+      {initials}
+    </div>
+  );
+}
+
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const params = useParams();
+  const router = useRouter();
   const locale = params.locale as string;
   const { logout, user } = useAuth();
-  
-  // Fetch pending counts for badges - using the correct API endpoints
+
   const { data: pendingData } = useApiQuery<{
     pendingActivities: number;
     pendingPhotos: number;
     pendingSurveys: number;
-  }>(['sidebar', 'pending-counts'], () => 
+  }>(['sidebar', 'pending-counts'], () =>
     api.get('/approvals/pending-counts'), {
     enabled: role === 'coordinator' || role === 'admin',
   });
@@ -55,7 +97,7 @@ export default function Sidebar({ role }: SidebarProps) {
   const { data: volunteerPendingData } = useApiQuery<{
     pendingSurveys: number;
     pendingApprovals: number;
-  }>(['volunteer', 'pending-counts'], () => 
+  }>(['volunteer', 'pending-counts'], () =>
     api.get('/dashboard/volunteer/pending-counts'), {
     enabled: role === 'volunteer',
   });
@@ -75,12 +117,7 @@ export default function Sidebar({ role }: SidebarProps) {
       { name: 'Dashboard', href: '/coordinator/dashboard', icon: HomeIcon, exact: true },
       { name: 'Activities', href: '/coordinator/activities', icon: CalendarIcon },
       { name: 'Assign Activity', href: '/coordinator/assign', icon: PlusCircleIcon },
-      { 
-        name: 'Approvals', 
-        href: '/coordinator/approvals', 
-        icon: CheckCircleIcon, 
-        badge: 'count' 
-      },
+      { name: 'Approvals', href: '/coordinator/approvals', icon: CheckCircleIcon, badge: 'count' },
       { name: 'Volunteers', href: '/coordinator/volunteers', icon: UserGroupIcon },
       { name: 'Schools', href: '/coordinator/schools', icon: AcademicCapIcon },
       { name: 'Surveys', href: '/coordinator/surveys', icon: DocumentTextIcon },
@@ -89,134 +126,137 @@ export default function Sidebar({ role }: SidebarProps) {
     volunteer: [
       { name: 'Dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
       { name: 'My Activities', href: '/volunteer/activities', icon: CalendarIcon },
-      
-      
-      { 
-        name: 'Feedback', 
-        href: '/volunteer/surveys/volunteer', 
-        icon: ChatBubbleLeftIcon, 
-        badge: 'pending' 
-      },
-      //{ name: 'Photos', href: '/volunteer/photos', icon: PhotoIcon },
+      { name: 'Feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
+    ],
+    facilitator: [
+      { name: 'Dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
+      { name: 'My Activities', href: '/volunteer/activities', icon: CalendarIcon },
     ],
   };
 
   const getBadgeCount = (item: NavigationItem) => {
     if (!item.badge) return null;
-
-    if (role === 'coordinator' || role === 'admin') {
-      if (item.name === 'Approvals' && pendingData) {
-        return (pendingData.pendingActivities || 0) + (pendingData.pendingPhotos || 0);
-      }
+    if ((role === 'coordinator' || role === 'admin') && item.name === 'Approvals' && pendingData) {
+      return (pendingData.pendingActivities || 0) + (pendingData.pendingPhotos || 0);
     }
-
-    if (role === 'volunteer') {
-      if (item.name === 'Activity Surveys' && volunteerPendingData) {
-        return volunteerPendingData.pendingSurveys || 0;
-      }
-      if (item.name === 'Volunteer Feedback' && volunteerPendingData) {
-        // Separate count for volunteer feedback
-        return volunteerPendingData.pendingSurveys || 0;
-      }
+    if (role === 'volunteer' && item.name === 'Feedback' && volunteerPendingData) {
+      return volunteerPendingData.pendingSurveys || 0;
     }
-
     return null;
   };
 
   const isActive = (href: string, exact?: boolean) => {
     const hrefWithLocale = `/${locale}${href}`;
-    if (exact) {
-      return pathname === hrefWithLocale;
-    }
+    if (exact) return pathname === hrefWithLocale;
     return pathname.startsWith(hrefWithLocale);
   };
 
+  const profileHref = `/${locale}/${role}/profile`;
+
   return (
-    <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4 border-r border-gray-200">
-      <div className="flex h-16 shrink-0 items-center">
-        <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full bg-green-600 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">E</span>
+    <div className="flex grow flex-col overflow-y-auto bg-white border-r border-gray-100 shadow-sm">
+      {/* Logo */}
+      <div className="flex h-16 shrink-0 items-center px-5 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <div className="relative h-9 w-9 shrink-0">
+            <Image
+              src="/evergreen.png"
+              alt="Evergreen"
+              fill
+              className="object-contain"
+              priority
+            />
           </div>
-          <span className="ml-3 text-xl font-bold text-gray-900">Evergreen</span>
+          <span className="text-lg font-bold tracking-tight text-gray-900">
+            Evergreen
+          </span>
         </div>
       </div>
-      
-      <nav className="flex flex-1 flex-col">
-        <ul role="list" className="flex flex-1 flex-col gap-y-7">
-          <li>
-            <ul role="list" className="-mx-2 space-y-1">
-              {navigation[role].map((item) => {
-                const active = isActive(item.href, item.exact);
-                const badgeCount = getBadgeCount(item);
-                const hrefWithLocale = `/${locale}${item.href}`;
-                
-                return (
-                  <li key={item.name}>
-                    <Link
-                      href={hrefWithLocale}
-                      className={`
-                        group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold
-                        ${active
-                          ? 'bg-green-50 text-green-600'
-                          : 'text-gray-700 hover:text-green-600 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      <item.icon
-                        className={`h-6 w-6 shrink-0 ${
-                          active ? 'text-green-600' : 'text-gray-400 group-hover:text-green-600'
-                        }`}
-                        aria-hidden="true"
-                      />
-                      <span className="flex-1">{item.name}</span>
-                      {badgeCount !== null && badgeCount > 0 && (
-                        <span className={`
-                          inline-flex items-center justify-center min-w-5 h-5 px-1.5 
-                          text-xs font-medium rounded-full
-                          ${active 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-red-100 text-red-700'
-                          }
-                        `}>
-                          {badgeCount}
-                        </span>
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </li>
-          
-          <li className="mt-auto">
-            <div className="p-2 border-t border-gray-200">
-              <div className="flex items-center gap-x-3 mb-4">
-                <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                  <span className="text-green-600 font-semibold text-sm">
-                    {user?.full_name?.charAt(0) || 'U'}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user?.full_name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate capitalize">
-                    {user?.role}
-                  </p>
-                </div>
-              </div>
-              
-              <button
-                onClick={logout}
-                className="w-full flex items-center gap-x-3 rounded-md p-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:text-red-600"
-              >
-                <ArrowRightOnRectangleIcon className="h-5 w-5 text-gray-400" />
-                Sign out
-              </button>
-            </div>
-          </li>
+
+      {/* Role badge */}
+      <div className="px-5 pt-4 pb-2">
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize
+          ${role === 'admin' ? 'bg-rose-50 text-rose-700' :
+            role === 'coordinator' ? 'bg-blue-50 text-blue-700' :
+            'bg-green-50 text-green-700'}`}>
+          {role}
+        </span>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex flex-1 flex-col px-3 pb-4">
+        <ul role="list" className="flex flex-1 flex-col gap-y-1">
+          {navigation[role].map((item) => {
+            const active = isActive(item.href, item.exact);
+            const badgeCount = getBadgeCount(item);
+            const hrefWithLocale = `/${locale}${item.href}`;
+
+            return (
+              <li key={item.name}>
+                <Link
+                  href={hrefWithLocale}
+                  className={`
+                    group flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150
+                    ${active
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:text-green-700 hover:bg-gray-50'
+                    }
+                  `}
+                >
+                  <item.icon
+                    className={`h-5 w-5 shrink-0 transition-colors ${
+                      active ? 'text-green-600' : 'text-gray-400 group-hover:text-green-600'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="flex-1 truncate">{item.name}</span>
+                  {badgeCount !== null && badgeCount > 0 && (
+                    <span className={`
+                      inline-flex items-center justify-center min-w-[20px] h-5 px-1.5
+                      text-xs font-semibold rounded-full
+                      ${active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}
+                    `}>
+                      {badgeCount}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
+
+        {/* Bottom user section */}
+        <div className="mt-auto pt-4 border-t border-gray-100">
+          {/* Profile link */}
+          <Link
+            href={profileHref}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 mb-1 transition-all duration-150 group
+              ${pathname === profileHref
+                ? 'bg-green-50 text-green-700'
+                : 'text-gray-600 hover:text-green-700 hover:bg-gray-50'
+              }`}
+          >
+            <UserAvatar user={user} size="sm" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {user?.full_name || 'User'}
+              </p>
+              <p className="text-xs text-gray-400 truncate">
+                View profile & settings
+              </p>
+            </div>
+            <Cog6ToothIcon className="h-4 w-4 text-gray-300 group-hover:text-green-500 shrink-0" />
+          </Link>
+
+          {/* Sign out */}
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
+          >
+            <ArrowRightOnRectangleIcon className="h-5 w-5 text-gray-400 group-hover:text-red-500" />
+            Sign out
+          </button>
+        </div>
       </nav>
     </div>
   );

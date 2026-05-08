@@ -51,7 +51,7 @@ export async function getCoordinatorActivities(filters?: {
   return apiFetch(url);
 }
 
-// Assign activity to volunteer
+// Assign activity to a facilitator. The API payload still uses volunteer_id as the legacy field name.
 export async function assignActivity(data: {
   activity_template_id: string;
   volunteer_id: string;

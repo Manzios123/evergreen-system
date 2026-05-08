@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,7 +17,7 @@ const userSchema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
-  role: z.enum(['admin', 'coordinator', 'volunteer']),
+  role: z.enum(['admin', 'coordinator', 'volunteer', 'facilitator']),
   pilot_ids: z.array(z.string()).optional(),
   school_ids: z.array(z.string()).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -29,6 +29,8 @@ type FormData = z.infer<typeof userSchema>;
 
 export default function CreateUserForm() {
   const router = useRouter();
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const { user: currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,9 @@ export default function CreateUserForm() {
   const selectedRole = watch('role');
   const selectedPilotIds = watch('pilot_ids') || [];
   const selectedSchoolIds = watch('school_ids') || [];
+  const usersListPath = currentUser?.role === 'coordinator'
+    ? `/${locale}/coordinator/volunteers`
+    : `/${locale}/admin/users`;
 
   // Fetch pilots and schools
   useEffect(() => {
@@ -161,7 +166,7 @@ export default function CreateUserForm() {
         password: data.password,
         role: data.role,
         pilot_ids: data.pilot_ids && data.pilot_ids.length > 0 ? data.pilot_ids : undefined,
-        school_ids: data.role === 'volunteer' && data.school_ids && data.school_ids.length > 0 ? data.school_ids : undefined,
+        school_ids: (data.role === 'volunteer' || data.role === 'facilitator') && data.school_ids && data.school_ids.length > 0 ? data.school_ids : undefined,
       };
 
       console.log('Creating user with data:', userData);
@@ -174,7 +179,7 @@ export default function CreateUserForm() {
         reset();
         
         setTimeout(() => {
-          router.push('/admin/users');
+          router.push(usersListPath);
         }, 2000);
       } else {
         setError('Failed to create user');
@@ -347,7 +352,8 @@ export default function CreateUserForm() {
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-base px-4 py-3 h-12"
             >
               <option value="volunteer">Volunteer</option>
-              <option value="coordinator">Coordinator</option>
+              <option value="facilitator">Facilitator</option>
+              {currentUser?.role === 'admin' && <option value="coordinator">Coordinator</option>}
               {currentUser?.role === 'admin' && <option value="admin">Admin</option>}
             </select>
             {errors.role && (
@@ -422,13 +428,13 @@ export default function CreateUserForm() {
           <p className="text-xs text-gray-500">
             {selectedRole === 'coordinator' 
               ? 'Coordinators must be assigned to at least one pilot.' 
-              : 'Pilot assignment is optional for volunteers and admins.'}
+              : 'Pilot assignment is optional for volunteers, facilitators, and admins.'}
           </p>
         </div>
       </div>
 
-      {/* Schools Section (Only for volunteers) */}
-      {selectedRole === 'volunteer' && (
+      {/* Schools Section (Only for volunteers and facilitators) */}
+      {(selectedRole === 'volunteer' || selectedRole === 'facilitator') && (
         <div className="pt-4 border-t border-gray-200">
           <h3 className="text-sm font-medium text-gray-900 mb-3">School Assignments</h3>
           <div className="space-y-3">
@@ -488,18 +494,23 @@ export default function CreateUserForm() {
               </div>
             )}
             <p className="text-xs text-gray-500">
-              School assignments are optional but help organize volunteers and activities.
+              School assignments are optional but help organize volunteers, facilitators, and activities.
             </p>
           </div>
         </div>
       )}
 
       {/* Role-specific guidance */}
-      <div className={`p-4 rounded-md ${selectedRole === 'volunteer' ? 'bg-blue-50' : selectedRole === 'coordinator' ? 'bg-yellow-50' : 'bg-purple-50'}`}>
+      <div className={`p-4 rounded-md ${selectedRole === 'volunteer' ? 'bg-blue-50' : selectedRole === 'facilitator' ? 'bg-green-50' : selectedRole === 'coordinator' ? 'bg-yellow-50' : 'bg-purple-50'}`}>
         <div className="flex">
           <div className="shrink-0">
             {selectedRole === 'volunteer' && (
               <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+            )}
+            {selectedRole === 'facilitator' && (
+              <svg className="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
               </svg>
             )}
@@ -520,6 +531,7 @@ export default function CreateUserForm() {
           <div className="ml-3">
             <h3 className="text-sm font-medium">
               {selectedRole === 'volunteer' && <span className="text-blue-800">Volunteer Information</span>}
+              {selectedRole === 'facilitator' && <span className="text-green-800">Facilitator Information</span>}
               {selectedRole === 'coordinator' && <span className="text-yellow-800">Coordinator Information</span>}
               {selectedRole === 'admin' && <span className="text-purple-800">Admin Information</span>}
             </h3>
@@ -527,6 +539,11 @@ export default function CreateUserForm() {
               {selectedRole === 'volunteer' && (
                 <p className="text-blue-700">
                   Volunteers participate in activities at assigned schools. School assignment helps track which schools the volunteer works with.
+                </p>
+              )}
+              {selectedRole === 'facilitator' && (
+                <p className="text-green-700">
+                  Facilitators are assigned reporting activities and can submit activity reports. School assignment helps coordinators find the right facilitators for each school.
                 </p>
               )}
               {selectedRole === 'coordinator' && (
@@ -548,7 +565,7 @@ export default function CreateUserForm() {
       <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
         <button
           type="button"
-          onClick={() => router.push('/admin/users')}
+          onClick={() => router.push(usersListPath)}
           className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
         >
           Cancel

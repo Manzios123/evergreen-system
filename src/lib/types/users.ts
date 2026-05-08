@@ -3,7 +3,7 @@ export interface CreateUserFormData {
     full_name: string;
     password: string;
     confirmPassword: string;
-    role: 'admin' | 'coordinator' | 'volunteer';
+    role: 'admin' | 'coordinator' | 'volunteer' | 'facilitator';
     pilot_ids?: string[];
     school_ids?: string[];
   }

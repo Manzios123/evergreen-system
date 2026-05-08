@@ -36,13 +36,13 @@ interface PilotWithStats extends Pilot {
 
 // Custom StatusBadge for Pilot status
 interface PilotStatusBadgeProps {
-  status: 'active' | 'completed' | 'cancelled';
+  status: Pilot['status'];
   showIcon?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
 
 function PilotStatusBadge({ status, showIcon = false, size = 'md' }: PilotStatusBadgeProps) {
-  const statusConfig = {
+  const statusConfig: Record<Pilot['status'], { label: string; color: string }> = {
     active: {
       label: 'Active',
       color: 'bg-green-100 text-green-800 ring-green-600/20',
@@ -54,6 +54,14 @@ function PilotStatusBadge({ status, showIcon = false, size = 'md' }: PilotStatus
     cancelled: {
       label: 'Cancelled',
       color: 'bg-red-100 text-red-800 ring-red-600/20',
+    },
+    draft: {
+      label: 'Draft',
+      color: 'bg-gray-100 text-gray-800 ring-gray-600/20',
+    },
+    closed: {
+      label: 'Closed',
+      color: 'bg-slate-100 text-slate-800 ring-slate-600/20',
     },
   };
 

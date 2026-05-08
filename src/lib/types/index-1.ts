@@ -1,5 +1,4 @@
-// src/lib/types/index.ts
-// CHANGE: Added profile_picture field to User interface
+// Base API types
 
 export type ActivityStatus = 
   | 'draft' 
@@ -51,19 +50,17 @@ export interface Activity {
   surveys?: Survey[];
 }
 
-// ✅ UPDATED: added profile_picture
 export interface User {
   id: string;
   email: string;
   full_name: string;
   role: 'admin' | 'coordinator' | 'volunteer' | 'facilitator';
   pilot_id?: string;
-  profile_picture?: string | null;
-  is_active?: boolean;
   created_at: string;
   updated_at: string;
 }
 
+// Update the School interface to match D1 schema
 export interface School {
   [x: string]: any;
   id: string;
@@ -75,9 +72,10 @@ export interface School {
   created_at: string;
   updated_at: string;
   deleted_at?: string;
-  is_active?: boolean;
+  is_active?: boolean; // computed field: 1 if deleted_at IS NULL, else 0
 }
 
+// Add SchoolContact interface
 export interface SchoolContact {
   id: string;
   school_id: string;
@@ -97,13 +95,12 @@ export interface Pilot {
   description?: string;
   start_date: string;
   end_date?: string;
-  status: 'active' | 'completed' | 'cancelled' | 'draft' | 'closed';
+  status: 'active' | 'completed' | 'cancelled';
   created_at: string;
   updated_at: string;
-  success?: boolean;
-  message?: string;
 }
 
+// Add VolunteerDashboard type
 export interface VolunteerDashboard {
   totalActivities: number;
   completedActivities: number;
@@ -113,8 +110,9 @@ export interface VolunteerDashboard {
   upcomingActivities: Activity[];
 }
 
+// Add missing component prop types
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'warning' | 'success' | 'ghost' | 'default';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'warning' | 'success' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   icon?: React.ReactNode;
@@ -140,6 +138,7 @@ export interface UploadDashboardProps {
   onUploadSuccess?: () => void;
 }
 
+// Add Survey type for volunteer pages
 export interface Survey {
   id: string;
   template: SurveyTemplate;
@@ -177,12 +176,12 @@ export interface PaginationParams {
   limit?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-  offset?: number;
 }
 
+// Survey types
 export interface SurveyQuestion {
   id: string;
-  type: 'text' | 'textarea' | 'number' | 'select' | 'radio' | 'checkbox' | 'rating' | 'date';
+  type: 'text' |'textarea'| 'number' | 'select' | 'radio' | 'checkbox' | 'rating' | 'date';
   question: string;
   required: boolean;
   options?: string[];
@@ -219,6 +218,7 @@ export interface SurveyResponse {
   updatedAt: string;
 }
 
+// Photo types
 export interface Photo {
   id: string;
   url: string;
@@ -239,11 +239,15 @@ export interface Photo {
   metadata?: {
     width?: number;
     height?: number;
-    location?: { lat: number; lng: number };
+    location?: {
+      lat: number;
+      lng: number;
+    };
     takenAt?: string;
   };
 }
 
+// Export types
 export interface ExportConfig {
   format: 'json' | 'csv' | 'excel' | 'pdf';
   filters?: Record<string, any>;
@@ -263,6 +267,7 @@ export interface ExportJob {
   error?: string;
 }
 
+// Pilot & School extended types
 export interface SchoolStats {
   totalActivities: number;
   completedActivities: number;
@@ -272,39 +277,48 @@ export interface SchoolStats {
 }
 
 export interface PilotStats {
-  totalSchools?: number;
-  totalActivities?: number;
-  totalVolunteers?: number;
-  completionRate?: number;
-  averageRating?: number;
-  pilot?: string;
-  users?: number;
-  activities?: number;
-  schools?: number;
-  engagement?: number;
+  totalSchools: number;
+  totalActivities: number;
+  totalVolunteers: number;
+  completionRate: number;
+  averageRating: number;
 }
 
+// Activity filters
 export interface ActivityFilters {
   status?: ActivityStatus[];
   pilotId?: string[];
   schoolId?: string[];
   volunteerId?: string[];
-  dateRange?: { start: string; end: string };
+  dateRange?: {
+    start: string;
+    end: string;
+  };
   type?: ActivityType[];
   search?: string;
 }
 
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  offset?: number;
+}
+
+// Add these interfaces for admin survey responses
 export interface AdminSurveyResponse {
   id: string;
   submitted_at: string;
+  // Student specific
   total_students?: number;
   activity_id?: string;
   submitted_by?: string;
   submitted_by_name?: string;
   submitted_by_email?: string;
+  // Volunteer specific
   volunteer_id?: string;
   volunteer_name?: string;
   volunteer_email?: string;
+  // Common
   survey_template_id: string;
   template_name: string;
   survey_type: string;
@@ -332,6 +346,7 @@ export interface AdminApiResponse<T> {
   totalPages?: number;
 }
 
+// Report data types
 export interface OverviewStats {
   totalUsers: number;
   totalActivities: number;
@@ -366,6 +381,15 @@ export interface SurveyStats {
   completionRate: number;
   avgRating: number;
   responseTrends: Array<{ month: string; count: number }>;
+}
+
+export interface PilotStats {
+  pilot: string;
+  users: number;
+  activities: number;
+  schools: number;
+  completionRate: number;
+  engagement: number;
 }
 
 export interface ReportsApiResponse<T> {

@@ -10,6 +10,8 @@ import SkeletonLoader from '@/components/ui/skeleton-loader';
 import Alert from '@/components/ui/alert';
 import EmptyState from '@/components/ui/empty-state';
 import { useApiQuery } from '@/lib/hooks/use-api';
+import { useAuth } from '@/components/providers/AuthProvider';
+import DashboardGreeting from '@/components/dashboard/dashboard-greeting';
 import { Activity, User, School, Survey } from '@/lib/types';
 import {
   Calendar,
@@ -36,6 +38,7 @@ export default function CoordinatorDashboardPage() {
   const router = useRouter();
   const params = useParams();
   const locale = params.locale as string;
+  const { user } = useAuth();
   
   // Fetch dashboard data
   const { 
@@ -160,7 +163,7 @@ export default function CoordinatorDashboardPage() {
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Coordinator Dashboard</h1>
+          <DashboardGreeting name={user?.full_name} fallback="Coordinator" />
           <p className="mt-1 text-sm text-gray-500">
             {dashboardData?.pilot?.name || 'Pilot Program Dashboard'}
           </p>

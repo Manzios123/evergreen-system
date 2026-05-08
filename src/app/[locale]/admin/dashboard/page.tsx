@@ -3,6 +3,8 @@
 
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
+import { useAuth } from '@/components/providers/AuthProvider';
+import DashboardGreeting from '@/components/dashboard/dashboard-greeting';
 import StatusBadge from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/proggress';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
@@ -123,11 +125,11 @@ type AdminDashboardData = {
 
 export default function AdminDashboardPage() {
   // Fetch admin dashboard data with the correct type
-  const { 
-    data: dashboardData, 
-    isLoading, 
-    error, 
-    refetch 
+  const {
+    data: dashboardData,
+    isLoading,
+    error,
+    refetch
   } = useApiQuery<AdminDashboardData>(
     ['admin-dashboard'],
     () => api.get('/dashboard/admin')
@@ -138,7 +140,7 @@ export default function AdminDashboardPage() {
     if (!dashboardData) return null;
 
     const { systemStatistics, pilots, surveys } = dashboardData;
-    
+
     return {
       totalPilots: systemStatistics.total_pilots,
       activePilots: systemStatistics.active_pilots,
@@ -155,6 +157,8 @@ export default function AdminDashboardPage() {
     };
   }, [dashboardData]);
 
+  const { user } = useAuth();
+
   // Get system health status and styling
   const getHealthStatus = (health: string | undefined) => {
     const healthValue = health?.toLowerCase();
@@ -170,7 +174,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const healthStatus = dashboardData?.summary?.systemHealth 
+  const healthStatus = dashboardData?.summary?.systemHealth
     ? getHealthStatus(dashboardData.summary.systemHealth)
     : { label: 'Unknown', className: 'bg-gray-100 text-gray-800' };
 
@@ -184,13 +188,13 @@ export default function AdminDashboardPage() {
             <SkeletonLoader key={i} type="card" />
           ))}
         </div>
-        
+
         {/* Charts Skeleton */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <SkeletonLoader type="card" />
           <SkeletonLoader type="card" />
         </div>
-        
+
         {/* Tables Skeleton */}
         <SkeletonLoader type="table" />
       </div>
@@ -200,13 +204,13 @@ export default function AdminDashboardPage() {
   // Error state - handle 401/403 specifically
   if (error) {
     const isAuthError = error.status === 401 || error.status === 403;
-    
+
     return (
       <Alert
         title={isAuthError ? "Session expired" : "Unable to load admin dashboard"}
         type="error"
       >
-        {isAuthError 
+        {isAuthError
           ? "Your session has expired or you don't have permission to view this page. Please log in again."
           : "There was an error loading dashboard data. Please try again."}
         <div className="mt-4">
@@ -230,7 +234,7 @@ export default function AdminDashboardPage() {
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          <DashboardGreeting name={user?.full_name} fallback="Admin" />
           <p className="mt-1 text-sm text-gray-500">
             System-wide overview and administration
           </p>
@@ -290,7 +294,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </Card>
-          
+
           {/* Users Card */}
           <Card className="p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
@@ -310,7 +314,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </Card>
-          
+
           {/* Activities Card */}
           <Card className="p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
@@ -330,7 +334,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </Card>
-          
+
           {/* Surveys Card */}
           <Card className="p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
@@ -369,7 +373,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -388,7 +392,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </Card>
-          
+
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -427,7 +431,7 @@ export default function AdminDashboardPage() {
                   <ArrowRightIcon className="h-4 w-4 ml-1" />
                 </Link>
               </div>
-              
+
               {dashboardData?.pilots?.summary && dashboardData.pilots.summary.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
@@ -461,7 +465,7 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                              pilot.status === 'active' 
+                              pilot.status === 'active'
                                 ? 'bg-green-100 text-green-800'
                                 : pilot.status === 'completed'
                                 ? 'bg-blue-100 text-blue-800'
@@ -510,7 +514,7 @@ export default function AdminDashboardPage() {
                   <ArrowRightIcon className="h-4 w-4 ml-1" />
                 </Link>
               </div>
-              
+
               {dashboardData?.recentActivity && dashboardData.recentActivity.length > 0 ? (
                 <div className="space-y-4">
                   {[...dashboardData.recentActivity]
@@ -610,7 +614,7 @@ export default function AdminDashboardPage() {
           <Card>
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Users by Role</h2>
-              
+
               {dashboardData?.users?.distribution && dashboardData.users.distribution.length > 0 ? (
                 <div className="space-y-4">
                   {dashboardData.users.distribution.map((roleStat) => (
@@ -652,14 +656,14 @@ export default function AdminDashboardPage() {
           <Card>
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Activities by Status</h2>
-              
+
               {dashboardData?.activities?.distribution && dashboardData.activities.distribution.length > 0 ? (
                 <div className="space-y-4">
                   {dashboardData.activities.distribution.map((statusStat) => (
                     <div key={statusStat.status} className="flex items-center justify-between">
                       <div className="flex items-center">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          statusStat.status === 'approved' 
+                          statusStat.status === 'approved'
                             ? 'bg-green-100 text-green-800'
                             : statusStat.status === 'pending'
                             ? 'bg-yellow-100 text-yellow-800'

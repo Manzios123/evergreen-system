@@ -40,6 +40,7 @@ export default function UserDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const locale = (params.locale as string) || 'en';
   const [retryCount, setRetryCount] = useState(0);
 
   const {
@@ -72,7 +73,7 @@ export default function UserDetailPage() {
       <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex items-center gap-4">
           <Link
-            href="/admin/users"
+            href={`/${locale}/admin/users`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeftIcon className="h-4 w-4" />
@@ -155,7 +156,7 @@ export default function UserDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link
-            href="/admin/users"
+            href={`/${locale}/admin/users`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeftIcon className="h-4 w-4" />
@@ -165,7 +166,7 @@ export default function UserDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900">User Details</h1>
         </div>
         <div className="flex items-center gap-3">
-          <Link href={`/admin/users/${id}/edit`}>
+          <Link href={`/${locale}/admin/users/${id}/edit`}>
             <Button variant="default" className="inline-flex items-center gap-2">
               <PencilIcon className="h-4 w-4" />
               Edit User

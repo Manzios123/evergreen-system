@@ -9,7 +9,9 @@ import Alert from '@/components/ui/alert';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
-import { User } from '@/lib/types';
+import { Pilot, School, User } from '@/lib/types';
+import { pilotsApi } from '@/lib/api/pilots';
+import { schoolsApi } from '@/lib/api/schools';
 import { ArrowLeftIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 
 // Extended User type for API response and form
@@ -26,17 +28,27 @@ interface UserApiResponse {
   user: ExtendedUser;
 }
 
+interface UpdateUserPayload {
+  full_name: string;
+  email: string;
+  role: 'volunteer' | 'facilitator';
+  pilot_ids?: string[];
+  school_ids?: string[];
+}
+
 export default function EditUserPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const locale = (params.locale as string) || 'en';
 
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
-    role: 'volunteer' as 'admin' | 'coordinator' | 'volunteer',
+    role: 'volunteer' as 'volunteer' | 'facilitator',
     status: 'active' as 'active' | 'inactive' | 'pending',
-    pilot_id: '',
+    pilot_ids: [] as string[],
+    school_ids: [] as string[],
   });
   
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -52,10 +64,36 @@ export default function EditUserPage() {
   );
 
   const user = response?.user;
+  const selectedPilotIds = formData.pilot_ids;
 
   // Mutation for updating
   const updateUserMutation = useApiMutation(
-    (data: Partial<User>) => api.put(`/users/${id}`, data)
+    (data: UpdateUserPayload) => api.put(`/users/${id}`, data)
+  );
+
+  const {
+    data: pilotsResponse,
+    isLoading: isLoadingPilots,
+    error: pilotsError,
+  } = useApiQuery(
+    ['pilots', 'coordinator-user-edit'],
+    () => pilotsApi.getPilots({ isActive: true, limit: 100 })
+  );
+
+  const {
+    data: schoolsResponse,
+    isLoading: isLoadingSchools,
+    error: schoolsError,
+  } = useApiQuery(
+    ['schools', 'coordinator-user-edit'],
+    () => schoolsApi.getSchools({ isActive: true, limit: 100 })
+  );
+
+  const pilots: Pilot[] = pilotsResponse?.success && pilotsResponse.data ? pilotsResponse.data : [];
+  const schools: School[] = schoolsResponse?.success && schoolsResponse.data ? schoolsResponse.data : [];
+
+  const availableSchools = schools.filter((school) =>
+    selectedPilotIds.length > 0 && school.pilot_id && selectedPilotIds.includes(String(school.pilot_id))
   );
 
   const { mutate: updateUser } = updateUserMutation;
@@ -68,9 +106,10 @@ export default function EditUserPage() {
       setFormData({
         full_name: user.full_name || '',
         email: user.email || '',
-        role: (user.role as 'admin' | 'coordinator' | 'volunteer') || 'volunteer',
+        role: (user.role === 'facilitator' ? 'facilitator' : 'volunteer') as 'volunteer' | 'facilitator',
         status: (user.status as 'active' | 'inactive' | 'pending') || 'active',
-        pilot_id: user.pilot_id || '',
+        pilot_ids: user.pilot_ids || (user.pilot_id ? [user.pilot_id] : []),
+        school_ids: user.school_ids || [],
       });
     }
   }, [user]);
@@ -84,6 +123,29 @@ export default function EditUserPage() {
     if (formErrors[name]) {
       setFormErrors((prev) => ({ ...prev, [name]: '' }));
     }
+  };
+
+  const handleMultiSelectChange = (
+    e: React.ChangeEvent<HTMLSelectElement>,
+    field: 'pilot_ids' | 'school_ids'
+  ) => {
+    const values = Array.from(e.target.selectedOptions).map((option) => option.value);
+
+    setFormData((prev) => {
+      if (field === 'pilot_ids') {
+        const allowedSchoolIds = schools
+          .filter((school) => school.pilot_id && values.includes(String(school.pilot_id)))
+          .map((school) => school.id);
+
+        return {
+          ...prev,
+          pilot_ids: values,
+          school_ids: prev.school_ids.filter((schoolId) => allowedSchoolIds.includes(schoolId)),
+        };
+      }
+
+      return { ...prev, school_ids: values };
+    });
   };
 
   const validateForm = () => {
@@ -115,19 +177,13 @@ export default function EditUserPage() {
     }
 
     // Prepare payload - only send fields we're editing
-    const payload: Partial<User> = {
+    const payload: UpdateUserPayload = {
       full_name: formData.full_name,
       email: formData.email,
       role: formData.role,
+      pilot_ids: formData.pilot_ids,
+      school_ids: formData.school_ids,
     };
-
-    // Only include pilot_id if not admin
-    if (formData.role !== 'admin' && formData.pilot_id) {
-      payload.pilot_id = formData.pilot_id;
-    } else if (formData.role === 'admin') {
-      // Clear pilot_id for admins
-      payload.pilot_id = '';
-    }
 
     // Note: We cannot include 'status' in payload as it's not in the User type
     // If backend supports status updates, we would need a different endpoint or payload structure
@@ -135,14 +191,16 @@ export default function EditUserPage() {
     updateUser(payload, {
       onSuccess: () => {
         alert('User updated successfully!');
-        router.push(`/coordinator/users/${id}`);
+        router.push(`/${locale}/coordinator/volunteers/${id}`);
       },
     });
   };
 
   const handleCancel = () => {
-    router.push(`/coordinator/users/${id}`);
+    router.push(`/${locale}/coordinator/volunteers/${id}`);
   };
+
+  const displayName = user?.full_name || user?.email || id;
 
   if (isLoading) {
     return (
@@ -162,7 +220,7 @@ export default function EditUserPage() {
       <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex items-center gap-4">
           <Link
-            href={`/coordinator/users/${id}`}
+            href={`/${locale}/coordinator/volunteers/${id}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeftIcon className="h-4 w-4" />
@@ -182,14 +240,14 @@ export default function EditUserPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link
-            href={`/coordinator/users/${id}`}
+            href={`/${locale}/coordinator/volunteers/${id}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeftIcon className="h-4 w-4" />
             Back to User
           </Link>
           <div className="h-6 w-px bg-gray-300 hidden sm:block" />
-          <h1 className="text-2xl font-bold text-gray-900">Edit User</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Edit {displayName}</h1>
         </div>
       </div>
 
@@ -260,9 +318,8 @@ export default function EditUserPage() {
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="admin">Administrator</option>
-              <option value="coordinator">Coordinator</option>
               <option value="volunteer">Volunteer</option>
+              <option value="facilitator">Facilitator</option>
             </select>
             {formErrors.role && (
               <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
@@ -287,31 +344,87 @@ export default function EditUserPage() {
             </div>
           )}
 
-          {/* Pilot ID (only for non-admins) */}
-          {formData.role !== 'admin' ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Pilot ID (Optional)
-              </label>
-              <input
-                type="text"
-                name="pilot_id"
-                value={formData.pilot_id}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter pilot ID"
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                Assign this user to a specific pilot. Leave empty for no pilot assignment.
-              </p>
-            </div>
-          ) : (
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-700">
-                <strong>Note:</strong> Administrators are not assigned to specific pilots and have system-wide access.
-              </p>
-            </div>
-          )}
+          {/* Pilot Assignment */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Pilot Assignment
+            </label>
+            {pilotsError ? (
+              <Alert type="error" title="Unable to load pilots">
+                Pilot options could not be loaded. Please try again before saving assignment changes.
+              </Alert>
+            ) : isLoadingPilots ? (
+              <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500">
+                Loading pilots...
+              </div>
+            ) : pilots.length === 0 ? (
+              <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500">
+                No pilots available for assignment.
+              </div>
+            ) : (
+              <select
+                multiple
+                name="pilot_ids"
+                value={formData.pilot_ids}
+                onChange={(e) => handleMultiSelectChange(e, 'pilot_ids')}
+                className="w-full min-h-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {pilots.map((pilot) => (
+                  <option key={pilot.id} value={pilot.id}>
+                    {pilot.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="mt-1 text-sm text-gray-500">
+              Select by pilot name. Use Ctrl or Cmd to select more than one.
+            </p>
+          </div>
+
+          {/* School Assignment */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              School Assignment
+            </label>
+            {schoolsError ? (
+              <Alert type="error" title="Unable to load schools">
+                School options could not be loaded. Please try again before saving assignment changes.
+              </Alert>
+            ) : isLoadingSchools ? (
+              <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500">
+                Loading schools...
+              </div>
+            ) : selectedPilotIds.length === 0 ? (
+              <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500">
+                Select a pilot first to see available schools.
+              </div>
+            ) : availableSchools.length === 0 ? (
+              <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500">
+                No schools available for this pilot.
+              </div>
+            ) : (
+              <select
+                multiple
+                name="school_ids"
+                value={formData.school_ids}
+                onChange={(e) => handleMultiSelectChange(e, 'school_ids')}
+                className="w-full min-h-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {availableSchools.map((school) => {
+                  const pilot = pilots.find((item) => item.id === school.pilot_id);
+
+                  return (
+                    <option key={school.id} value={school.id}>
+                      {school.name}{pilot ? ` (${pilot.name})` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
+            <p className="mt-1 text-sm text-gray-500">
+              Select by school name. Use Ctrl or Cmd to select more than one.
+            </p>
+          </div>
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-4 pt-6 border-t">

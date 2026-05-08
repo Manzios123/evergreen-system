@@ -2,16 +2,20 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/navigation'; // Use next/navigation instead of next-intl router
+import { useRouter } from 'next/navigation';
 import { login as apiLogin, logout as apiLogout, getCurrentUser, isAuthenticated } from '@/lib/auth';
+import { usersApi } from '@/lib/api/users';
 
 interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'volunteer' | 'coordinator' | 'admin';
+  name?: string;
+  phone?: string;
+  role: 'volunteer' | 'facilitator' | 'coordinator' | 'admin';
   pilot_ids?: string[];
   school_ids?: string[];
+  profile_picture?: string | null;
 }
 
 interface AuthContextType {
@@ -19,6 +23,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<any>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,7 +39,20 @@ export function useAuth() {
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter(); // Now using next/navigation router
+  const router = useRouter();
+
+  // Refresh user from token (useful after profile update)
+  const refreshUser = async () => {
+    if (isAuthenticated()) {
+      try {
+        const data = await usersApi.getMe();
+        setUser(data.user as User);
+      } catch {
+        const userData = getCurrentUser();
+        setUser(userData);
+      }
+    }
+  };
 
   useEffect(() => {
     const initAuth = () => {
@@ -44,7 +62,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       }
       setIsLoading(false);
     };
-    
     initAuth();
   }, []);
 
@@ -64,11 +81,11 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     apiLogout();
     setUser(null);
-    router.push('/login'); // This will push to the current locale's login
+    router.push('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
