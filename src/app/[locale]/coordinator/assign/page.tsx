@@ -536,6 +536,7 @@ export default function AssignActivityPage() {
                     error={errors.scheduled_date?.message}
                     leftIcon={<Calendar className="h-5 w-5 text-gray-400" />}
                     className="pl-10"
+                    helpText="Multiple reports can be assigned for the same day when needed."
                     required
                   />
 
