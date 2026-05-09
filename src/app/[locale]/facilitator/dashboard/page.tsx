@@ -1,7 +1,16 @@
 'use client';
 
-import VolunteerDashboardPage from '../../volunteer/dashboard/page';
+import { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 
 export default function FacilitatorDashboardPage() {
-  return <VolunteerDashboardPage />;
+  const router = useRouter();
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
+
+  useEffect(() => {
+    router.replace(`/${locale}/volunteer/dashboard`);
+  }, [locale, router]);
+
+  return null;
 }

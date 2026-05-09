@@ -135,7 +135,7 @@ export default function Sidebar({ role }: SidebarProps) {
       { name: 'Feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
     ],
     facilitator: [
-      { name: 'Dashboard', href: '/facilitator/dashboard', icon: HomeIcon, exact: true },
+      { name: 'Dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
       { name: 'My Activities', href: '/volunteer/activities', icon: CalendarIcon },
     ],
   };

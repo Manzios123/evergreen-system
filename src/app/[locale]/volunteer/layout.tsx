@@ -19,8 +19,8 @@ export default function VolunteerLayout({
     );
   }
 
-  // Check if user has the correct role
-  if (!user || user.role !== 'volunteer') {
+  // Facilitators use the volunteer-compatible reporting workflow.
+  if (!user || (user.role !== 'volunteer' && user.role !== 'facilitator')) {
     // The RoleLayout will handle redirection
     return <RoleLayout role="volunteer">{children}</RoleLayout>;
   }

@@ -36,7 +36,7 @@ export default function LoginPage() {
         router.push('/volunteer/dashboard');
         break;
       case 'facilitator':
-        router.push('/facilitator/dashboard');
+        router.push('/volunteer/dashboard');
         break;
       default:
         router.push('/dashboard');
