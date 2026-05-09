@@ -38,6 +38,7 @@ const navigation = {
   facilitator: [
     { name: 'Dashboard', href: '/volunteer/dashboard' },
     { name: 'My Activities', href: '/volunteer/activities' },
+    { name: 'Feedback', href: '/volunteer/surveys/volunteer' },
   ],
 };
 

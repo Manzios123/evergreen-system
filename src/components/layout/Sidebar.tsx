@@ -105,7 +105,7 @@ export default function Sidebar({ role }: SidebarProps) {
     pendingApprovals: number;
   }>(['volunteer', 'pending-counts'], () =>
     api.get('/dashboard/volunteer/pending-counts'), {
-    enabled: role === 'volunteer',
+    enabled: role === 'volunteer' || role === 'facilitator',
   });
 
   const navigation: Record<string, NavigationItem[]> = {
@@ -137,6 +137,7 @@ export default function Sidebar({ role }: SidebarProps) {
     facilitator: [
       { name: 'Dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
       { name: 'My Activities', href: '/volunteer/activities', icon: CalendarIcon },
+      { name: 'Feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
     ],
   };
 
@@ -145,7 +146,7 @@ export default function Sidebar({ role }: SidebarProps) {
     if ((role === 'coordinator' || role === 'admin') && item.name === 'Approvals' && pendingData) {
       return (pendingData.pendingActivities || 0) + (pendingData.pendingPhotos || 0);
     }
-    if (role === 'volunteer' && item.name === 'Feedback' && volunteerPendingData) {
+    if ((role === 'volunteer' || role === 'facilitator') && item.name === 'Feedback' && volunteerPendingData) {
       return volunteerPendingData.pendingSurveys || 0;
     }
     return null;
