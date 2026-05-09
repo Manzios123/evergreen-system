@@ -163,7 +163,7 @@ export default function CoordinatorDashboardPage() {
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <DashboardGreeting name={user?.full_name} fallback="Coordinator" />
+          <DashboardGreeting name={user?.full_name || user?.name} email={user?.email} role={user?.role} fallback="Coordinator" />
           <p className="mt-1 text-sm text-gray-500">
             {dashboardData?.pilot?.name || 'Pilot Program Dashboard'}
           </p>

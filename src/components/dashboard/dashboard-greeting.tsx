@@ -2,14 +2,30 @@
 
 interface DashboardGreetingProps {
   name?: string | null;
-  fallback: string;
+  email?: string | null;
+  role?: string | null;
+  fallback?: string;
   className?: string;
 }
 
-function getDisplayName(name: string | null | undefined, fallback: string) {
+function getRoleLabel(role?: string | null) {
+  if (!role) return '';
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function getDisplayName(
+  name: string | null | undefined,
+  email: string | null | undefined,
+  role: string | null | undefined,
+  fallback?: string
+) {
   const trimmed = name?.trim();
-  if (!trimmed) return fallback;
-  return trimmed.split(/\s+/)[0] || fallback;
+  if (trimmed) return trimmed.split(/\s+/)[0] || trimmed;
+
+  const emailValue = email?.trim();
+  if (emailValue) return emailValue;
+
+  return getRoleLabel(role) || fallback || 'User';
 }
 
 function getGreeting(date = new Date()) {
@@ -20,10 +36,10 @@ function getGreeting(date = new Date()) {
   return 'Good evening';
 }
 
-export default function DashboardGreeting({ name, fallback, className }: DashboardGreetingProps) {
+export default function DashboardGreeting({ name, email, role, fallback, className }: DashboardGreetingProps) {
   return (
     <h1 className={className || 'text-2xl font-bold text-gray-900'}>
-      {getGreeting()}, {getDisplayName(name, fallback)}
+      {getGreeting()}, {getDisplayName(name, email, role, fallback)}
     </h1>
   );
 }

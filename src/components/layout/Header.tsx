@@ -138,9 +138,7 @@ export default function Header() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const role = user?.role || 'volunteer';
   const profileHref = `/${locale}/${role}/profile`;
-  const dashboardHref = role === 'facilitator'
-    ? `/${locale}/volunteer/dashboard`
-    : `/${locale}/${role}/dashboard`;
+  const dashboardHref = `/${locale}/${role}/dashboard`;
   const displayName = getDisplayName(user);
 
   return (

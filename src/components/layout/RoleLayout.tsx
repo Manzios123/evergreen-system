@@ -43,7 +43,7 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
           router.push(`/${locale}/volunteer/dashboard`);
           break;
         case 'facilitator':
-          router.push(`/${locale}/volunteer/dashboard`);
+          router.push(`/${locale}/facilitator/dashboard`);
           break;
         default:
           router.push(`/${locale}/dashboard`);

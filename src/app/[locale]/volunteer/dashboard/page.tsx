@@ -55,7 +55,9 @@ export default function VolunteerDashboardPage() {
     <div>
       <div className="mb-8">
         <DashboardGreeting
-          name={user?.full_name}
+          name={user?.full_name || user?.name}
+          email={user?.email}
+          role={user?.role}
           fallback={user?.role === 'facilitator' ? 'Facilitator' : 'Volunteer'}
           className="text-2xl font-bold text-gray-900 sm:text-3xl"
         />

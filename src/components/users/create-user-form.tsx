@@ -59,6 +59,8 @@ export default function CreateUserForm() {
   const selectedRole = watch('role');
   const selectedPilotIds = watch('pilot_ids') || [];
   const selectedSchoolIds = watch('school_ids') || [];
+  const selectedPilotId = selectedPilotIds[0] || '';
+  const selectedSchoolId = selectedSchoolIds[0] || '';
   const usersListPath = currentUser?.role === 'coordinator'
     ? `/${locale}/coordinator/volunteers`
     : `/${locale}/admin/users`;
@@ -130,29 +132,20 @@ export default function CreateUserForm() {
 
   // Filter schools based on selected pilots and ensure they have an ID
   const filteredSchools = useMemo(() => {
-    console.log('Filtering schools...');
-    console.log('Selected pilot IDs:', selectedPilotIds);
-    console.log('Total schools available:', schools.length);
-    
-    // If no pilots selected, show no schools
-    if (selectedPilotIds.length === 0) {
-      console.log('No pilots selected, showing no schools');
+    if (!selectedPilotId) {
       return [];
     }
     
-    // Filter schools that belong to ANY selected pilot AND have an ID
     const filtered = schools.filter((school): school is School & { id: string } => {
       const schoolPilotId = school.pilot_id?.toString();
       const hasId = !!school.id;
-      const matches = schoolPilotId && selectedPilotIds.includes(schoolPilotId);
+      const matches = schoolPilotId === selectedPilotId;
       
       return hasId && !!matches;
     });
     
-    console.log(`Filtered schools count: ${filtered.length}`);
-    
     return filtered;
-  }, [schools, selectedPilotIds]);
+  }, [schools, selectedPilotId]);
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
@@ -194,46 +187,18 @@ export default function CreateUserForm() {
     }
   };
 
-  // Handle pilot checkbox change
-  const handlePilotChange = (pilotId: string, isChecked: boolean) => {
-    const currentPilotIds = watch('pilot_ids') || [];
-    let newPilotIds: string[];
-    
-    if (isChecked) {
-      newPilotIds = [...currentPilotIds, pilotId];
-    } else {
-      newPilotIds = currentPilotIds.filter(id => id !== pilotId);
-      // Also remove schools from deselected pilot
-      const schoolsToRemove = schools.filter(school => school.pilot_id?.toString() === pilotId && school.id).map(s => s.id!);
-      const currentSchoolIds = watch('school_ids') || [];
-      const newSchoolIds = currentSchoolIds.filter(id => !schoolsToRemove.includes(id));
-      setValue('school_ids', newSchoolIds);
+  const handlePilotSelectChange = (pilotId: string) => {
+    setValue('pilot_ids', pilotId ? [pilotId] : []);
+
+    const currentSchoolId = (watch('school_ids') || [])[0];
+    const currentSchool = schools.find((school) => school.id === currentSchoolId);
+    if (!pilotId || (currentSchool && String(currentSchool.pilot_id) !== pilotId)) {
+      setValue('school_ids', []);
     }
-    
-    setValue('pilot_ids', newPilotIds);
-    console.log('Updated pilot IDs:', newPilotIds);
   };
 
-  // Handle school checkbox change
-  const handleSchoolChange = (schoolId: string, isChecked: boolean) => {
-    const currentSchoolIds = watch('school_ids') || [];
-    let newSchoolIds: string[];
-    
-    if (isChecked) {
-      newSchoolIds = [...currentSchoolIds, schoolId];
-    } else {
-      newSchoolIds = currentSchoolIds.filter(id => id !== schoolId);
-    }
-    
-    setValue('school_ids', newSchoolIds);
-  };
-
-  // Get pilot names for display
-  const getSelectedPilotNames = () => {
-    return selectedPilotIds.map(pilotId => {
-      const pilot = pilots.find(p => p.id.toString() === pilotId.toString());
-      return pilot ? pilot.name : `Pilot ID: ${pilotId}`;
-    }).join(', ');
+  const handleSchoolSelectChange = (schoolId: string) => {
+    setValue('school_ids', schoolId ? [schoolId] : []);
   };
 
   return (
@@ -365,7 +330,7 @@ export default function CreateUserForm() {
 
       {/* Pilots Section */}
       <div className="pt-4 border-t border-gray-200">
-        <h3 className="text-sm font-medium text-gray-900 mb-3">Pilot Assignments</h3>
+        <h3 className="text-sm font-medium text-gray-900 mb-3">Pilot Assignment</h3>
         <div className="space-y-3">
           {isLoadingPilots ? (
             <div className="text-sm text-gray-500 flex items-center">
@@ -380,55 +345,25 @@ export default function CreateUserForm() {
               No active pilots available. Create pilots first.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <select
+              value={selectedPilotId}
+              onChange={(e) => handlePilotSelectChange(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            >
+              <option value="">Select a pilot</option>
               {pilots
                 .filter(pilot => pilot.status === 'active')
-                .map((pilot) => {
-                  const isChecked = selectedPilotIds.includes(pilot.id.toString());
-                  const pilotSchoolsCount = schools.filter(s => s.pilot_id?.toString() === pilot.id.toString() && s.id).length;
-                  
-                  return (
-                    <div key={pilot.id} className="flex items-start p-3 border border-gray-200 rounded-md hover:bg-gray-50">
-                      <div className="flex items-center h-5">
-                        <input
-                          type="checkbox"
-                          id={`pilot-${pilot.id}`}
-                          checked={isChecked}
-                          onChange={(e) => handlePilotChange(pilot.id.toString(), e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                        />
-                      </div>
-                      <label
-                        htmlFor={`pilot-${pilot.id}`}
-                        className="ml-3 flex-1 cursor-pointer"
-                      >
-                        <div className="font-medium text-gray-900 flex justify-between">
-                          <span>{pilot.name}</span>
-                          <span className="text-xs font-normal text-gray-500">
-                            {pilotSchoolsCount} school{pilotSchoolsCount !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                        {pilot.description && (
-                          <p className="text-sm text-gray-500 mt-1">{pilot.description}</p>
-                        )}
-                        <div className="text-xs text-gray-400 mt-2">
-                          {pilot.start_date && (
-                            <span>
-                              {new Date(pilot.start_date).toLocaleDateString()} - 
-                              {pilot.end_date ? new Date(pilot.end_date).toLocaleDateString() : 'Present'}
-                            </span>
-                          )}
-                        </div>
-                      </label>
-                    </div>
-                  );
-                })}
-            </div>
+                .map((pilot) => (
+                  <option key={pilot.id} value={pilot.id}>
+                    {pilot.name}
+                  </option>
+                ))}
+            </select>
           )}
           <p className="text-xs text-gray-500">
             {selectedRole === 'coordinator' 
-              ? 'Coordinators must be assigned to at least one pilot.' 
-              : 'Pilot assignment is optional for volunteers, facilitators, and admins.'}
+              ? 'Select the pilot this coordinator manages.'
+              : 'Select the pilot this user belongs to.'}
           </p>
         </div>
       </div>
@@ -436,7 +371,7 @@ export default function CreateUserForm() {
       {/* Schools Section (Only for volunteers and facilitators) */}
       {(selectedRole === 'volunteer' || selectedRole === 'facilitator') && (
         <div className="pt-4 border-t border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">School Assignments</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-3">School Assignment</h3>
           <div className="space-y-3">
             {isLoadingSchools ? (
               <div className="text-sm text-gray-500 flex items-center">
@@ -448,53 +383,34 @@ export default function CreateUserForm() {
               </div>
             ) : filteredSchools.length === 0 ? (
               <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-md">
-                {selectedPilotIds.length === 0 
-                  ? 'Select pilots above to see available schools'
+                {!selectedPilotId
+                  ? 'Select a pilot above to see available schools'
                   : <div>
-                      <p>No schools available for the selected {selectedPilotIds.length} pilot(s).</p>
+                      <p>No schools available for the selected pilot.</p>
                       <p className="mt-1 text-xs">
-                        Selected pilots: {getSelectedPilotNames()}
-                      </p>
-                      <p className="mt-1 text-xs">
-                        Note: Only schools assigned to the selected pilots will appear here.
+                        Only schools assigned to the selected pilot will appear here.
                       </p>
                     </div>}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-2">
+              <select
+                value={selectedSchoolId}
+                onChange={(e) => handleSchoolSelectChange(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="">Select a school</option>
                 {filteredSchools.map((school) => {
                   const pilot = pilots.find(p => p.id.toString() === school.pilot_id?.toString());
-                  const isChecked = watch('school_ids')?.includes(school.id) || false;
                   return (
-                    <div key={school.id} className="flex items-start p-3 border border-gray-200 rounded-md hover:bg-gray-50">
-                      <div className="flex items-center h-5">
-                        <input
-                          type="checkbox"
-                          id={`school-${school.id}`}
-                          checked={isChecked}
-                          onChange={(e) => handleSchoolChange(school.id, e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                        />
-                      </div>
-                      <label
-                        htmlFor={`school-${school.id}`}
-                        className="ml-3 flex-1 cursor-pointer"
-                      >
-                        <div className="font-medium text-gray-900">{school.name}</div>
-                        <div className="text-sm text-gray-500 mt-1 space-y-1">
-                          {school.address && <p>📍 {school.address}</p>}
-                          {school.city && <p>🏙️ {school.city}</p>}
-                          {school.state && <p>📍 {school.state}</p>}
-                          {pilot && <p className="font-medium text-green-600 mt-2">📋 Pilot: {pilot.name}</p>}
-                        </div>
-                      </label>
-                    </div>
+                    <option key={school.id} value={school.id}>
+                      {school.name}{pilot ? ` (${pilot.name})` : ''}
+                    </option>
                   );
                 })}
-              </div>
+              </select>
             )}
             <p className="text-xs text-gray-500">
-              School assignments are optional but help organize volunteers, facilitators, and activities.
+              Select the school this user belongs to.
             </p>
           </div>
         </div>

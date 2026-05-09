@@ -59,9 +59,15 @@ function UserAvatar({ user, size = 'md' }: { user: any; size?: 'sm' | 'md' }) {
   }
 
   // Initials fallback
-  const initials = user?.full_name
-    ? user.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
-    : 'U';
+  const displayName = user?.full_name || user?.name || user?.email || user?.phone || 'User';
+  const initialsSource = user?.full_name || user?.name || displayName;
+  const initials = initialsSource
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n: string) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'U';
 
   const colors: Record<string, string> = {
     admin: 'bg-rose-100 text-rose-700 ring-rose-200',
@@ -129,7 +135,7 @@ export default function Sidebar({ role }: SidebarProps) {
       { name: 'Feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
     ],
     facilitator: [
-      { name: 'Dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
+      { name: 'Dashboard', href: '/facilitator/dashboard', icon: HomeIcon, exact: true },
       { name: 'My Activities', href: '/volunteer/activities', icon: CalendarIcon },
     ],
   };
@@ -152,6 +158,8 @@ export default function Sidebar({ role }: SidebarProps) {
   };
 
   const profileHref = `/${locale}/${role}/profile`;
+  const displayName = user?.full_name || user?.name || user?.email || user?.phone || 'User';
+  const secondaryText = user?.email || user?.phone || 'View profile & settings';
 
   return (
     <div className="flex grow flex-col overflow-y-auto bg-white border-r border-gray-100 shadow-sm">
@@ -239,10 +247,10 @@ export default function Sidebar({ role }: SidebarProps) {
             <UserAvatar user={user} size="sm" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 truncate">
-                {user?.full_name || 'User'}
+                {displayName}
               </p>
               <p className="text-xs text-gray-400 truncate">
-                View profile & settings
+                {secondaryText}
               </p>
             </div>
             <Cog6ToothIcon className="h-4 w-4 text-gray-300 group-hover:text-green-500 shrink-0" />

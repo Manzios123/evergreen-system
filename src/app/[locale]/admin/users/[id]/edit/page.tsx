@@ -36,6 +36,16 @@ interface UpdateUserPayload {
   school_ids?: string[];
 }
 
+function normalizeIds(ids?: string[]) {
+  return (ids || []).filter(Boolean).map(String).sort();
+}
+
+function sameIds(a?: string[], b?: string[]) {
+  const left = normalizeIds(a);
+  const right = normalizeIds(b);
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
 export default function EditUserPage() {
   const params = useParams();
   const router = useRouter();
@@ -66,6 +76,8 @@ export default function EditUserPage() {
   const user = response?.user;
   const selectedRole = formData.role;
   const selectedPilotIds = formData.pilot_ids;
+  const selectedPilotId = selectedPilotIds[0] || '';
+  const selectedSchoolId = formData.school_ids[0] || '';
 
   // Mutation for updating
   const updateUserMutation = useApiMutation(
@@ -94,7 +106,7 @@ export default function EditUserPage() {
   const schools: School[] = schoolsResponse?.success && schoolsResponse.data ? schoolsResponse.data : [];
 
   const availableSchools = schools.filter((school) =>
-    selectedPilotIds.length > 0 && school.pilot_id && selectedPilotIds.includes(String(school.pilot_id))
+    selectedPilotId && school.pilot_id && String(school.pilot_id) === selectedPilotId
   );
 
   const { mutate: updateUser } = updateUserMutation;
@@ -126,27 +138,20 @@ export default function EditUserPage() {
     }
   };
 
-  const handleMultiSelectChange = (
-    e: React.ChangeEvent<HTMLSelectElement>,
-    field: 'pilot_ids' | 'school_ids'
-  ) => {
-    const values = Array.from(e.target.selectedOptions).map((option) => option.value);
-
+  const handlePilotSelectChange = (pilotId: string) => {
     setFormData((prev) => {
-      if (field === 'pilot_ids') {
-        const allowedSchoolIds = schools
-          .filter((school) => school.pilot_id && values.includes(String(school.pilot_id)))
-          .map((school) => school.id);
-
-        return {
-          ...prev,
-          pilot_ids: values,
-          school_ids: prev.school_ids.filter((schoolId) => allowedSchoolIds.includes(schoolId)),
-        };
-      }
-
-      return { ...prev, school_ids: values };
+      const currentSchool = schools.find((school) => school.id === prev.school_ids[0]);
+      const keepSchool = pilotId && currentSchool && String(currentSchool.pilot_id) === pilotId;
+      return {
+        ...prev,
+        pilot_ids: pilotId ? [pilotId] : [],
+        school_ids: keepSchool ? prev.school_ids : [],
+      };
     });
+  };
+
+  const handleSchoolSelectChange = (schoolId: string) => {
+    setFormData((prev) => ({ ...prev, school_ids: schoolId ? [schoolId] : [] }));
   };
 
   const validateForm = () => {
@@ -184,14 +189,21 @@ export default function EditUserPage() {
       role: formData.role,
     };
 
+    const originalPilotIds = user?.pilot_ids || (user?.pilot_id ? [user.pilot_id] : []);
+    const originalSchoolIds = user?.school_ids || [];
+
     if (formData.role !== 'admin') {
-      payload.pilot_ids = formData.pilot_ids;
-      payload.school_ids = (formData.role === 'volunteer' || formData.role === 'facilitator')
-        ? formData.school_ids
-        : [];
-    } else {
-      payload.pilot_ids = [];
-      payload.school_ids = [];
+      if (!sameIds(formData.pilot_ids, originalPilotIds) && formData.pilot_ids.length > 0) {
+        payload.pilot_ids = formData.pilot_ids;
+      }
+
+      if (
+        (formData.role === 'volunteer' || formData.role === 'facilitator') &&
+        !sameIds(formData.school_ids, originalSchoolIds) &&
+        formData.school_ids.length > 0
+      ) {
+        payload.school_ids = formData.school_ids;
+      }
     }
 
     // Note: We cannot include 'status' in payload as it's not in the User type
@@ -375,12 +387,12 @@ export default function EditUserPage() {
                 </div>
               ) : (
                 <select
-                  multiple
                   name="pilot_ids"
-                  value={formData.pilot_ids}
-                  onChange={(e) => handleMultiSelectChange(e, 'pilot_ids')}
-                  className="w-full min-h-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={selectedPilotId}
+                  onChange={(e) => handlePilotSelectChange(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
+                  <option value="">Select a pilot</option>
                   {pilots.map((pilot) => (
                     <option key={pilot.id} value={pilot.id}>
                       {pilot.name}
@@ -389,7 +401,7 @@ export default function EditUserPage() {
                 </select>
               )}
               <p className="mt-1 text-sm text-gray-500">
-                Select by pilot name. Use Ctrl or Cmd to select more than one.
+                Select the pilot this user belongs to.
               </p>
             </div>
           ) : (
@@ -414,7 +426,7 @@ export default function EditUserPage() {
                 <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500">
                   Loading schools...
                 </div>
-              ) : selectedPilotIds.length === 0 ? (
+              ) : !selectedPilotId ? (
                 <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500">
                   Select a pilot first to see available schools.
                 </div>
@@ -424,12 +436,12 @@ export default function EditUserPage() {
                 </div>
               ) : (
                 <select
-                  multiple
                   name="school_ids"
-                  value={formData.school_ids}
-                  onChange={(e) => handleMultiSelectChange(e, 'school_ids')}
-                  className="w-full min-h-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={selectedSchoolId}
+                  onChange={(e) => handleSchoolSelectChange(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
+                  <option value="">Select a school</option>
                   {availableSchools.map((school) => {
                     const pilot = pilots.find((item) => item.id === school.pilot_id);
 
@@ -442,7 +454,7 @@ export default function EditUserPage() {
                 </select>
               )}
               <p className="mt-1 text-sm text-gray-500">
-                Select by school name. Use Ctrl or Cmd to select more than one.
+                Select the school this user belongs to.
               </p>
             </div>
           )}

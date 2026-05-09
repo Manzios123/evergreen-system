@@ -28,6 +28,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getPrimaryRole(raw: any): User['role'] {
+  if (raw?.role) return raw.role;
+  const roles = Array.isArray(raw?.roles) ? raw.roles : [];
+  if (roles.includes('admin')) return 'admin';
+  if (roles.includes('coordinator')) return 'coordinator';
+  if (roles.includes('facilitator')) return 'facilitator';
+  return 'volunteer';
+}
+
+function normalizeUser(raw: any): User {
+  const fullName = raw?.full_name || raw?.fullName || raw?.name || '';
+
+  return {
+    ...raw,
+    full_name: fullName,
+    name: raw?.name || fullName,
+    role: getPrimaryRole(raw),
+    pilot_ids: raw?.pilot_ids || [],
+    school_ids: raw?.school_ids || [],
+  };
+}
+
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
@@ -46,19 +68,25 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated()) {
       try {
         const data = await usersApi.getMe();
-        setUser(data.user as User);
+        setUser(normalizeUser(data.user));
       } catch {
         const userData = getCurrentUser();
-        setUser(userData);
+        setUser(userData ? normalizeUser(userData) : null);
       }
     }
   };
 
   useEffect(() => {
-    const initAuth = () => {
+    const initAuth = async () => {
       if (isAuthenticated()) {
         const userData = getCurrentUser();
-        setUser(userData);
+        setUser(userData ? normalizeUser(userData) : null);
+        try {
+          const data = await usersApi.getMe();
+          setUser(normalizeUser(data.user));
+        } catch {
+          // Keep the token-derived user if the profile refresh is unavailable.
+        }
       }
       setIsLoading(false);
     };
@@ -69,7 +97,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       const response = await apiLogin(email, password);
-      setUser(response.user);
+      setUser(normalizeUser(response.user));
+      try {
+        const data = await usersApi.getMe();
+        setUser(normalizeUser(data.user));
+      } catch {
+        // The login response still contains enough identity for routing.
+      }
       return response;
     } catch (error) {
       throw error;

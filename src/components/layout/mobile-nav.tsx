@@ -36,7 +36,7 @@ const navigation = {
     { name: 'Feedback', href: '/volunteer/surveys/volunteer' },
   ],
   facilitator: [
-    { name: 'Dashboard', href: '/volunteer/dashboard' },
+    { name: 'Dashboard', href: '/facilitator/dashboard' },
     { name: 'My Activities', href: '/volunteer/activities' },
   ],
 };
@@ -56,9 +56,14 @@ function UserAvatar({ user }: { user: any }) {
     );
   }
 
-  const initials = user?.full_name
-    ? user.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
-    : 'U';
+  const displayName = user?.full_name || user?.name || user?.email || user?.phone || 'User';
+  const initials = (user?.full_name || user?.name || displayName)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n: string) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'U';
 
   const colors: Record<string, string> = {
     admin: 'bg-rose-100 text-rose-700',
@@ -86,6 +91,8 @@ export default function MobileNav() {
 
   const userNav = navigation[user.role as keyof typeof navigation] || [];
   const profileHref = `/${locale}/${user.role}/profile`;
+  const displayName = user.full_name || user.name || user.email || user.phone || 'User';
+  const secondaryText = user.email || user.phone || 'Profile & settings';
 
   return (
     <>
@@ -188,8 +195,8 @@ export default function MobileNav() {
                       >
                         <UserAvatar user={user} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{user.full_name}</p>
-                          <p className="text-xs text-gray-400">Profile & settings</p>
+                          <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
+                          <p className="text-xs text-gray-400 truncate">{secondaryText}</p>
                         </div>
                       </Link>
 

@@ -234,7 +234,7 @@ export default function AdminDashboardPage() {
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <DashboardGreeting name={user?.full_name} fallback="Admin" />
+          <DashboardGreeting name={user?.full_name || user?.name} email={user?.email} role={user?.role} fallback="Admin" />
           <p className="mt-1 text-sm text-gray-500">
             System-wide overview and administration
           </p>
