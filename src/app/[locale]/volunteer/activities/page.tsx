@@ -134,7 +134,7 @@ export default function VolunteerActivitiesPage() {
         description="You haven't been assigned any activities. Check back soon!"
         action={{
           label: 'Dashboard',
-          onClick: () => (window.location.href = createLocalizedUrl('/volunteer/activities/dashboard')),
+          onClick: () => (window.location.href = createLocalizedUrl('/volunteer/dashboard')),
         }}
       />
     );
@@ -154,12 +154,12 @@ export default function VolunteerActivitiesPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Activities</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Track and manage your volunteering activities
+            Track and manage your assigned activities
           </p>
         </div>
         <Link href={createLocalizedUrl('/volunteer/dashboard')}>
           <Button variant="default" icon={<PlusIcon className="h-5 w-5" />}>
-            Report New Activity
+            Submit Report
           </Button>
         </Link>
       </div>
