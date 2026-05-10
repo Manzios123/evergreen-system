@@ -21,6 +21,7 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import Alert from '@/components/ui/alert';
 
@@ -52,7 +53,29 @@ interface ApiResponse<T> {
   };
 }
 
+function normalizeArray<T>(response: unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
+  if (response && typeof response === 'object') {
+    const data = response as { data?: unknown; results?: unknown; assignments?: unknown; pilots?: unknown; items?: unknown };
+    if (Array.isArray(data.data)) return data.data as T[];
+    if (Array.isArray(data.results)) return data.results as T[];
+    if (Array.isArray(data.assignments)) return data.assignments as T[];
+    if (Array.isArray(data.pilots)) return data.pilots as T[];
+    if (Array.isArray(data.items)) return data.items as T[];
+  }
+  return [];
+}
+
+function getPagination(response: unknown): ApiResponse<SurveyAssignment[]>['pagination'] | undefined {
+  if (response && typeof response === 'object' && 'pagination' in response) {
+    return (response as ApiResponse<SurveyAssignment[]>).pagination;
+  }
+  return undefined;
+}
+
 export default function AdminSurveyAssignmentsPage() {
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const [filters, setFilters] = useState({
     status: '',
     survey_type: '',
@@ -62,19 +85,21 @@ export default function AdminSurveyAssignmentsPage() {
   });
 
   // Fetch all survey assignments for admin
-  const { data: assignmentsResponse, isLoading, error, refetch } = useApiQuery<ApiResponse<SurveyAssignment[]>>(
+  const { data: assignmentsResponse, isLoading, error, refetch } = useApiQuery<unknown>(
     ['survey-assignments', 'admin', filters],
-    () => api.get<ApiResponse<SurveyAssignment[]>>('/survey-assignments', { params: filters })
+    () => api.get<unknown>('/survey-assignments', { params: filters })
   );
 
   // Extract data array (fallback to empty array)
-  const assignments = assignmentsResponse?.data ?? [];
+  const assignments = normalizeArray<SurveyAssignment>(assignmentsResponse);
+  const pagination = getPagination(assignmentsResponse);
 
   // Fetch pilots for filter
-  const { data: pilots } = useApiQuery<any[]>(
+  const { data: pilotsResponse } = useApiQuery<unknown>(
     ['pilots'],
-    () => api.get<any[]>('/pilots')
+    () => api.get<unknown>('/pilots')
   );
+  const pilots = normalizeArray<any>(pilotsResponse);
 
   const columns = [
     {
@@ -154,12 +179,12 @@ export default function AdminSurveyAssignmentsPage() {
       header: 'Actions',
       render: (assignment: SurveyAssignment) => (
         <div className="flex space-x-2">
-          <Link href={`/admin/surveys/assignments/${assignment.id}`}>
+          <Link href={`/${locale}/admin/surveys/assignments/${assignment.id}`}>
             <Button size="sm" variant="outline">
               <EyeIcon className="h-4 w-4" />
             </Button>
           </Link>
-          <Link href={`/admin/surveys/assignments/${assignment.id}/edit`}>
+          <Link href={`/${locale}/admin/surveys/assignments/${assignment.id}/edit`}>
             <Button size="sm" variant="outline">
               <PencilIcon className="h-4 w-4" />
             </Button>
@@ -190,7 +215,7 @@ export default function AdminSurveyAssignmentsPage() {
 
   const handleCreateAssignment = () => {
     // Redirect to create assignment page
-    window.location.href = '/admin/surveys/assignments/new';
+    window.location.href = `/${locale}/admin/surveys/assignments/new`;
   };
 
   const handleBulkAssignPreSurveys = async () => {
@@ -230,9 +255,9 @@ export default function AdminSurveyAssignmentsPage() {
     );
   }
 
-  const pendingAssignments = assignments?.filter(a => a.status === 'pending');
-  const completedAssignments = assignments?.filter(a => a.status === 'completed');
-  const overdueAssignments = assignments?.filter(a => 
+  const pendingAssignments = assignments.filter(a => a.status === 'pending');
+  const completedAssignments = assignments.filter(a => a.status === 'completed');
+  const overdueAssignments = assignments.filter(a =>
     a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed'
   );
 
@@ -301,7 +326,7 @@ export default function AdminSurveyAssignmentsPage() {
                 onChange={(e) => setFilters({...filters, pilot_id: e.target.value})}
               >
                 <option value="">All Pilots</option>
-                {pilots?.map(pilot => (
+                {pilots.map(pilot => (
                   <option key={pilot.id} value={pilot.id}>
                     {pilot.name}
                   </option>
@@ -377,12 +402,12 @@ export default function AdminSurveyAssignmentsPage() {
               All Assignments ({assignments?.length || 0})
             </h2>
             <div className="text-sm text-gray-500">
-              Showing {assignments?.length || 0} assignments
+              Showing {assignments.length} assignments
             </div>
           </div>
           
           <DataTable
-            data={assignments || []}
+            data={assignments}
             columns={columns}
             emptyMessage="No survey assignments found"
           />
@@ -390,7 +415,7 @@ export default function AdminSurveyAssignmentsPage() {
       </Card>
 
       {/* Pagination */}
-      {assignmentsResponse?.pagination && assignmentsResponse.pagination.totalPages > 1 && (
+      {pagination && pagination.totalPages > 1 && (
         <div className="flex justify-center mt-4">
           <nav className="flex items-center space-x-2">
             <Button
@@ -402,12 +427,12 @@ export default function AdminSurveyAssignmentsPage() {
               Previous
             </Button>
             <span className="text-sm text-gray-700">
-              Page {filters.page} of {assignmentsResponse.pagination.totalPages}
+              Page {filters.page} of {pagination.totalPages}
             </span>
             <Button
               variant="outline"
               size="sm"
-              disabled={filters.page === assignmentsResponse.pagination.totalPages}
+              disabled={filters.page === pagination.totalPages}
               onClick={() => setFilters({...filters, page: filters.page + 1})}
             >
               Next

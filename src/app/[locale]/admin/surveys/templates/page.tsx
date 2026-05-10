@@ -20,7 +20,7 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 
 interface SurveyTemplate {
@@ -39,17 +39,32 @@ interface SurveyTemplate {
   question_count: number;
 }
 
+function normalizeArray<T>(response: unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
+  if (response && typeof response === 'object') {
+    const data = response as { data?: unknown; results?: unknown; templates?: unknown; items?: unknown };
+    if (Array.isArray(data.data)) return data.data as T[];
+    if (Array.isArray(data.results)) return data.results as T[];
+    if (Array.isArray(data.templates)) return data.templates as T[];
+    if (Array.isArray(data.items)) return data.items as T[];
+  }
+  return [];
+}
+
 export default function SurveyTemplatesPage() {
   const router = useRouter();
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Fetch survey templates
-  const { data: templates, isLoading, error, refetch } = useApiQuery<SurveyTemplate[]>(
+  const { data: templatesResponse, isLoading, error, refetch } = useApiQuery<unknown>(
     ['survey-templates', selectedType, selectedPeriod],
-    () => api.get<SurveyTemplate[]>('/survey-templates')
+    () => api.get<unknown>('/survey-templates')
   );
+  const templates = normalizeArray<SurveyTemplate>(templatesResponse);
 
   // Delete template mutation
   const deleteMutation = useApiMutation(
@@ -72,7 +87,7 @@ export default function SurveyTemplatesPage() {
   };
 
   // Filter templates based on selections
-  const filteredTemplates = templates?.filter(template => {
+  const filteredTemplates = templates.filter(template => {
     if (selectedType !== 'all' && template.survey_type !== selectedType) return false;
     if (selectedPeriod !== 'all' && template.survey_period !== selectedPeriod) return false;
     return true;
@@ -148,12 +163,12 @@ export default function SurveyTemplatesPage() {
       header: 'Actions',
       render: (template: SurveyTemplate) => (
         <div className="flex space-x-2">
-          <Link href={`/admin/surveys/templates/${template.id}`}>
+          <Link href={`/${locale}/admin/surveys/templates/${template.id}`}>
             <Button size="sm" variant="outline">
               <EyeIcon className="h-4 w-4" />
             </Button>
           </Link>
-          <Link href={`/admin/surveys/templates/${template.id}/edit`}>
+          <Link href={`/${locale}/admin/surveys/templates/${template.id}/edit`}>
             <Button size="sm" variant="outline">
               <PencilIcon className="h-4 w-4" />
             </Button>
@@ -218,7 +233,7 @@ export default function SurveyTemplatesPage() {
             Manage survey templates for pre and post surveys
           </p>
         </div>
-        <Link href="/admin/surveys/templates/new">
+        <Link href={`/${locale}/admin/surveys/templates/new`}>
           <Button>
             <PlusIcon className="h-5 w-5 mr-2" />
             New Template
@@ -309,12 +324,12 @@ export default function SurveyTemplatesPage() {
               Survey Templates ({filteredTemplates?.length || 0})
             </h2>
             <div className="text-sm text-gray-500">
-              Showing {filteredTemplates?.length || 0} of {templates?.length || 0} templates
+              Showing {filteredTemplates.length} of {templates.length} templates
             </div>
           </div>
           
           <DataTable
-            data={filteredTemplates || []}
+            data={filteredTemplates}
             columns={columns}
             emptyMessage={
               <EmptyState
@@ -336,7 +351,7 @@ export default function SurveyTemplatesPage() {
                       }
                     : {
                         label: 'Create Template',
-                        onClick: () => router.push('/admin/surveys/templates/new'),
+                        onClick: () => router.push(`/${locale}/admin/surveys/templates/new`),
                       }
                 }
               />
@@ -356,7 +371,7 @@ export default function SurveyTemplatesPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Volunteer Templates</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {templates?.filter(t => t.survey_type === 'volunteer').length || 0}
+                  {templates.filter(t => t.survey_type === 'volunteer').length}
                 </p>
               </div>
             </div>
@@ -371,7 +386,7 @@ export default function SurveyTemplatesPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Student Templates</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {templates?.filter(t => t.survey_type === 'student').length || 0}
+                  {templates.filter(t => t.survey_type === 'student').length}
                 </p>
               </div>
             </div>
@@ -386,7 +401,7 @@ export default function SurveyTemplatesPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Total Questions</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {templates?.reduce((sum, t) => sum + t.question_count, 0) || 0}
+                  {templates.reduce((sum, t) => sum + (t.question_count || 0), 0)}
                 </p>
               </div>
             </div>

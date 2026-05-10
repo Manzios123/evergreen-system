@@ -14,7 +14,7 @@ import {
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 interface Pilot {
@@ -36,8 +36,25 @@ interface SurveyTemplate {
   pilot_id: string;
 }
 
+function normalizeArray<T>(response: unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
+  if (response && typeof response === 'object') {
+    const data = response as { data?: unknown; results?: unknown; templates?: unknown; volunteers?: unknown; pilots?: unknown; users?: unknown; items?: unknown };
+    if (Array.isArray(data.data)) return data.data as T[];
+    if (Array.isArray(data.results)) return data.results as T[];
+    if (Array.isArray(data.templates)) return data.templates as T[];
+    if (Array.isArray(data.volunteers)) return data.volunteers as T[];
+    if (Array.isArray(data.pilots)) return data.pilots as T[];
+    if (Array.isArray(data.users)) return data.users as T[];
+    if (Array.isArray(data.items)) return data.items as T[];
+  }
+  return [];
+}
+
 export default function CreateAssignmentPage() {
   const router = useRouter();
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     survey_type: 'volunteer', // volunteer or student
@@ -51,15 +68,17 @@ export default function CreateAssignmentPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch data
-  const { data: pilots } = useApiQuery<Pilot[]>(['pilots'], () => api.get<Pilot[]>('/pilots'));
-  const { data: volunteers } = useApiQuery<Volunteer[]>(
+  const { data: pilotsResponse } = useApiQuery<unknown>(['pilots'], () => api.get<unknown>('/pilots'));
+  const pilots = normalizeArray<Pilot>(pilotsResponse);
+  const { data: volunteersResponse } = useApiQuery<unknown>(
     ['volunteers', formData.pilot_id],
-    () => api.get<Volunteer[]>(`/pilots/${formData.pilot_id}/volunteers`),
+    () => api.get<unknown>(`/pilots/${formData.pilot_id}/volunteers`),
     { enabled: !!formData.pilot_id && formData.survey_type === 'volunteer' }
   );
-  const { data: templates } = useApiQuery<SurveyTemplate[]>(
+  const volunteers = normalizeArray<Volunteer>(volunteersResponse);
+  const { data: templatesResponse } = useApiQuery<unknown>(
     ['survey-templates', formData.pilot_id, formData.survey_type],
-    () => api.get<SurveyTemplate[]>('/survey-templates', {
+    () => api.get<unknown>('/survey-templates', {
       params: {
         pilot_id: formData.pilot_id,
         survey_type: formData.survey_type,
@@ -68,6 +87,7 @@ export default function CreateAssignmentPage() {
     }),
     { enabled: !!formData.pilot_id }
   );
+  const templates = normalizeArray<SurveyTemplate>(templatesResponse);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -126,7 +146,7 @@ export default function CreateAssignmentPage() {
       const response = await api.post(endpoint, payload);
       
       alert('Assignment created successfully!');
-      router.push('/admin/surveys/assignments');
+      router.push(`/${locale}/admin/surveys/assignments`);
       
     } catch (err: any) {
       setError(err.message || 'Failed to create assignment');
@@ -233,7 +253,7 @@ export default function CreateAssignmentPage() {
                   required
                 >
                   <option value="">Select a pilot</option>
-                  {pilots?.map(pilot => (
+                  {pilots.map(pilot => (
                     <option key={pilot.id} value={pilot.id}>
                       {pilot.name}
                     </option>
@@ -392,7 +412,7 @@ export default function CreateAssignmentPage() {
       {/* Header */}
       <div>
         <Link
-          href="/admin/surveys/assignments"
+          href={`/${locale}/admin/surveys/assignments`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />

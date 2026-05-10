@@ -12,7 +12,7 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 interface Pilot {
@@ -42,8 +42,22 @@ const QUESTION_TYPES = [
   { value: 'scale_1_10', label: 'Scale (1-10)' },
 ];
 
+function normalizeArray<T>(response: unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
+  if (response && typeof response === 'object') {
+    const data = response as { data?: unknown; results?: unknown; pilots?: unknown; items?: unknown };
+    if (Array.isArray(data.data)) return data.data as T[];
+    if (Array.isArray(data.results)) return data.results as T[];
+    if (Array.isArray(data.pilots)) return data.pilots as T[];
+    if (Array.isArray(data.items)) return data.items as T[];
+  }
+  return [];
+}
+
 export default function CreateSurveyTemplatePage() {
   const router = useRouter();
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const [formData, setFormData] = useState({
     pilot_id: '',
     name: '',
@@ -57,7 +71,8 @@ export default function CreateSurveyTemplatePage() {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch pilots
-  const { data: pilots } = useApiQuery<Pilot[]>(['pilots'], () => api.get<Pilot[]>('/pilots'));
+  const { data: pilotsResponse } = useApiQuery<unknown>(['pilots'], () => api.get<unknown>('/pilots'));
+  const pilots = normalizeArray<Pilot>(pilotsResponse);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -116,7 +131,7 @@ export default function CreateSurveyTemplatePage() {
       const response = await api.post<TemplateResponse>('/survey-templates', payload);
       
       alert('Template created successfully!');
-      router.push(`/admin/surveys/templates/${response.id}`);
+      router.push(`/${locale}/admin/surveys/templates/${response.id}`);
       
     } catch (err: any) {
       setError(err.message || 'Failed to create template');
@@ -130,7 +145,7 @@ export default function CreateSurveyTemplatePage() {
       {/* Header */}
       <div>
         <Link
-          href="/admin/surveys/templates"
+          href={`/${locale}/admin/surveys/templates`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -181,7 +196,7 @@ export default function CreateSurveyTemplatePage() {
                     required
                   >
                     <option value="">Select a pilot</option>
-                    {pilots?.map(pilot => (
+                    {pilots.map(pilot => (
                       <option key={pilot.id} value={pilot.id}>
                         {pilot.name}
                       </option>
@@ -334,7 +349,7 @@ export default function CreateSurveyTemplatePage() {
             )}
 
             <div className="flex justify-end space-x-3 pt-6 border-t">
-              <Link href="/admin/surveys/templates">
+              <Link href={`/${locale}/admin/surveys/templates`}>
                 <Button variant="outline" type="button">
                   Cancel
                 </Button>

@@ -35,12 +35,14 @@ interface SurveyAssignment {
 
 interface EditAssignmentPageProps {
   params: {
+    locale: string;
     id: string;
   };
 }
 
 export default function EditAssignmentPage({ params }: EditAssignmentPageProps) {
   const router = useRouter();
+  const locale = params.locale || 'en';
   const [formData, setFormData] = useState({
     due_date: '',
     status: 'pending',
@@ -74,7 +76,7 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
       onSuccess: () => {
         setSuccess(true);
         setTimeout(() => {
-          router.push(`/admin/surveys/assignments/${params.id}`);
+          router.push(`/${locale}/admin/surveys/assignments/${params.id}`);
         }, 1500);
       },
       onError: (error: Error) => {
@@ -112,7 +114,7 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
         <Alert type="error" title="Unable to load assignment">
           <p className="mt-2">The assignment could not be loaded. It may have been deleted or is no longer available.</p>
           <div className="mt-4">
-            <Link href="/admin/surveys/assignments" className="inline-flex items-center text-sm">
+            <Link href={`/${locale}/admin/surveys/assignments`} className="inline-flex items-center text-sm">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
               Back to Assignments
             </Link>
@@ -127,7 +129,7 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
       {/* Header */}
       <div>
         <Link
-          href={`/admin/surveys/assignments/${params.id}`}
+          href={`/${locale}/admin/surveys/assignments/${params.id}`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -241,7 +243,7 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push(`/admin/surveys/assignments/${params.id}`)}
+                onClick={() => router.push(`/${locale}/admin/surveys/assignments/${params.id}`)}
                 disabled={updateMutation.isPending}
               >
                 Cancel

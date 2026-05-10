@@ -43,6 +43,7 @@ interface ApiResponse<T> {
 export default function SurveyResponseDetailPage() {
   const params = useParams();
   const responseId = params.id as string;
+  const locale = (params?.locale as string) || 'en';
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +125,7 @@ export default function SurveyResponseDetailPage() {
         <Alert type="error" title="Error">
           {error || 'Response not found'}
           <div className="mt-4">
-            <Link href="/admin/surveys" className="inline-flex items-center text-sm">
+            <Link href={`/${locale}/admin/surveys`} className="inline-flex items-center text-sm">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
               Back to Survey Reports
             </Link>
@@ -135,13 +136,14 @@ export default function SurveyResponseDetailPage() {
   }
   
   const { response, answers } = data;
+  const responseAnswers = Array.isArray(answers) ? answers : [];
   
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <Link
-          href="/admin/surveys"
+          href={`/${locale}/admin/surveys`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -235,12 +237,12 @@ export default function SurveyResponseDetailPage() {
         <h3 className="font-medium text-gray-900 mb-6">Survey Responses</h3>
         
         <div className="space-y-6">
-          {(answers || []).length === 0 ? (
+          {responseAnswers.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               No answers found for this response
             </div>
           ) : (
-            (answers || []).map((answer, index) => (
+            responseAnswers.map((answer, index) => (
               <div key={answer.question_id || index} className="border-b pb-6 last:border-0">
                 <div className="flex items-start mb-4">
                   <span className="bg-gray-100 text-gray-800 text-sm font-medium px-2.5 py-0.5 rounded mr-3">
@@ -277,7 +279,7 @@ export default function SurveyResponseDetailPage() {
           Go Back
         </Button>
         
-        <Link href="/admin/surveys">
+        <Link href={`/${locale}/admin/surveys`}>
           <Button variant="default">
             View All Responses
           </Button>

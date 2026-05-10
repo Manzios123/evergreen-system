@@ -30,6 +30,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
+import { useParams } from 'next/navigation';
 
 interface SurveyResponse {
   id: string;
@@ -83,6 +84,8 @@ interface AutoAssignResponse {
 type TabType = 'student' | 'volunteer' | 'admin';
 
 export default function AdminSurveysPage() {
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
   const [activeTab, setActiveTab] = useState<TabType>('student');
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -273,7 +276,7 @@ export default function AdminSurveysPage() {
     try {
       const response = await api.post<AutoAssignResponse>('/survey-assignments/auto-assign-role-survey');
       // MODIFIED: Redirect to admin assignment route instead of volunteer
-      window.location.href = `/admin/surveys/assignment/${response.assignment_id}`;
+      window.location.href = `/${locale}/admin/surveys/assignments/${response.assignment_id}`;
     } catch (err: any) {
       setError(err.message || 'Failed to load admin survey');
     } finally {
@@ -311,7 +314,7 @@ export default function AdminSurveysPage() {
   };
 
   const viewResponse = (responseId: string) => {
-    window.open(`/admin/surveys/responses/${responseId}`, '_blank');
+    window.open(`/${locale}/admin/surveys/responses/${responseId}`, '_blank');
   };
 
   const resetFilters = () => {
@@ -380,13 +383,13 @@ export default function AdminSurveysPage() {
         </div>
 
         <div className="flex gap-3">
-          <Link href="/admin/surveys/templates">
+          <Link href={`/${locale}/admin/surveys/templates`}>
             <Button variant="outline">
               <DocumentTextIcon className="h-4 w-4 mr-2" />
               Manage Templates
             </Button>
           </Link>
-          <Link href="/admin/surveys/assignments">
+          <Link href={`/${locale}/admin/surveys/assignments`}>
             <Button variant="outline">
               <UsersIcon className="h-4 w-4 mr-2" />
               View Assignments
@@ -494,14 +497,14 @@ export default function AdminSurveysPage() {
               <h3 className="font-medium text-gray-900 mb-4">Quick Links</h3>
               <div className="space-y-3">
                 <Link
-                  href="/admin/surveys?tab=volunteer"
+                  href={`/${locale}/admin/surveys?tab=volunteer`}
                   className="flex items-center text-blue-600 hover:text-blue-800"
                 >
                   <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                   View all staff survey submissions
                 </Link>
                 <Link
-                  href="/admin/surveys/templates"
+                  href={`/${locale}/admin/surveys/templates`}
                   className="flex items-center text-blue-600 hover:text-blue-800"
                 >
                   <DocumentTextIcon className="h-4 w-4 mr-2" />

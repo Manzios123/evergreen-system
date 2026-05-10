@@ -72,6 +72,7 @@ export default function EditSurveyTemplatePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = params.id as string;
+  const locale = (params?.locale as string) || 'en';
   
   const [formData, setFormData] = useState<Partial<SurveyTemplate>>({
     name: '',
@@ -104,7 +105,7 @@ export default function EditSurveyTemplatePage() {
     (data: Partial<SurveyTemplate>) => api.put(`/survey-templates/${id}`, data),
     {
       onSuccess: () => {
-        router.push(`/admin/surveys/templates/${id}?success=true`);
+        router.push(`/${locale}/admin/surveys/templates/${id}?success=true`);
       },
       onError: (error) => {
         setErrors({ submit: error.message });
@@ -123,7 +124,8 @@ export default function EditSurveyTemplatePage() {
         survey_period: template.survey_period,
         change_reason: '',
       });
-      setQuestions(template.questions.map(q => ({
+      const templateQuestions = Array.isArray(template.questions) ? template.questions : [];
+      setQuestions(templateQuestions.map(q => ({
         ...q,
         order_index: q.order_index || 0,
       })));
@@ -245,7 +247,7 @@ export default function EditSurveyTemplatePage() {
   };
 
   const handleCancel = () => {
-    router.push(`/admin/surveys/templates/${id}`);
+    router.push(`/${locale}/admin/surveys/templates/${id}`);
   };
 
   if (isLoading) {
@@ -273,7 +275,7 @@ export default function EditSurveyTemplatePage() {
           description="The survey template you're looking for doesn't exist or you don't have permission to edit it."
           action={{
             label: 'Back to Templates',
-            onClick: () => router.push('/admin/surveys/templates'),
+            onClick: () => router.push(`/${locale}/admin/surveys/templates`),
           }}
         />
         <div className="mt-4 text-center">

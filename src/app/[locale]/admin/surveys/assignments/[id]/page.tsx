@@ -54,12 +54,14 @@ interface SurveyResponse {
 
 interface AssignmentDetailPageProps {
   params: {
+    locale: string;
     id: string;
   };
 }
 
 export default function AssignmentDetailPage({ params }: AssignmentDetailPageProps) {
   const router = useRouter();
+  const locale = params.locale || 'en';
 
   // Fetch assignment details
   const { data: assignment, isLoading, error, refetch } = useApiQuery<SurveyAssignment>(
@@ -92,7 +94,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
     
     try {
       await api.delete(`/survey-assignments/${params.id}`);
-      router.push('/admin/surveys/assignments');
+      router.push(`/${locale}/admin/surveys/assignments`);
     } catch (error) {
       console.error('Failed to delete assignment:', error);
     }
@@ -136,7 +138,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
         >
           <p className="mt-2">The assignment could not be loaded.</p>
           <div className="mt-4">
-            <Link href="/admin/surveys/assignments" className="inline-flex items-center text-sm">
+            <Link href={`/${locale}/admin/surveys/assignments`} className="inline-flex items-center text-sm">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
               Back to Assignments
             </Link>
@@ -154,7 +156,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
       {/* Header */}
       <div>
         <Link
-          href="/admin/surveys/assignments"
+          href={`/${locale}/admin/surveys/assignments`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -175,7 +177,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
             </div>
           </div>
           <div className="flex space-x-2">
-            <Link href={`/admin/surveys/assignments/${params.id}/edit`}>
+            <Link href={`/${locale}/admin/surveys/assignments/${params.id}/edit`}>
               <Button variant="outline">
                 <PencilIcon className="h-4 w-4 mr-2" />
                 Edit
@@ -311,7 +313,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
               )}
               
               {assignment.completed && response && (
-                <Link href={`/admin/surveys/assignments/${params.id}/responses`} className="block">
+                <Link href={`/${locale}/admin/surveys/assignments/${params.id}/responses`} className="block">
                   <Button variant="default" className="w-full justify-start">
                     <EyeIcon className="h-4 w-4 mr-2" />
                     View Survey Responses
@@ -319,14 +321,14 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
                 </Link>
               )}
               
-              <Link href={`/admin/surveys/templates/${assignment.survey_template_id}`} className="block">
+              <Link href={`/${locale}/admin/surveys/templates/${assignment.survey_template_id}`} className="block">
                 <Button variant="outline" className="w-full justify-start">
                   <DocumentTextIcon className="h-4 w-4 mr-2" />
                   View Survey Template
                 </Button>
               </Link>
               
-              <Link href={`/admin/pilots/${assignment.pilot_id}`} className="block">
+              <Link href={`/${locale}/admin/pilots/${assignment.pilot_id}`} className="block">
                 <Button variant="outline" className="w-full justify-start">
                   <AcademicCapIcon className="h-4 w-4 mr-2" />
                   View Pilot Details
@@ -361,7 +363,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
               </div>
               
               <div className="mt-4">
-                <Link href={`/admin/surveys/assignments/${params.id}/responses`}>
+                <Link href={`/${locale}/admin/surveys/assignments/${params.id}/responses`}>
                   <Button variant="default">
                     View Full Responses
                   </Button>

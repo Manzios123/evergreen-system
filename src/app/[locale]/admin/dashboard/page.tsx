@@ -28,6 +28,7 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 
@@ -158,6 +159,8 @@ export default function AdminDashboardPage() {
   }, [dashboardData]);
 
   const { user } = useAuth();
+  const params = useParams();
+  const locale = (params?.locale as string) || 'en';
 
   // Get system health status and styling
   const getHealthStatus = (health: string | undefined) => {
@@ -588,7 +591,7 @@ export default function AdminDashboardPage() {
                     Add School
                   </Button>
                 </Link>
-                <Link href="/admin/templates/new" className="block">
+                <Link href={`/${locale}/admin/surveys/templates/new`} className="block">
                   <Button
                     variant="outline"
                     className="w-full justify-start"

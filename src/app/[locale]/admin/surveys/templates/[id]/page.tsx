@@ -87,6 +87,7 @@ export default function ViewSurveyTemplatePage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const locale = (params?.locale as string) || 'en';
   const [error, setError] = useState<string | null>(null);
 
   // Fetch template data
@@ -101,11 +102,11 @@ export default function ViewSurveyTemplatePage() {
   );
 
   const handleEdit = () => {
-    router.push(`/admin/surveys/templates/${id}/edit`);
+    router.push(`/${locale}/admin/surveys/templates/${id}/edit`);
   };
 
   const handleBack = () => {
-    router.push('/admin/surveys/templates');
+    router.push(`/${locale}/admin/surveys/templates`);
   };
 
   if (isLoading) {
@@ -213,16 +214,16 @@ export default function ViewSurveyTemplatePage() {
             {/* Questions Section */}
             <div className="mt-8">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Questions ({template.questions.length})</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Questions ({Array.isArray(template.questions) ? template.questions.length : 0})</h3>
               </div>
 
-              {template.questions.length === 0 ? (
+              {!Array.isArray(template.questions) || template.questions.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   No questions added to this template yet.
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {template.questions
+                  {[...template.questions]
                     .sort((a, b) => a.order_index - b.order_index)
                     .map((question, index) => (
                       <div key={question.id} className="border border-gray-200 rounded-lg p-4">

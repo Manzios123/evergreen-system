@@ -53,11 +53,13 @@ interface AssignmentDetails {
 
 interface AssignmentResponsesPageProps {
   params: {
+    locale: string;
     id: string;
   };
 }
 
 export default function AssignmentResponsesPage({ params }: AssignmentResponsesPageProps) {
+  const locale = params.locale || 'en';
   // Fetch assignment details
   const { data: assignment, isLoading: assignmentLoading } = useApiQuery<AssignmentDetails>(
     ['assignment-details', params.id],
@@ -103,7 +105,7 @@ export default function AssignmentResponsesPage({ params }: AssignmentResponsesP
             The assignment could not be loaded.
           </p>
           <div className="mt-4">
-            <Link href="/admin/surveys/assignments">
+            <Link href={`/${locale}/admin/surveys/assignments`}>
               <Button variant="outline" className="inline-flex items-center">
                 <ArrowLeftIcon className="h-4 w-4 mr-2" />
                 Back to Assignments
@@ -117,13 +119,14 @@ export default function AssignmentResponsesPage({ params }: AssignmentResponsesP
 
   const isStudentSurvey = assignment.survey_type === 'student';
   const isAggregated = response?.is_aggregated;
+  const assignmentQuestions = Array.isArray(assignment.questions) ? assignment.questions : [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <Link
-          href={`/admin/surveys/assignments/${params.id}`}
+          href={`/${locale}/admin/surveys/assignments/${params.id}`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -233,7 +236,7 @@ export default function AssignmentResponsesPage({ params }: AssignmentResponsesP
 
           {response && response.responses && Object.keys(response.responses).length > 0 ? (
             <div className="space-y-8">
-              {assignment.questions?.map((question: SurveyQuestion) => {
+              {assignmentQuestions.map((question: SurveyQuestion) => {
                 const questionResponse = response.responses[question.id];
                 return (
                   <div key={question.id} className="border-b pb-8 last:border-0">
@@ -346,10 +349,10 @@ export default function AssignmentResponsesPage({ params }: AssignmentResponsesP
 
       {/* Action Buttons */}
       <div className="flex justify-end space-x-3">
-        <Link href={`/admin/surveys/assignments/${params.id}`}>
+        <Link href={`/${locale}/admin/surveys/assignments/${params.id}`}>
           <Button variant="outline">Back to Assignment</Button>
         </Link>
-        <Link href={`/admin/surveys/assignments/${params.id}/edit`}>
+        <Link href={`/${locale}/admin/surveys/assignments/${params.id}/edit`}>
           <Button variant="default">Edit Assignment</Button>
         </Link>
       </div>
