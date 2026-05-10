@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useApiQuery } from '@/lib/hooks/use-api';
+import { useApiMutation, useApiQuery } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api/api';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
@@ -109,6 +109,25 @@ export default function ViewSurveyTemplatePage() {
     router.push(`/${locale}/admin/surveys/templates`);
   };
 
+  const deleteMutation = useApiMutation(
+    () => api.delete(`/survey-templates/${id}`),
+    {
+      onSuccess: () => {
+        router.push(`/${locale}/admin/surveys/templates`);
+      },
+      onError: (error: Error) => {
+        setError(error.message || 'Failed to delete template');
+      },
+    }
+  );
+
+  const handleDelete = () => {
+    if (confirm(`Are you sure you want to delete "${template?.name || 'this template'}"? Templates with active assignments will be blocked.`)) {
+      setError(null);
+      deleteMutation.mutate(undefined);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -161,6 +180,13 @@ export default function ViewSurveyTemplatePage() {
             Back to Templates
           </Button>
           <Button onClick={handleEdit}>Edit Template</Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? 'Deleting...' : 'Delete Template'}
+          </Button>
         </div>
       </div>
 

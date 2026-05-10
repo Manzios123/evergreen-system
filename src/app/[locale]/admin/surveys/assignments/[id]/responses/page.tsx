@@ -16,6 +16,7 @@ import {
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { format } from 'date-fns';
 
 interface SurveyQuestion {
@@ -51,31 +52,27 @@ interface AssignmentDetails {
   questions: SurveyQuestion[];
 }
 
-interface AssignmentResponsesPageProps {
-  params: {
-    locale: string;
-    id: string;
-  };
-}
-
-export default function AssignmentResponsesPage({ params }: AssignmentResponsesPageProps) {
-  const locale = params.locale || 'en';
+export default function AssignmentResponsesPage() {
+  const params = useParams();
+  const id = params?.id as string | undefined;
+  const locale = (params?.locale as string) || 'en';
   // Fetch assignment details
   const { data: assignment, isLoading: assignmentLoading } = useApiQuery<AssignmentDetails>(
-    ['assignment-details', params.id],
-    () => api.get<AssignmentDetails>(`/survey-assignments/${params.id}`)
+    ['assignment-details', id],
+    () => api.get<AssignmentDetails>(`/survey-assignments/${id}`),
+    { enabled: !!id }
   );
 
   // Fetch responses based on assignment type
   const { data: response, isLoading: responseLoading } = useApiQuery<SurveyResponse | null>(
-    ['assignment-response', params.id],
+    ['assignment-response', id],
     () => {
       if (!assignment) return Promise.resolve(null);
       
       if (assignment.survey_type === 'volunteer') {
-        return api.get<SurveyResponse>(`/survey-responses/volunteer/assignment/${params.id}`);
+        return api.get<SurveyResponse>(`/survey-responses/volunteer/assignment/${id}`);
       } else if (assignment.survey_type === 'student') {
-        return api.get<SurveyResponse>(`/survey-responses/student/assignment/${params.id}`);
+        return api.get<SurveyResponse>(`/survey-responses/student/assignment/${id}`);
       }
       return Promise.resolve(null);
     },
@@ -126,7 +123,7 @@ export default function AssignmentResponsesPage({ params }: AssignmentResponsesP
       {/* Header */}
       <div>
         <Link
-          href={`/${locale}/admin/surveys/assignments/${params.id}`}
+          href={`/${locale}/admin/surveys/assignments/${id}`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -349,10 +346,10 @@ export default function AssignmentResponsesPage({ params }: AssignmentResponsesP
 
       {/* Action Buttons */}
       <div className="flex justify-end space-x-3">
-        <Link href={`/${locale}/admin/surveys/assignments/${params.id}`}>
+        <Link href={`/${locale}/admin/surveys/assignments/${id}`}>
           <Button variant="outline">Back to Assignment</Button>
         </Link>
-        <Link href={`/${locale}/admin/surveys/assignments/${params.id}/edit`}>
+        <Link href={`/${locale}/admin/surveys/assignments/${id}/edit`}>
           <Button variant="default">Edit Assignment</Button>
         </Link>
       </div>

@@ -20,7 +20,7 @@ import {
   EyeIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 interface SurveyAssignment {
   id: string;
@@ -52,35 +52,31 @@ interface SurveyResponse {
   submitted_by_name: string;
 }
 
-interface AssignmentDetailPageProps {
-  params: {
-    locale: string;
-    id: string;
-  };
-}
-
-export default function AssignmentDetailPage({ params }: AssignmentDetailPageProps) {
+export default function AssignmentDetailPage() {
   const router = useRouter();
-  const locale = params.locale || 'en';
+  const params = useParams();
+  const id = params?.id as string | undefined;
+  const locale = (params?.locale as string) || 'en';
 
   // Fetch assignment details
   const { data: assignment, isLoading, error, refetch } = useApiQuery<SurveyAssignment>(
-    ['survey-assignment', params.id],
-    () => api.get<SurveyAssignment>(`/survey-assignments/${params.id}`)
+    ['survey-assignment', id],
+    () => api.get<SurveyAssignment>(`/survey-assignments/${id}`),
+    { enabled: !!id }
   );
 
   // Fetch response if completed
   const { data: response } = useApiQuery<SurveyResponse>(
-    ['survey-response', params.id],
+    ['survey-response', id],
     () => {
       if (!assignment || !assignment.completed) {
         // Return a rejected promise with a specific error
         return Promise.reject(new Error('Assignment not completed'));
       }
       if (assignment.survey_type === 'volunteer') {
-        return api.get<SurveyResponse>(`/survey-responses/volunteer/assignment/${params.id}`);
+        return api.get<SurveyResponse>(`/survey-responses/volunteer/assignment/${id}`);
       } else {
-        return api.get<SurveyResponse>(`/survey-responses/student/assignment/${params.id}`);
+        return api.get<SurveyResponse>(`/survey-responses/student/assignment/${id}`);
       }
     },
     { 
@@ -90,19 +86,24 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
   );
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this assignment?')) return;
+    if (!confirm('Are you sure you want to cancel this assignment? Completed assignments cannot be cancelled.')) return;
+    if (!id) return;
     
     try {
-      await api.delete(`/survey-assignments/${params.id}`);
+      await api.delete(`/survey-assignments/${id}`);
       router.push(`/${locale}/admin/surveys/assignments`);
     } catch (error) {
-      console.error('Failed to delete assignment:', error);
+      console.error('Failed to cancel assignment:', error);
     }
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
+    if (!id) return;
     try {
-      await api.put(`/survey-assignments/${params.id}`, { status: newStatus });
+      const payload = newStatus === 'completed'
+        ? { status: newStatus, completed_at: new Date().toISOString() }
+        : { status: newStatus };
+      await api.put(`/survey-assignments/${id}`, payload);
       refetch();
     } catch (error) {
       console.error('Failed to update status:', error);
@@ -110,11 +111,12 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
   };
 
   const handleExtendDueDate = async () => {
+    if (!id) return;
     const newDate = prompt('Enter new due date (YYYY-MM-DD):', assignment?.due_date || '');
     if (!newDate) return;
     
     try {
-      await api.put(`/survey-assignments/${params.id}`, { due_date: newDate });
+      await api.put(`/survey-assignments/${id}`, { due_date: newDate });
       refetch();
     } catch (error) {
       console.error('Failed to extend due date:', error);
@@ -177,7 +179,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
             </div>
           </div>
           <div className="flex space-x-2">
-            <Link href={`/${locale}/admin/surveys/assignments/${params.id}/edit`}>
+            <Link href={`/${locale}/admin/surveys/assignments/${id}/edit`}>
               <Button variant="outline">
                 <PencilIcon className="h-4 w-4 mr-2" />
                 Edit
@@ -185,7 +187,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
             </Link>
             <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-700">
               <TrashIcon className="h-4 w-4 mr-2" />
-              Delete
+              Cancel
             </Button>
           </div>
         </div>
@@ -313,7 +315,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
               )}
               
               {assignment.completed && response && (
-                <Link href={`/${locale}/admin/surveys/assignments/${params.id}/responses`} className="block">
+                <Link href={`/${locale}/admin/surveys/assignments/${id}/responses`} className="block">
                   <Button variant="default" className="w-full justify-start">
                     <EyeIcon className="h-4 w-4 mr-2" />
                     View Survey Responses
@@ -363,7 +365,7 @@ export default function AssignmentDetailPage({ params }: AssignmentDetailPagePro
               </div>
               
               <div className="mt-4">
-                <Link href={`/${locale}/admin/surveys/assignments/${params.id}/responses`}>
+                <Link href={`/${locale}/admin/surveys/assignments/${id}/responses`}>
                   <Button variant="default">
                     View Full Responses
                   </Button>

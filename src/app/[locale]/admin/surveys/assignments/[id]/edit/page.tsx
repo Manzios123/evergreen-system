@@ -15,7 +15,7 @@ import {
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 
 interface SurveyAssignment {
@@ -33,16 +33,11 @@ interface SurveyAssignment {
   volunteer_name: string;
 }
 
-interface EditAssignmentPageProps {
-  params: {
-    locale: string;
-    id: string;
-  };
-}
-
-export default function EditAssignmentPage({ params }: EditAssignmentPageProps) {
+export default function EditAssignmentPage() {
   const router = useRouter();
-  const locale = params.locale || 'en';
+  const params = useParams();
+  const id = params?.id as string | undefined;
+  const locale = (params?.locale as string) || 'en';
   const [formData, setFormData] = useState({
     due_date: '',
     status: 'pending',
@@ -52,10 +47,10 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
 
   // Fetch assignment details
   const { data: assignment, isLoading, error: fetchError } = useApiQuery<SurveyAssignment>(
-    ['survey-assignment', params.id],
-    () => api.get<SurveyAssignment>(`/survey-assignments/${params.id}`),
+    ['survey-assignment', id],
+    () => api.get<SurveyAssignment>(`/survey-assignments/${id}`),
     {
-      enabled: !!params.id,
+      enabled: !!id,
     }
   );
 
@@ -71,16 +66,28 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
 
   // Update assignment mutation
   const updateMutation = useApiMutation(
-    (data: any) => api.put(`/survey-assignments/${params.id}`, data),
+    (data: any) => api.put(`/survey-assignments/${id}`, data),
     {
       onSuccess: () => {
         setSuccess(true);
         setTimeout(() => {
-          router.push(`/${locale}/admin/surveys/assignments/${params.id}`);
+          router.push(`/${locale}/admin/surveys/assignments/${id}`);
         }, 1500);
       },
       onError: (error: Error) => {
         setError(error.message || 'Failed to update assignment');
+      },
+    }
+  );
+
+  const deleteMutation = useApiMutation(
+    () => api.delete(`/survey-assignments/${id}`),
+    {
+      onSuccess: () => {
+        router.push(`/${locale}/admin/surveys/assignments`);
+      },
+      onError: (error: Error) => {
+        setError(error.message || 'Failed to cancel assignment');
       },
     }
   );
@@ -129,7 +136,7 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
       {/* Header */}
       <div>
         <Link
-          href={`/${locale}/admin/surveys/assignments/${params.id}`}
+          href={`/${locale}/admin/surveys/assignments/${id}`}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -234,6 +241,7 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
                   <option value="completed">Completed</option>
                   <option value="overdue">Overdue</option>
                   <option value="locked">Locked</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
             </div>
@@ -243,7 +251,7 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push(`/${locale}/admin/surveys/assignments/${params.id}`)}
+                onClick={() => router.push(`/${locale}/admin/surveys/assignments/${id}`)}
                 disabled={updateMutation.isPending}
               >
                 Cancel
@@ -274,12 +282,13 @@ export default function EditAssignmentPage({ params }: EditAssignmentPageProps) 
               type="button"
               variant="destructive"
               onClick={() => {
-                if (confirm('Are you sure you want to delete this assignment? This action cannot be undone.')) {
-                  // Add delete mutation here
+                if (confirm('Are you sure you want to cancel this assignment? Completed assignments cannot be cancelled.')) {
+                  deleteMutation.mutate(undefined);
                 }
               }}
+              disabled={deleteMutation.isPending}
             >
-              Delete Assignment
+              {deleteMutation.isPending ? 'Cancelling...' : 'Cancel Assignment'}
             </Button>
           </div>
         </div>

@@ -203,7 +203,7 @@ export default function AdminSurveyAssignmentsPage() {
   ];
 
   const handleDeleteAssignment = async (assignmentId: string) => {
-    if (!confirm('Are you sure you want to delete this assignment?')) return;
+    if (!confirm('Are you sure you want to cancel this assignment? Completed assignments cannot be cancelled.')) return;
     
     try {
       await api.delete(`/survey-assignments/${assignmentId}`);
@@ -300,6 +300,7 @@ export default function AdminSurveyAssignmentsPage() {
                 <option value="completed">Completed</option>
                 <option value="overdue">Overdue</option>
                 <option value="locked">Locked</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
             <div>

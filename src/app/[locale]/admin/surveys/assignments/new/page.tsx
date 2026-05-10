@@ -26,6 +26,7 @@ interface Volunteer {
   id: string;
   full_name: string;
   email: string;
+  role?: string;
 }
 
 interface SurveyTemplate {
@@ -70,9 +71,26 @@ export default function CreateAssignmentPage() {
   // Fetch data
   const { data: pilotsResponse } = useApiQuery<unknown>(['pilots'], () => api.get<unknown>('/pilots'));
   const pilots = normalizeArray<Pilot>(pilotsResponse);
-  const { data: volunteersResponse } = useApiQuery<unknown>(
-    ['volunteers', formData.pilot_id],
-    () => api.get<unknown>(`/pilots/${formData.pilot_id}/volunteers`),
+  const { data: volunteersResponse, error: volunteersError, isLoading: volunteersLoading } = useApiQuery<unknown>(
+    ['survey-respondents', formData.pilot_id],
+    async () => {
+      const [volunteerResponse, facilitatorResponse] = await Promise.all([
+        api.get<unknown>('/users', { params: { role: 'volunteer', pilot_id: formData.pilot_id } }),
+        api.get<unknown>('/users', { params: { role: 'facilitator', pilot_id: formData.pilot_id } }),
+      ]);
+
+      const volunteers = normalizeArray<Volunteer>(volunteerResponse).map(user => ({ ...user, role: 'volunteer' }));
+      const facilitators = normalizeArray<Volunteer>(facilitatorResponse).map(user => ({ ...user, role: 'facilitator' }));
+      const byId = new Map<string, Volunteer>();
+
+      for (const user of [...volunteers, ...facilitators]) {
+        byId.set(user.id, user);
+      }
+
+      return Array.from(byId.values()).sort((a, b) =>
+        (a.full_name || a.email || '').localeCompare(b.full_name || b.email || '')
+      );
+    },
     { enabled: !!formData.pilot_id && formData.survey_type === 'volunteer' }
   );
   const volunteers = normalizeArray<Volunteer>(volunteersResponse);
@@ -117,7 +135,7 @@ export default function CreateAssignmentPage() {
       let payload: any = {};
 
       if (formData.survey_type === 'volunteer') {
-        if (!formData.volunteer_id) throw new Error('Please select a volunteer');
+        if (!formData.volunteer_id) throw new Error('Please select a respondent');
         
         // Choose endpoint based on survey period (pre_activity or post_activity)
         if (formData.survey_period === 'pre_activity') {
@@ -131,6 +149,7 @@ export default function CreateAssignmentPage() {
         payload = {
           volunteer_id: formData.volunteer_id,
           pilot_id: formData.pilot_id,
+          survey_template_id: formData.survey_template_id,
           due_date_days: Math.ceil((new Date(formData.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         };
       } else {
@@ -308,9 +327,15 @@ export default function CreateAssignmentPage() {
             {formData.survey_type === 'volunteer' && formData.pilot_id && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Volunteer
+                  Select Respondent
                 </label>
-                {volunteers && volunteers.length > 0 ? (
+                {volunteersLoading ? (
+                  <p className="text-sm text-gray-500">Loading eligible respondents...</p>
+                ) : volunteersError ? (
+                  <Alert type="error" title="Unable to load eligible respondents">
+                    <p className="mt-2">Please try again. The selected pilot could not load volunteer-compatible users.</p>
+                  </Alert>
+                ) : volunteers.length > 0 ? (
                   <select
                     name="volunteer_id"
                     value={formData.volunteer_id}
@@ -318,16 +343,16 @@ export default function CreateAssignmentPage() {
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                     required
                   >
-                    <option value="">Select a volunteer</option>
+                    <option value="">Select a respondent</option>
                     {volunteers.map(volunteer => (
                       <option key={volunteer.id} value={volunteer.id}>
-                        {volunteer.full_name} ({volunteer.email})
+                        {volunteer.full_name || volunteer.email} ({volunteer.role || 'user'}{volunteer.email ? ` - ${volunteer.email}` : ''})
                       </option>
                     ))}
                   </select>
                 ) : (
                   <p className="text-sm text-gray-500">
-                    No volunteers found in this pilot.
+                    No eligible volunteer or facilitator respondents found in this pilot.
                   </p>
                 )}
               </div>
@@ -378,7 +403,7 @@ export default function CreateAssignmentPage() {
                 </div>
                 {formData.survey_type === 'volunteer' && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Volunteer:</span>
+                    <span className="text-gray-600">Respondent:</span>
                     <span className="font-medium">{volunteers?.find(v => v.id === formData.volunteer_id)?.full_name}</span>
                   </div>
                 )}
