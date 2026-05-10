@@ -34,6 +34,14 @@ interface TemplateResponse {
   [key: string]: any;
 }
 
+const QUESTION_TYPES = [
+  { value: 'text', label: 'Text' },
+  { value: 'number', label: 'Number' },
+  { value: 'agree_disagree_unsure', label: 'Agree / Disagree / Unsure' },
+  { value: 'scale_1_5', label: 'Scale (1-5)' },
+  { value: 'scale_1_10', label: 'Scale (1-10)' },
+];
+
 export default function CreateSurveyTemplatePage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -289,13 +297,11 @@ export default function CreateSurveyTemplatePage() {
                               onChange={(e) => handleQuestionChange(index, 'question_type', e.target.value)}
                               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                             >
-                              <option value="text">Text</option>
-                              <option value="textarea">Text Area</option>
-                              <option value="number">Number</option>
-                              <option value="select">Select (Dropdown)</option>
-                              <option value="radio">Radio Buttons</option>
-                              <option value="checkbox">Checkbox</option>
-                              <option value="rating">Rating</option>
+                              {QUESTION_TYPES.map(type => (
+                                <option key={type.value} value={type.value}>
+                                  {type.label}
+                                </option>
+                              ))}
                             </select>
                           </div>
 

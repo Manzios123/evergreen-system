@@ -5,7 +5,7 @@ export interface SurveyQuestion {
   id: string;
   component_id?: string;
   question_text: string;
-  question_type: 'text' | 'number' | 'select' | 'multi_select' | 'rating' | 'date';
+  question_type: 'agree_disagree_unsure' | 'scale_1_5' | 'scale_1_10' | 'text' | 'number';
   order_index: number;
   is_required: boolean;
   created_at: string;

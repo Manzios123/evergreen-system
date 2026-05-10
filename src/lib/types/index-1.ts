@@ -181,7 +181,7 @@ export interface PaginationParams {
 // Survey types
 export interface SurveyQuestion {
   id: string;
-  type: 'text' |'textarea'| 'number' | 'select' | 'radio' | 'checkbox' | 'rating' | 'date';
+  type: 'agree_disagree_unsure' | 'scale_1_5' | 'scale_1_10' | 'text' | 'number';
   question: string;
   required: boolean;
   options?: string[];

@@ -48,11 +48,10 @@ const formatDate = (dateString: string): string => {
 
 const QUESTION_TYPES = [
   { value: 'text', label: 'Text' },
-  { value: 'multiple_choice', label: 'Multiple Choice' },
-  { value: 'checkbox', label: 'Checkbox' },
-  { value: 'scale', label: 'Scale (1-5)' },
-  { value: 'date', label: 'Date' },
-  { value: 'time', label: 'Time' },
+  { value: 'number', label: 'Number' },
+  { value: 'agree_disagree_unsure', label: 'Agree / Disagree / Unsure' },
+  { value: 'scale_1_5', label: 'Scale (1-5)' },
+  { value: 'scale_1_10', label: 'Scale (1-10)' },
 ];
 
 const SURVEY_TYPES = [
@@ -143,10 +142,10 @@ export default function EditSurveyTemplatePage() {
     if (field === 'is_required') {
       updatedQuestions[index] = { ...updatedQuestions[index], [field]: value };
     } else if (field === 'question_type') {
-      updatedQuestions[index] = { 
-        ...updatedQuestions[index], 
+      updatedQuestions[index] = {
+        ...updatedQuestions[index],
         [field]: value,
-        ...(value !== 'multiple_choice' && value !== 'checkbox' ? { options: [] } : {})
+        options: []
       };
     } else {
       updatedQuestions[index] = { ...updatedQuestions[index], [field]: value };
@@ -198,33 +197,6 @@ export default function EditSurveyTemplatePage() {
     setQuestions(reorderedQuestions);
   };
 
-  const handleAddOption = (questionIndex: number) => {
-    const updatedQuestions = [...questions];
-    if (!updatedQuestions[questionIndex].options) {
-      updatedQuestions[questionIndex].options = [];
-    }
-    updatedQuestions[questionIndex].options!.push('');
-    setQuestions(updatedQuestions);
-  };
-
-  const handleOptionChange = (questionIndex: number, optionIndex: number, value: string) => {
-    const updatedQuestions = [...questions];
-    if (updatedQuestions[questionIndex].options) {
-      updatedQuestions[questionIndex].options![optionIndex] = value;
-      setQuestions(updatedQuestions);
-    }
-  };
-
-  const handleRemoveOption = (questionIndex: number, optionIndex: number) => {
-    const updatedQuestions = [...questions];
-    if (updatedQuestions[questionIndex].options) {
-      updatedQuestions[questionIndex].options = updatedQuestions[questionIndex].options!.filter(
-        (_, i) => i !== optionIndex
-      );
-      setQuestions(updatedQuestions);
-    }
-  };
-
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -241,11 +213,9 @@ export default function EditSurveyTemplatePage() {
         newErrors[`question_${index}_text`] = 'Question text is required';
       }
 
-      if (
-        (question.question_type === 'multiple_choice' || question.question_type === 'checkbox') &&
-        (!question.options || question.options.length === 0)
-      ) {
-        newErrors[`question_${index}_options`] = 'At least one option is required';
+      const validQuestionTypes = QUESTION_TYPES.map(type => type.value);
+      if (!validQuestionTypes.includes(question.question_type)) {
+        newErrors[`question_${index}_type`] = 'Choose a supported question type';
       }
     });
 
@@ -580,59 +550,10 @@ export default function EditSurveyTemplatePage() {
                               />
                             </div>
 
-                            {/* Options for Multiple Choice */}
-                            {(question.question_type === 'multiple_choice' || question.question_type === 'checkbox') && (
-                              <div className="border border-gray-200 rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <label className="block text-sm font-medium text-gray-700">
-                                    Options *
-                                  </label>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleAddOption(index)}
-                                  >
-                                    <PlusIcon className="h-4 w-4 mr-2" />
-                                    Add Option
-                                  </Button>
-                                </div>
-                                
-                                {errors[`question_${index}_options`] && (
-                                  <p className="text-sm text-red-600 mb-3">
-                                    {errors[`question_${index}_options`]}
-                                  </p>
-                                )}
-
-                                {(!question.options || question.options.length === 0) ? (
-                                  <p className="text-sm text-gray-500 text-center py-4">
-                                    No options added. Add at least one option.
-                                  </p>
-                                ) : (
-                                  <div className="space-y-2">
-                                    {question.options!.map((option, optionIndex) => (
-                                      <div key={optionIndex} className="flex items-center gap-2">
-                                        <input
-                                          type="text"
-                                          value={option}
-                                          onChange={(e) =>
-                                            handleOptionChange(index, optionIndex, e.target.value)
-                                          }
-                                          placeholder={`Option ${optionIndex + 1}`}
-                                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                        />
-                                        <button
-                                          type="button"
-                                          className="p-2 text-red-400 hover:text-red-500"
-                                          onClick={() => handleRemoveOption(index, optionIndex)}
-                                        >
-                                          <TrashIcon className="h-4 w-4" />
-                                        </button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
+                            {errors[`question_${index}_type`] && (
+                              <p className="text-sm text-red-600">
+                                {errors[`question_${index}_type`]}
+                              </p>
                             )}
                           </div>
                         </div>
