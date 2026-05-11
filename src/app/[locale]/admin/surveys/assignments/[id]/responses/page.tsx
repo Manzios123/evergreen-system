@@ -52,6 +52,32 @@ interface AssignmentDetails {
   questions: SurveyQuestion[];
 }
 
+function textOr(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function formatLabel(value: unknown, fallback = 'Unknown') {
+  return textOr(value, fallback).replace(/_/g, ' ');
+}
+
+function normalizeAssignment(response: AssignmentDetails | { assignment?: Partial<AssignmentDetails>; questions?: SurveyQuestion[] }): AssignmentDetails {
+  const base = ((response as any).assignment || response) as Partial<AssignmentDetails>;
+  return {
+    id: textOr(base.id, ''),
+    survey_name: textOr((base as any).survey_name || (base as any).template_name, 'Untitled survey'),
+    survey_description: textOr(base.survey_description, ''),
+    survey_type: textOr(base.survey_type, 'student'),
+    survey_period: textOr(base.survey_period, 'survey'),
+    assigned_to_user_id: base.assigned_to_user_id || null,
+    assigned_to_pilot_id: base.assigned_to_pilot_id || null,
+    due_date: textOr(base.due_date, ''),
+    status: textOr(base.status, 'unknown'),
+    volunteer_name: base.volunteer_name || null,
+    pilot_name: textOr(base.pilot_name, 'Unknown pilot'),
+    questions: Array.isArray((response as any).questions) ? (response as any).questions : Array.isArray(base.questions) ? base.questions : [],
+  };
+}
+
 export default function AssignmentResponsesPage() {
   const params = useParams();
   const id = params?.id as string | undefined;
@@ -59,7 +85,7 @@ export default function AssignmentResponsesPage() {
   // Fetch assignment details
   const { data: assignment, isLoading: assignmentLoading } = useApiQuery<AssignmentDetails>(
     ['assignment-details', id],
-    () => api.get<AssignmentDetails>(`/survey-assignments/${id}`),
+    () => api.get<AssignmentDetails | { assignment?: Partial<AssignmentDetails>; questions?: SurveyQuestion[] }>(`/survey-assignments/${id}`).then(normalizeAssignment),
     { enabled: !!id }
   );
 
@@ -163,7 +189,7 @@ export default function AssignmentResponsesPage() {
           <div className="bg-gray-50 rounded-lg p-4">
             <p className="text-sm font-medium text-gray-500">Survey Type</p>
             <p className="mt-1 text-sm text-gray-900 capitalize">
-              {assignment.survey_type} • {assignment.survey_period.replace('_', ' ')}
+              {formatLabel(assignment.survey_type)} • {formatLabel(assignment.survey_period)}
             </p>
           </div>
         </div>
@@ -242,7 +268,7 @@ export default function AssignmentResponsesPage() {
                         {question.order_index + 1}. {question.question_text}
                       </h3>
                       <p className="text-sm text-gray-500">
-                        Type: <span className="capitalize">{question.question_type.replace('_', ' ')}</span>
+                        Type: <span className="capitalize">{formatLabel(question.question_type, 'text')}</span>
                       </p>
                     </div>
                     

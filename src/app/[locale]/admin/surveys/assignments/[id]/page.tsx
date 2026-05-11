@@ -1,6 +1,7 @@
 // app/[locale]/admin/surveys/assignments/[id]/page.tsx
 'use client';
 
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
@@ -45,6 +46,18 @@ interface SurveyAssignment {
   completed_at: string | null;
 }
 
+interface AssignmentApiResponse {
+  assignment?: Partial<SurveyAssignment>;
+  questions?: unknown[];
+  completed?: boolean;
+  completed_at?: string | null;
+  response_id?: string | null;
+  submission_stats?: {
+    submissions_count?: number;
+    last_submission_at?: string | null;
+  };
+}
+
 interface SurveyResponse {
   id: string;
   submitted_at: string;
@@ -52,16 +65,68 @@ interface SurveyResponse {
   submitted_by_name: string;
 }
 
+function textOr(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function formatLabel(value: unknown, fallback = 'Unknown') {
+  return textOr(value, fallback).replace(/_/g, ' ');
+}
+
+function formatDate(value: unknown, fallback = 'Not set') {
+  if (typeof value !== 'string' || !value) return fallback;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : date.toLocaleDateString();
+}
+
+function formatDateTime(value: unknown, fallback = 'Not set') {
+  if (typeof value !== 'string' || !value) return fallback;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
+}
+
+function normalizeAssignment(response: SurveyAssignment | AssignmentApiResponse): SurveyAssignment {
+  const wrapped = (response as AssignmentApiResponse).assignment;
+  const base = (wrapped || response) as Partial<SurveyAssignment>;
+  const completedAt = base.completed_at || (response as AssignmentApiResponse).completed_at || null;
+  const status = textOr(base.status, completedAt ? 'completed' : 'unknown');
+
+  return {
+    id: textOr(base.id, ''),
+    survey_template_id: textOr(base.survey_template_id, ''),
+    assigned_to_user_id: base.assigned_to_user_id || null,
+    assigned_to_pilot_id: base.assigned_to_pilot_id || null,
+    assigned_by_user_id: textOr(base.assigned_by_user_id, ''),
+    due_date: base.due_date || null,
+    status,
+    created_at: textOr(base.created_at, ''),
+    updated_at: textOr(base.updated_at, ''),
+    survey_name: textOr((base as any).survey_name || (base as any).template_name, 'Untitled survey'),
+    survey_description: base.survey_description || null,
+    survey_type: textOr(base.survey_type, 'student'),
+    survey_period: textOr(base.survey_period, 'survey'),
+    pilot_id: textOr(base.pilot_id || base.assigned_to_pilot_id, ''),
+    pilot_name: textOr(base.pilot_name, 'Unknown pilot'),
+    assigned_by_name: textOr(base.assigned_by_name, 'Unknown user'),
+    volunteer_name: base.volunteer_name || null,
+    volunteer_email: base.volunteer_email || null,
+    completed: Boolean(base.completed || (response as AssignmentApiResponse).completed || status === 'completed' || completedAt),
+    completed_at: completedAt,
+  };
+}
+
 export default function AssignmentDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string | undefined;
   const locale = (params?.locale as string) || 'en';
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   // Fetch assignment details
   const { data: assignment, isLoading, error, refetch } = useApiQuery<SurveyAssignment>(
     ['survey-assignment', id],
-    () => api.get<SurveyAssignment>(`/survey-assignments/${id}`),
+    () => api.get<SurveyAssignment | AssignmentApiResponse>(`/survey-assignments/${id}`).then(normalizeAssignment),
     { enabled: !!id }
   );
 
@@ -99,27 +164,36 @@ export default function AssignmentDetailPage() {
 
   const handleUpdateStatus = async (newStatus: string) => {
     if (!id) return;
+    setActionError(null);
+    setActionMessage(null);
     try {
+      if (newStatus === 'completed' && !confirm('Mark this student survey assignment as complete?')) return;
       const payload = newStatus === 'completed'
         ? { status: newStatus, completed_at: new Date().toISOString() }
         : { status: newStatus };
       await api.put(`/survey-assignments/${id}`, payload);
+      setActionMessage(newStatus === 'completed' ? 'Student survey assignment marked complete.' : 'Assignment updated.');
       refetch();
     } catch (error) {
       console.error('Failed to update status:', error);
+      setActionError('Unable to update this assignment. Please try again.');
     }
   };
 
   const handleExtendDueDate = async () => {
     if (!id) return;
+    setActionError(null);
+    setActionMessage(null);
     const newDate = prompt('Enter new due date (YYYY-MM-DD):', assignment?.due_date || '');
     if (!newDate) return;
     
     try {
       await api.put(`/survey-assignments/${id}`, { due_date: newDate });
+      setActionMessage('Due date updated.');
       refetch();
     } catch (error) {
       console.error('Failed to extend due date:', error);
+      setActionError('Unable to update the due date. Please try again.');
     }
   };
 
@@ -152,9 +226,26 @@ export default function AssignmentDetailPage() {
 
   const isOverdue = assignment.due_date && new Date(assignment.due_date) < new Date() && assignment.status !== 'completed';
   const isVolunteerAssignment = assignment.survey_type === 'volunteer';
+  const isCompleted = assignment.completed || assignment.status === 'completed';
+  const safeAssignmentId = assignment.id || id;
+  const completeActionLabel = assignment.survey_type === 'student'
+    ? 'Mark Student Survey Complete'
+    : 'Mark as Complete';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {actionError && (
+        <Alert type="error" title="Action failed">
+          {actionError}
+        </Alert>
+      )}
+
+      {actionMessage && (
+        <Alert type="success" title="Success">
+          {actionMessage}
+        </Alert>
+      )}
+
       {/* Header */}
       <div>
         <Link
@@ -171,20 +262,22 @@ export default function AssignmentDetailPage() {
               {assignment.survey_name}
             </h1>
             <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-              <span className="capitalize">{assignment.survey_period.replace('_', ' ')} Survey</span>
+              <span className="capitalize">{formatLabel(assignment.survey_period, 'Survey')} Survey</span>
               <span>•</span>
-              <span className="capitalize">{assignment.survey_type}</span>
+              <span className="capitalize">{formatLabel(assignment.survey_type)}</span>
               <span>•</span>
               <span>{assignment.pilot_name}</span>
             </div>
           </div>
           <div className="flex space-x-2">
-            <Link href={`/${locale}/admin/surveys/assignments/${id}/edit`}>
+            {safeAssignmentId && (
+            <Link href={`/${locale}/admin/surveys/assignments/${safeAssignmentId}/edit`}>
               <Button variant="outline">
                 <PencilIcon className="h-4 w-4 mr-2" />
                 Edit
               </Button>
             </Link>
+            )}
             <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-700">
               <TrashIcon className="h-4 w-4 mr-2" />
               Cancel
@@ -226,7 +319,7 @@ export default function AssignmentDetailPage() {
                 <div className="ml-3">
                   <p className="text-sm font-medium text-gray-500">Due Date</p>
                   <p className="text-gray-900">
-                    {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'No due date'}
+                    {formatDate(assignment.due_date, 'No due date')}
                   </p>
                   {isOverdue && (
                     <p className="text-sm text-red-600">Overdue</p>
@@ -242,9 +335,9 @@ export default function AssignmentDetailPage() {
                   <p className="text-sm font-medium text-gray-500">Status</p>
                   <div className="flex items-center space-x-2">
                     <StatusBadge status={assignment.status as any} />
-                    {assignment.completed && assignment.completed_at && (
+                    {isCompleted && assignment.completed_at && (
                       <span className="text-sm text-gray-500">
-                        Completed on {new Date(assignment.completed_at).toLocaleDateString()}
+                        Completed on {formatDate(assignment.completed_at)}
                       </span>
                     )}
                   </div>
@@ -259,7 +352,7 @@ export default function AssignmentDetailPage() {
                   <p className="text-sm font-medium text-gray-500">Created By</p>
                   <p className="text-gray-900">{assignment.assigned_by_name}</p>
                   <p className="text-sm text-gray-500">
-                    Created on {new Date(assignment.created_at).toLocaleDateString()}
+                    Created on {formatDate(assignment.created_at)}
                   </p>
                 </div>
               </div>
@@ -272,7 +365,7 @@ export default function AssignmentDetailPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
             
             <div className="space-y-3">
-              {!assignment.completed && (
+              {!isCompleted && (
                 <>
                   <Button 
                     variant="outline" 
@@ -280,7 +373,7 @@ export default function AssignmentDetailPage() {
                     onClick={() => handleUpdateStatus('completed')}
                   >
                     <EyeIcon className="h-4 w-4 mr-2" />
-                    Mark as Completed
+                    {completeActionLabel}
                   </Button>
                   
                   <Button 
@@ -314,8 +407,8 @@ export default function AssignmentDetailPage() {
                 </>
               )}
               
-              {assignment.completed && response && (
-                <Link href={`/${locale}/admin/surveys/assignments/${id}/responses`} className="block">
+              {isCompleted && safeAssignmentId && (
+                <Link href={`/${locale}/admin/surveys/assignments/${safeAssignmentId}/responses`} className="block">
                   <Button variant="default" className="w-full justify-start">
                     <EyeIcon className="h-4 w-4 mr-2" />
                     View Survey Responses
@@ -323,32 +416,36 @@ export default function AssignmentDetailPage() {
                 </Link>
               )}
               
+              {assignment.survey_template_id && (
               <Link href={`/${locale}/admin/surveys/templates/${assignment.survey_template_id}`} className="block">
                 <Button variant="outline" className="w-full justify-start">
                   <DocumentTextIcon className="h-4 w-4 mr-2" />
                   View Survey Template
                 </Button>
               </Link>
+              )}
               
+              {assignment.pilot_id && (
               <Link href={`/${locale}/admin/pilots/${assignment.pilot_id}`} className="block">
                 <Button variant="outline" className="w-full justify-start">
                   <AcademicCapIcon className="h-4 w-4 mr-2" />
                   View Pilot Details
                 </Button>
               </Link>
+              )}
             </div>
           </div>
         </Card>
       </div>
 
       {/* Response Preview */}
-      {assignment.completed && response && (
+      {isCompleted && response && (
         <Card>
           <div className="p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Survey Response</h2>
               <span className="text-sm text-gray-500">
-                Submitted by {response.submitted_by_name} on {new Date(response.submitted_at).toLocaleDateString()}
+                Submitted by {textOr(response.submitted_by_name, 'Unknown user')} on {formatDate(response.submitted_at)}
               </span>
             </div>
             
@@ -360,16 +457,18 @@ export default function AssignmentDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Total Questions</p>
-                  <p className="text-gray-900">{Object.keys(response.responses).length}</p>
+                  <p className="text-gray-900">{Object.keys(response.responses || {}).length}</p>
                 </div>
               </div>
               
               <div className="mt-4">
-                <Link href={`/${locale}/admin/surveys/assignments/${id}/responses`}>
+                {safeAssignmentId && (
+                <Link href={`/${locale}/admin/surveys/assignments/${safeAssignmentId}/responses`}>
                   <Button variant="default">
                     View Full Responses
                   </Button>
                 </Link>
+                )}
               </div>
             </div>
           </div>
@@ -402,7 +501,7 @@ export default function AssignmentDetailPage() {
                   Assignment created by {assignment.assigned_by_name}
                 </p>
                 <p className="text-xs text-gray-400">
-                  {new Date(assignment.created_at).toLocaleString()}
+                  {formatDateTime(assignment.created_at)}
                 </p>
               </div>
             </div>
@@ -418,7 +517,7 @@ export default function AssignmentDetailPage() {
                     Survey was completed
                   </p>
                   <p className="text-xs text-gray-400">
-                    {new Date(assignment.completed_at).toLocaleString()}
+                    {formatDateTime(assignment.completed_at)}
                   </p>
                 </div>
               </div>
@@ -434,7 +533,7 @@ export default function AssignmentDetailPage() {
                   Assignment was last modified
                 </p>
                 <p className="text-xs text-gray-400">
-                  {new Date(assignment.updated_at).toLocaleString()}
+                  {formatDateTime(assignment.updated_at)}
                 </p>
               </div>
             </div>

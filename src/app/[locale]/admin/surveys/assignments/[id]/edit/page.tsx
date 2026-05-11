@@ -33,6 +33,32 @@ interface SurveyAssignment {
   volunteer_name: string;
 }
 
+function textOr(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function formatLabel(value: unknown, fallback = 'Unknown') {
+  return textOr(value, fallback).replace(/_/g, ' ');
+}
+
+function normalizeAssignment(response: SurveyAssignment | { assignment?: Partial<SurveyAssignment> }): SurveyAssignment {
+  const base = ((response as any).assignment || response) as Partial<SurveyAssignment>;
+  return {
+    id: textOr(base.id, ''),
+    survey_template_id: textOr(base.survey_template_id, ''),
+    assigned_to_user_id: base.assigned_to_user_id || null,
+    assigned_to_pilot_id: base.assigned_to_pilot_id || null,
+    due_date: textOr(base.due_date, ''),
+    status: textOr(base.status, 'pending'),
+    survey_name: textOr((base as any).survey_name || (base as any).template_name, 'Untitled survey'),
+    survey_description: textOr(base.survey_description, ''),
+    survey_type: textOr(base.survey_type, 'student'),
+    survey_period: textOr(base.survey_period, 'survey'),
+    pilot_name: textOr(base.pilot_name, 'Unknown pilot'),
+    volunteer_name: textOr(base.volunteer_name, ''),
+  };
+}
+
 export default function EditAssignmentPage() {
   const router = useRouter();
   const params = useParams();
@@ -48,7 +74,7 @@ export default function EditAssignmentPage() {
   // Fetch assignment details
   const { data: assignment, isLoading, error: fetchError } = useApiQuery<SurveyAssignment>(
     ['survey-assignment', id],
-    () => api.get<SurveyAssignment>(`/survey-assignments/${id}`),
+    () => api.get<SurveyAssignment | { assignment?: Partial<SurveyAssignment> }>(`/survey-assignments/${id}`).then(normalizeAssignment),
     {
       enabled: !!id,
     }
@@ -166,7 +192,7 @@ export default function EditAssignmentPage() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Type</p>
                 <p className="mt-1 text-sm text-gray-900 capitalize">
-                  {assignment.survey_type} • {assignment.survey_period.replace('_', ' ')}
+                  {formatLabel(assignment.survey_type)} • {formatLabel(assignment.survey_period)}
                 </p>
               </div>
               <div>

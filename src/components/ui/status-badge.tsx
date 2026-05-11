@@ -2,7 +2,7 @@
 import { cn } from '@/lib/utils';
 
 interface StatusBadgeProps {
-  status: string;
+  status?: string | null;
   showIcon?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -125,8 +125,9 @@ export default function StatusBadge({
   size = 'md', 
   className 
 }: StatusBadgeProps) {
-  const config = statusConfig[status as keyof typeof statusConfig] || {
-    label: status.charAt(0).toUpperCase() + status.slice(1),
+  const safeStatus = typeof status === 'string' && status.trim() ? status : 'unknown';
+  const config = statusConfig[safeStatus as keyof typeof statusConfig] || {
+    label: safeStatus.charAt(0).toUpperCase() + safeStatus.slice(1),
     color: 'bg-gray-100 text-gray-800 ring-gray-600/20',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
