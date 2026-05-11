@@ -21,6 +21,7 @@ const navigation = {
     { name: 'Media', labelKey: 'media', href: '/admin/media' },
     { name: 'Exports', labelKey: 'exports', href: '/admin/exports' },
     { name: 'Reports', labelKey: 'reports', href: '/admin/reports' },
+    { name: 'Analytics', labelKey: 'analytics', href: '/admin/analytics' },
   ],
   coordinator: [
     { name: 'Dashboard', labelKey: 'dashboard', href: '/coordinator/dashboard' },

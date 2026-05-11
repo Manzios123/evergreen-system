@@ -60,7 +60,8 @@
     "assignActivity": "Assign Activity",
     "myActivities": "My Activities",
     "feedback": "Feedback",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "analytics": "Analytics"
   },
   "layout": {
     "maintenance": "The system is currently under maintenance. Some features may be temporarily unavailable while improvements are being completed.",

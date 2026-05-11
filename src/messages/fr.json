@@ -57,7 +57,8 @@
       "myActivities": "Mes activités",
       "feedback": "Commentaires",
       "signOut": "Déconnexion",
-      "users": "Utilisateurs"
+      "users": "Utilisateurs",
+      "analytics": "Analytique"
     },
     "layout": {
       "maintenance": "Le système est actuellement en maintenance. Certaines fonctionnalités peuvent être temporairement indisponibles pendant les améliorations.",

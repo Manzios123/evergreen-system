@@ -124,6 +124,7 @@ export default function Sidebar({ role }: SidebarProps) {
       { name: 'Media', labelKey: 'media', href: '/admin/media', icon: PhotoIcon },
       { name: 'Exports', labelKey: 'exports', href: '/admin/exports', icon: ArrowDownTrayIcon },
       { name: 'Reports', labelKey: 'reports', href: '/admin/reports', icon: ChartBarIcon },
+      { name: 'Analytics', labelKey: 'analytics', href: '/admin/analytics', icon: ChartBarIcon },
     ],
     coordinator: [
       { name: 'Dashboard', labelKey: 'dashboard', href: '/coordinator/dashboard', icon: HomeIcon, exact: true },
