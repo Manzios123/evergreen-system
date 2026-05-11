@@ -50,7 +50,13 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err: any) {
-      setError(err.message || t('invalidCredentials'));
+      if (err?.status === 401 || err?.error === 'Invalid credentials') {
+        setError('Incorrect email or password. Please try again.');
+      } else if (err?.status === 403 || err?.error === 'Account disabled') {
+        setError(err?.message || 'Your account is not active. Please contact an administrator.');
+      } else {
+        setError('Unable to sign in right now. Please try again.');
+      }
     }
   };
   

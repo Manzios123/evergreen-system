@@ -12,6 +12,7 @@ export interface AnalyticsFilters {
 export interface AnalyticsResponse<T> {
   success: boolean;
   data: T;
+  warnings?: Array<{ section: string; message: string }>;
 }
 
 export interface AnalyticsOverview {

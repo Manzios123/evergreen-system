@@ -118,6 +118,7 @@ export default function AdminAnalyticsPage() {
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -165,8 +166,9 @@ export default function AdminAnalyticsPage() {
     async function loadAnalytics() {
       setIsLoading(true);
       setError(null);
+      setWarnings([]);
       try {
-        const [overviewResponse, reportResponse, surveyResponse] = await Promise.all([
+        const [overviewResult, reportResult, surveyResult] = await Promise.allSettled([
           analyticsApi.overview(),
           analyticsApi.reports(filters),
           analyticsApi.surveys(filters),
@@ -174,12 +176,38 @@ export default function AdminAnalyticsPage() {
 
         if (!isMounted) return;
 
-        setOverview(overviewResponse.data || emptyOverview);
-        setReports(reportResponse.data || emptyReports);
-        setSurveys(surveyResponse.data || emptySurveys);
-      } catch (err: any) {
-        if (isMounted) {
-          setError(err?.message || 'Unable to load analytics.');
+        const nextWarnings: string[] = [];
+        let failedSections = 0;
+
+        if (overviewResult.status === 'fulfilled') {
+          setOverview(overviewResult.value.data || emptyOverview);
+          nextWarnings.push(...(overviewResult.value.warnings || []).map((warning) => warning.message));
+        } else {
+          failedSections += 1;
+          setOverview(emptyOverview);
+        }
+
+        if (reportResult.status === 'fulfilled') {
+          setReports(reportResult.value.data || emptyReports);
+          nextWarnings.push(...(reportResult.value.warnings || []).map((warning) => warning.message));
+        } else {
+          failedSections += 1;
+          setReports(emptyReports);
+        }
+
+        if (surveyResult.status === 'fulfilled') {
+          setSurveys(surveyResult.value.data || emptySurveys);
+          nextWarnings.push(...(surveyResult.value.warnings || []).map((warning) => warning.message));
+        } else {
+          failedSections += 1;
+          setSurveys(emptySurveys);
+        }
+
+        setWarnings(Array.from(new Set(nextWarnings)));
+        if (failedSections === 3) {
+          setError('Unable to load analytics right now. Please try again.');
+        } else if (failedSections > 0) {
+          setError('Some analytics sections could not be loaded.');
         }
       } finally {
         if (isMounted) setIsLoading(false);
@@ -357,6 +385,16 @@ export default function AdminAnalyticsPage() {
       {error && (
         <Alert type="error" title="Unable to load analytics">
           {error}
+        </Alert>
+      )}
+
+      {warnings.length > 0 && (
+        <Alert type="warning" title="Some analytics are unavailable">
+          <ul className="list-disc space-y-1 pl-5">
+            {warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
         </Alert>
       )}
 
