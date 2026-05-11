@@ -44,20 +44,17 @@ interface SkeletonLoaderProps {
   
     if (type === 'table') {
       return (
-        <div className="space-y-4">
-          {/* Table Header */}
-          <div className="grid grid-cols-4 gap-4">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <div className="grid grid-cols-4 gap-4 border-b border-gray-200 bg-gray-50 p-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-6 bg-gray-200 rounded animate-pulse"></div>
+              <div key={i} className="h-4 rounded bg-gray-200 animate-pulse"></div>
             ))}
           </div>
-          
-          {/* Table Rows */}
-          <div className="space-y-3">
+          <div className="divide-y divide-gray-100">
             {Array.from({ length: rows }).map((_, i) => (
-              <div key={i} className="grid grid-cols-4 gap-4">
+              <div key={i} className="grid grid-cols-4 gap-4 p-4">
                 {[1, 2, 3, 4].map((j) => (
-                  <div key={j} className="h-8 bg-gray-100 rounded animate-pulse"></div>
+                  <div key={j} className="h-5 rounded bg-gray-100 animate-pulse"></div>
                 ))}
               </div>
             ))}

@@ -186,7 +186,7 @@ export default function AdminUsersPage() {
       key: 'actions',
       header: 'Actions',
       render: (user: UserWithPilot) => (
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => router.push(`/${locale}/coordinator/volunteers/${user.id}`)}
             className="inline-flex items-center justify-center rounded-md h-8 px-3 text-xs hover:bg-gray-100 hover:text-gray-900 text-gray-700"

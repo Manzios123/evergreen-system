@@ -342,7 +342,7 @@ export default function AdminSurveysPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Survey Analytics Center</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -350,14 +350,14 @@ export default function AdminSurveysPage() {
           </p>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
         
         </div>
       </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex gap-6 overflow-x-auto">
           {(['student', 'volunteer', 'admin'] as TabType[]).map((tab) => (
             <button
               key={tab}
@@ -472,7 +472,7 @@ export default function AdminSurveysPage() {
         <>
           {/* Filters */}
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="font-medium text-gray-900">Filters</h3>
               <Button
                 variant="ghost"
@@ -484,8 +484,8 @@ export default function AdminSurveysPage() {
               </Button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="min-w-0">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Pilot
                 </label>
@@ -503,7 +503,7 @@ export default function AdminSurveysPage() {
                 </select>
               </div>
               
-              <div>
+              <div className="min-w-0">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Survey Template
                 </label>
@@ -521,7 +521,7 @@ export default function AdminSurveysPage() {
                 </select>
               </div>
               
-              <div>
+              <div className="min-w-0">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Survey Period
                 </label>
@@ -539,23 +539,23 @@ export default function AdminSurveysPage() {
                 </select>
               </div>
               
-              <div>
+              <div className="min-w-0 sm:col-span-2 xl:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Date Range
                 </label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <input
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="From"
                   />
                   <input
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="To"
                   />
                 </div>
@@ -566,8 +566,8 @@ export default function AdminSurveysPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Search {activeTab === 'student' ? 'by Volunteer' : 'by Email/Name'}
               </label>
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative min-w-0 flex-1">
                   <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                   <input
                     type="text"
@@ -697,14 +697,14 @@ export default function AdminSurveysPage() {
 
           {/* Data Table */}
           <Card className="p-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="font-medium text-gray-900">Survey Responses</h3>
                 <p className="text-sm text-gray-500">
                   Showing {responses.length} of {pagination.total} responses
                 </p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <Button
                   variant="outline"
                   onClick={handleExport}
@@ -766,22 +766,22 @@ export default function AdminSurveysPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {responses.map((response) => (
                         <tr key={response.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
+                          <td className="px-6 py-4 align-top">
+                            <div className="max-w-xs truncate text-sm font-medium text-gray-900" title={response.template_name}>
                               {response.template_name}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
+                          <td className="px-6 py-4 align-top">
+                            <div className="max-w-xs truncate text-sm text-gray-900" title={response.pilot_name || response.pilot_id}>
                               {response.pilot_name || response.pilot_id}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-4 align-top">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                               {response.survey_period.replace('_', ' ')}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-4 align-top">
                             <div className="text-sm text-gray-900">
                               {new Date(response.submitted_at).toLocaleDateString()}
                             </div>
@@ -791,21 +791,21 @@ export default function AdminSurveysPage() {
                           </td>
                           {activeTab === 'student' ? (
                             <>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
+                              <td className="px-6 py-4 align-top">
+                                <div className="max-w-xs truncate text-sm text-gray-900" title={response.submitted_by_name || 'Unknown'}>
                                   {response.submitted_by_name || 'Unknown'}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   Activity: {response.activity_id ? response.activity_id.substring(0, 8) + '...' : 'N/A'}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <td className="px-6 py-4 align-top text-sm text-gray-900">
                                 {response.total_students || 0}
                               </td>
                             </>
                           ) : (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
+                            <td className="px-6 py-4 align-top">
+                              <div className="max-w-xs truncate text-sm text-gray-900" title={response.volunteer_name || response.volunteer_email || 'Unknown'}>
                                 {response.volunteer_name || response.volunteer_email || 'Unknown'}
                               </div>
                               {response.volunteer_email && (
@@ -815,7 +815,7 @@ export default function AdminSurveysPage() {
                               )}
                             </td>
                           )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <td className="px-6 py-4 align-top text-sm font-medium">
                             <Button
                               variant="ghost"
                               size="sm"

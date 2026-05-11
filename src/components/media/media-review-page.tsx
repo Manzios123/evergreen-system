@@ -216,7 +216,7 @@ export function MediaReviewPage({ locale, role }: MediaReviewPageProps) {
       </div>
 
       <Card className="p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           <label className="text-sm">
             <span className="mb-1 block font-medium text-gray-700">Type</span>
             <select
@@ -311,7 +311,7 @@ export function MediaReviewPage({ locale, role }: MediaReviewPageProps) {
                       {item.uploadedAt ? new Date(item.uploadedAt).toLocaleDateString() : 'Unknown'}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => setSelectedItem(item)}>View</Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownload(item)}>Download</Button>
                         <Button variant="destructive" size="sm" onClick={() => handleDelete(item)}>Delete</Button>
@@ -360,7 +360,7 @@ export function MediaReviewPage({ locale, role }: MediaReviewPageProps) {
               <div><dt className="font-medium text-gray-500">Size</dt><dd>{formatBytes(selectedItem.size)}</dd></div>
             </dl>
             {selectedItem.caption && <p className="mt-4 rounded bg-gray-50 p-3 text-sm text-gray-700">{selectedItem.caption}</p>}
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
               <Button variant="outline" onClick={() => handleDownload(selectedItem)}>Download</Button>
               <Button variant="destructive" onClick={() => handleDelete(selectedItem)}>Delete Permanently</Button>
             </div>

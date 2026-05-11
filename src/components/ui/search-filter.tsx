@@ -46,8 +46,8 @@ export default function SearchFilter({
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="flex-1 relative">
+      <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative min-w-0 flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
           </div>
@@ -59,33 +59,37 @@ export default function SearchFilter({
             className="pl-10"
           />
         </div>
-        <Button type="submit">Search</Button>
-        {filters.length > 0 && (
-          <Button
-            variant="outline"
-            type="button"
-            icon={<FunnelIcon className="h-4 w-4" />}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            Filters
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+          <Button type="submit" className="flex-1 sm:flex-none">Search</Button>
+          {filters.length > 0 && (
+            <Button
+              variant="outline"
+              type="button"
+              className="flex-1 sm:flex-none"
+              icon={<FunnelIcon className="h-4 w-4" />}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              Filters
+            </Button>
+          )}
+        </div>
       </form>
 
       {showFilters && filters.length > 0 && (
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-sm font-medium text-gray-900">Filters</h3>
             <button
+              type="button"
               onClick={clearFilters}
               className="text-sm text-gray-500 hover:text-gray-700"
             >
               Clear all
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {filters.map((filter) => (
-              <div key={filter.key}>
+              <div key={filter.key} className="min-w-0">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {filter.label}
                 </label>

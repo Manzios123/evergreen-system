@@ -9,6 +9,10 @@ interface Column<T> {
   render?: (item: T) => ReactNode;
   align?: 'left' | 'center' | 'right';
   sortable?: boolean;
+  className?: string;
+  cellClassName?: string;
+  truncate?: boolean;
+  minWidth?: string;
 }
 
 interface DataTableProps<T> {
@@ -33,18 +37,42 @@ export default function DataTable<T extends Record<string, any>>({
   emptyMessage = 'No data available',
   pagination,
 }: DataTableProps<T>) {
+  const getCellContent = (item: T, column: Column<T>) => {
+    if (column.render) {
+      return column.render(item);
+    }
+
+    const value = item[column.key];
+    if (value === null || value === undefined || value === '') {
+      return <span className="text-gray-400">-</span>;
+    }
+
+    const text = String(value);
+    if (column.truncate === false) {
+      return <span className="whitespace-normal break-words">{text}</span>;
+    }
+
+    return (
+      <span className="block max-w-xs truncate" title={text}>
+        {text}
+      </span>
+    );
+  };
+
   if (loading) {
     return (
-      <div className="overflow-x-auto">
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               {columns.map((column, index) => (
                 <th
                   key={column.key || index}
-                  className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                  className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     column.align === 'center' ? 'text-center' : column.align === 'right' ? 'text-right' : ''
-                  }`}
+                  } ${column.className || ''}`}
+                  style={column.minWidth ? { minWidth: column.minWidth } : undefined}
                 >
                   {column.header}
                 </th>
@@ -55,14 +83,15 @@ export default function DataTable<T extends Record<string, any>>({
             {[1, 2, 3].map((row) => (
               <tr key={row} className="animate-pulse">
                 {columns.map((column, colIndex) => (
-                  <td key={colIndex} className="px-6 py-4">
-                    <div className="h-4 bg-gray-200 rounded"></div>
+                  <td key={colIndex} className="px-4 py-4">
+                    <div className="h-4 rounded bg-gray-100"></div>
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     );
   }
@@ -101,7 +130,8 @@ export default function DataTable<T extends Record<string, any>>({
                   scope="col"
                   className={`px-3 py-3.5 text-left text-sm font-semibold text-gray-900 ${
                     column.align === 'center' ? 'text-center' : column.align === 'right' ? 'text-right' : ''
-                  }`}
+                  } ${column.className || ''}`}
+                  style={column.minWidth ? { minWidth: column.minWidth } : undefined}
                 >
                   {column.header}
                 </th>
@@ -118,11 +148,11 @@ export default function DataTable<T extends Record<string, any>>({
                 {columns.map((column, colIndex) => (
                   <td
                     key={colIndex}
-                    className={`whitespace-nowrap px-3 py-4 text-sm text-gray-900 ${
+                    className={`px-3 py-4 align-top text-sm text-gray-900 ${
                       column.align === 'center' ? 'text-center' : column.align === 'right' ? 'text-right' : ''
-                    }`}
+                    } ${column.cellClassName || ''}`}
                   >
-                    {column.render ? column.render(item) : item[column.key]}
+                    {getCellContent(item, column)}
                   </td>
                 ))}
               </tr>
