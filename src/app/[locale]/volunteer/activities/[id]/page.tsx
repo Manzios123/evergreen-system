@@ -25,6 +25,7 @@ import {
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { activitiesApi } from '@/lib/api/activities';
+import { mediaApi, MediaItem } from '@/lib/api/media';
 import { ActivitySubmissionFormV2 } from '@/components/activities/activity-submission-form-v2';
 import { Activity, ActivityStatus } from '@/lib/types'; // ADDED: Import types
 
@@ -93,6 +94,18 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
       }
       return activitiesApi.get(unwrappedParams.id) as Promise<ActivityApiResponse>;
     },
+    {
+      enabled: !!unwrappedParams?.id,
+    }
+  );
+
+  const {
+    data: mediaItems = [],
+    isLoading: isLoadingMedia,
+    error: mediaError,
+  } = useApiQuery<MediaItem[]>(
+    ['activity-media', unwrappedParams?.id],
+    () => mediaApi.list(unwrappedParams!.id),
     {
       enabled: !!unwrappedParams?.id,
     }
@@ -431,24 +444,47 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
               </Card>
             )}
 
-            {/* Media Gallery Placeholder */}
-            {activity.status === 'approved' && (
+            {/* Media Gallery */}
+            {(mediaItems.length > 0 || isLoadingMedia || mediaError) && (
               <Card>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Activity Media
                 </h2>
-                <div className="text-center py-8">
-                  <div className="flex justify-center space-x-4 mb-4">
-                    <PhotoIcon className="h-12 w-12 text-gray-300" />
-                    <VideoCameraIcon className="h-12 w-12 text-gray-300" />
+                {isLoadingMedia && <SkeletonLoader type="card" />}
+                {mediaError && (
+                  <Alert type="error" title="Unable to load media">
+                    Your uploaded media could not be loaded right now.
+                  </Alert>
+                )}
+                {!isLoadingMedia && !mediaError && mediaItems.length > 0 && (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    {mediaItems.map((item) => (
+                      <a
+                        key={item.id}
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group block overflow-hidden rounded-lg border bg-gray-50"
+                      >
+                        <div className="aspect-square">
+                          {item.mediaType === 'video' ? (
+                            <video src={item.url} className="h-full w-full object-cover" muted preload="metadata" />
+                          ) : (
+                            <img src={item.thumbnailUrl || item.url} alt={item.caption || item.filename} className="h-full w-full object-cover" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 p-2 text-xs text-gray-600">
+                          {item.mediaType === 'video' ? (
+                            <VideoCameraIcon className="h-4 w-4 shrink-0" />
+                          ) : (
+                            <PhotoIcon className="h-4 w-4 shrink-0" />
+                          )}
+                          <span className="truncate">{item.caption || item.filename}</span>
+                        </div>
+                      </a>
+                    ))}
                   </div>
-                  <p className="text-sm text-gray-500">
-                    Photos and videos from this activity would appear here
-                  </p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Media is uploaded through the activity submission form
-                  </p>
-                </div>
+                )}
               </Card>
             )}
 

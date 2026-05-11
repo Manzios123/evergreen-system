@@ -17,6 +17,7 @@ const navigation = {
     { name: 'Schools', href: '/admin/schools' },
     { name: 'Activities', href: '/admin/activities' },
     { name: 'Surveys', href: '/admin/surveys' },
+    { name: 'Media', href: '/admin/media' },
     { name: 'Exports', href: '/admin/exports' },
     { name: 'Reports', href: '/admin/reports' },
   ],
@@ -28,6 +29,7 @@ const navigation = {
     { name: 'Volunteers', href: '/coordinator/volunteers' },
     { name: 'Schools', href: '/coordinator/schools' },
     { name: 'Surveys', href: '/coordinator/surveys' },
+    { name: 'Media', href: '/coordinator/media' },
     { name: 'Exports', href: '/coordinator/exports' },
   ],
   volunteer: [

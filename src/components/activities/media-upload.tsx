@@ -40,6 +40,8 @@ export interface MediaItem {
 interface MediaUploadProps {
   activityId: string;
   maxItems?: number;
+  maxImages?: number;
+  maxVideos?: number;
   maxSizeMB?: number;
   allowedTypes?: ('photo' | 'video' | 'document')[];
   onMediaChange?: (media: MediaItem[]) => void;
@@ -47,9 +49,11 @@ interface MediaUploadProps {
   compressionLevel?: 'low' | 'medium' | 'high';
 }
 
-export function MediaUpload({ 
-  activityId, 
-  maxItems = 15, 
+export function MediaUpload({
+  activityId,
+  maxItems = 4,
+  maxImages = 3,
+  maxVideos = 1,
   maxSizeMB = 50,
   allowedTypes = ['photo', 'video'],
   onMediaChange,
@@ -62,6 +66,9 @@ export function MediaUpload({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+
+  const imageCount = mediaItems.filter(item => item.mediaType === 'photo').length;
+  const videoCount = mediaItems.filter(item => item.mediaType === 'video').length;
 
   // Image compression options
   const getImageCompressionOptions = () => {
@@ -129,13 +136,52 @@ export function MediaUpload({
     return await api.upload<MediaItem>(`/activities/${activityId}/media`, formData);
   };
 
+  const loadExistingMedia = useCallback(async () => {
+    if (!activityId) return;
+
+    try {
+      const response = await api.get<{ data?: MediaItem[] } | MediaItem[]>(`/activities/${activityId}/media`);
+      const items = Array.isArray(response) ? response : response.data || [];
+      setMediaItems(items);
+      onMediaChange?.(items);
+    } catch (error: any) {
+      setError(error.message || 'Unable to load existing media for this activity');
+    }
+  }, [activityId, onMediaChange]);
+
+  useEffect(() => {
+    loadExistingMedia();
+  }, [loadExistingMedia]);
+
+  useEffect(() => {
+    onMediaChange?.(mediaItems);
+  }, [mediaItems, onMediaChange]);
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (disabled) return;
     
     setError(null);
     setSuccess(null);
 
-    // Check if adding these files would exceed maximum
+    const incomingImages = acceptedFiles.filter(file => file.type.startsWith('image/')).length;
+    const incomingVideos = acceptedFiles.filter(file => file.type.startsWith('video/')).length;
+    const unsupportedFiles = acceptedFiles.filter(file => !file.type.startsWith('image/') && !file.type.startsWith('video/'));
+
+    if (unsupportedFiles.length > 0) {
+      setError('Only image and video files can be uploaded with activity reports.');
+      return;
+    }
+
+    if (imageCount + incomingImages > maxImages) {
+      setError(`Maximum ${maxImages} images per report allowed. You can upload ${Math.max(maxImages - imageCount, 0)} more image${maxImages - imageCount === 1 ? '' : 's'}.`);
+      return;
+    }
+
+    if (videoCount + incomingVideos > maxVideos) {
+      setError(`Maximum ${maxVideos} video per report allowed. You can upload ${Math.max(maxVideos - videoCount, 0)} more video${maxVideos - videoCount === 1 ? '' : 's'}.`);
+      return;
+    }
+
     if (mediaItems.length + acceptedFiles.length > maxItems) {
       setError(`Maximum ${maxItems} media items allowed. You can upload ${maxItems - mediaItems.length} more.`);
       return;
@@ -219,17 +265,14 @@ export function MediaUpload({
         setError(`Failed to upload "${file.name}": ${error.message || error.error || 'Unknown error'}`);
         // Remove failed preview
         setMediaItems(prev => prev.filter(item => 
-          !item.filename.includes(file.name) || item.id.startsWith('preview-')
+          !(item.filename.includes(file.name) && item.id.startsWith('preview-'))
         ));
       } finally {
         setUploading(prev => prev.filter(name => name !== file.name));
       }
     }
 
-    if (onMediaChange) {
-      onMediaChange(mediaItems);
-    }
-  }, [activityId, maxItems, mediaItems, disabled, onMediaChange, allowedTypes, compressionLevel]);
+  }, [activityId, maxItems, maxImages, maxVideos, mediaItems, imageCount, videoCount, disabled, allowedTypes, compressionLevel]);
 
   // Delete media using api utility
   const deleteMedia = async (mediaId: string) => {
@@ -284,6 +327,8 @@ export function MediaUpload({
   }, [mediaItems]);
 
   const remainingSlots = maxItems - mediaItems.length;
+  const remainingImages = maxImages - imageCount;
+  const remainingVideos = maxVideos - videoCount;
 
   // Format file size
   const formatFileSize = (bytes: number): string => {
@@ -308,13 +353,16 @@ export function MediaUpload({
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Activity Media</h3>
             <p className="text-sm text-gray-500">
-              Upload photos and videos from your activity {mediaItems.length > 0 && `(${mediaItems.length}/${maxItems})`}
+              Upload up to {maxImages} images and {maxVideos} video from your activity
             </p>
           </div>
           {mediaItems.length > 0 && (
-            <div className="text-sm">
+            <div className="flex flex-wrap gap-2 text-sm">
               <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                {remainingSlots} slot{remainingSlots !== 1 ? 's' : ''} remaining
+                Images {imageCount}/{maxImages}
+              </span>
+              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full">
+                Videos {videoCount}/{maxVideos}
               </span>
             </div>
           )}
@@ -365,7 +413,7 @@ export function MediaUpload({
                 {isDragActive ? 'Drop media here' : 'Drag & drop photos/videos or click to browse'}
               </p>
               <p className="mt-1 text-xs text-gray-500">
-                Upload up to {remainingSlots} item{remainingSlots !== 1 ? 's' : ''} (max {maxSizeMB}MB each)
+                Remaining: {Math.max(remainingImages, 0)} image{remainingImages === 1 ? '' : 's'} and {Math.max(remainingVideos, 0)} video{remainingVideos === 1 ? '' : 's'} (max {maxSizeMB}MB each)
               </p>
               <p className="mt-2 text-xs text-gray-400">
                 Photos: JPG, PNG, GIF, WebP, HEIC | Videos: MP4, MOV, AVI, WebM
@@ -487,7 +535,7 @@ export function MediaUpload({
                 <div className="flex items-center">
                   <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400 mr-2" />
                   <p className="text-sm text-yellow-800">
-                    Maximum of {maxItems} media items reached. Delete some to add more.
+                    Maximum report media reached: {maxImages} images and {maxVideos} video.
                   </p>
                 </div>
               </div>

@@ -17,6 +17,26 @@ export interface MediaItem {
   compressionProfile?: 'low' | 'medium' | 'high';
 }
 
+export interface MediaReviewItem {
+  id: string;
+  activityId: string;
+  url: string;
+  filename: string;
+  caption?: string | null;
+  mediaType: 'photo' | 'video' | 'document';
+  fileType?: string | null;
+  size: number;
+  uploadedAt: string;
+  status: string;
+  activityTitle?: string | null;
+  activityDescription?: string | null;
+  schoolName?: string | null;
+  pilotId?: string | null;
+  pilotName?: string | null;
+  uploadedByName?: string | null;
+  uploadedByEmail?: string | null;
+}
+
 export const mediaApi = {
   // Upload media for an activity
   upload: (activityId: string, file: File, mediaType: 'photo' | 'video', caption?: string) => {
@@ -45,5 +65,23 @@ export const mediaApi = {
   }),
 
   // List media for an activity
-  list: (activityId: string) => apiRequest<MediaItem[]>(`/activities/${activityId}/media`),
+  list: async (activityId: string): Promise<MediaItem[]> => {
+    const response = await apiRequest<{ data?: MediaItem[] } | MediaItem[]>(`/activities/${activityId}/media`);
+    return Array.isArray(response) ? response : response.data || [];
+  },
+
+  reviewList: async (params?: { media_type?: 'photo' | 'video'; pilot_id?: string; school_id?: string; limit?: number }): Promise<MediaReviewItem[]> => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          searchParams.append(key, String(value));
+        }
+      });
+    }
+
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    const response = await apiRequest<{ data?: MediaReviewItem[] } | MediaReviewItem[]>(`/media/review${query}`);
+    return Array.isArray(response) ? response : response.data || [];
+  },
 };

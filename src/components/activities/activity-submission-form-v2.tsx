@@ -445,7 +445,9 @@ export function ActivitySubmissionFormV2({
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Upload Photos & Videos</h3>
                   <MediaUpload
                     activityId={activity.id}
-                    maxItems={15}
+                    maxItems={4}
+                    maxImages={3}
+                    maxVideos={1}
                     maxSizeMB={50}
                     allowedTypes={['photo', 'video']}
                     onMediaChange={setUploadedMedia}

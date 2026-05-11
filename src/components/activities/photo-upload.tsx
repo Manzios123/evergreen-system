@@ -15,6 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import imageCompression from 'browser-image-compression';
+import { api } from '@/lib/api';
 
 interface Photo {
   id: string;
@@ -37,9 +38,9 @@ interface PhotoUploadProps {
   disabled?: boolean;
 }
 
-export function PhotoUpload({ 
-  activityId, 
-  maxPhotos = 10, 
+export function PhotoUpload({
+  activityId,
+  maxPhotos = 3,
   maxSizeMB = 5,
   onPhotosChange,
   disabled = false
@@ -80,17 +81,7 @@ export function PhotoUpload({
       formData.append('caption', caption);
     }
 
-    const response = await fetch(`/api/activities/${activityId}/photos`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to upload photo');
-    }
-
-    return await response.json();
+    return api.upload<Photo>(`/activities/${activityId}/photos`, formData);
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -142,7 +133,7 @@ export function PhotoUpload({
       } catch (error: any) {
         setError(`Failed to upload "${file.name}": ${error.message}`);
         // Remove failed preview
-        setPhotos(prev => prev.filter(p => !p.filename.includes(file.name) || p.id.startsWith('preview-')));
+        setPhotos(prev => prev.filter(p => !(p.filename.includes(file.name) && p.id.startsWith('preview-'))));
       } finally {
         setUploading(prev => prev.filter(name => name !== file.name));
       }
@@ -163,14 +154,7 @@ export function PhotoUpload({
     try {
       setError(null);
       
-      const response = await fetch(`/api/photos/${photoId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete photo');
-      }
+      await api.delete(`/photos/${photoId}`);
 
       // Remove from local state
       setPhotos(prev => prev.filter(p => p.id !== photoId));

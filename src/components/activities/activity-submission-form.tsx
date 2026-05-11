@@ -442,13 +442,13 @@ export function ActivitySubmissionForm({
                 <div className="pl-10">
                   <PhotoUpload
                     activityId={activity.id}
-                    maxPhotos={10}
+                    maxPhotos={3}
                     maxSizeMB={5}
                     onPhotosChange={setUploadedPhotos}
                     disabled={!isOwner && submissionType === 'save'}
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Upload photos to document your activity (optional, max 10 photos, 5MB each)
+                    Upload photos to document your activity (optional, max 3 images, 5MB each)
                   </p>
                 </div>
               </div>

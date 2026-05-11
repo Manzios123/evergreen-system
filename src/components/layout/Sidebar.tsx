@@ -22,6 +22,7 @@ import {
   BuildingLibraryIcon,
   UserCircleIcon,
   Cog6ToothIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
@@ -116,6 +117,7 @@ export default function Sidebar({ role }: SidebarProps) {
       { name: 'Schools', href: '/admin/schools', icon: BuildingLibraryIcon },
       { name: 'Activities', href: '/admin/activities', icon: CalendarIcon },
       { name: 'Surveys', href: '/admin/surveys', icon: ClipboardDocumentListIcon },
+      { name: 'Media', href: '/admin/media', icon: PhotoIcon },
       { name: 'Exports', href: '/admin/exports', icon: ArrowDownTrayIcon },
       { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
     ],
@@ -127,6 +129,7 @@ export default function Sidebar({ role }: SidebarProps) {
       { name: 'Volunteers', href: '/coordinator/volunteers', icon: UserGroupIcon },
       { name: 'Schools', href: '/coordinator/schools', icon: AcademicCapIcon },
       { name: 'Surveys', href: '/coordinator/surveys', icon: DocumentTextIcon },
+      { name: 'Media', href: '/coordinator/media', icon: PhotoIcon },
       { name: 'Exports', href: '/coordinator/exports', icon: ArrowDownTrayIcon },
     ],
     volunteer: [
