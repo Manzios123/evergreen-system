@@ -12,6 +12,20 @@
     "english": "English",
     "kinyarwanda": "Kinyarwanda",
     "french": "French",
+    "language": "Language",
+    "loading": "Loading...",
+    "logout": "Logout",
+    "signOut": "Sign out",
+    "settings": "Settings",
+    "search": "Search",
+    "clearFilters": "Clear filters",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "view": "View",
+    "edit": "Edit",
+    "download": "Download",
+    "noDataFound": "No data found",
      "status": {
       "draft": "Draft",
       "pending": "Pending Approval",
@@ -28,6 +42,7 @@
   },
   "navigation": {
     "dashboard": "Dashboard",
+    "users": "Users",
     "activities": "Activities",
     "surveys": "Surveys",
     "reports": "Reports",
@@ -39,8 +54,25 @@
     "pilots": "Pilots",
     "schools": "Schools",
     "exports": "Exports",
+    "media": "Media",
     "system": "System",
-    "approvals": "Approvals"
+    "approvals": "Approvals",
+    "assignActivity": "Assign Activity",
+    "myActivities": "My Activities",
+    "feedback": "Feedback",
+    "signOut": "Sign out"
+  },
+  "layout": {
+    "maintenance": "The system is currently under maintenance. Some features may be temporarily unavailable while improvements are being completed.",
+    "profileSettings": "Profile & settings",
+    "viewProfileSettings": "View profile & settings",
+    "notifications": "Notifications",
+    "noNotifications": "No notifications yet",
+    "markAllRead": "Mark all read",
+    "unread": "unread",
+    "profile": "Profile",
+    "dashboard": "Dashboard",
+    "logout": "Logout"
   },
    "volunteer": {
     "dashboard": {

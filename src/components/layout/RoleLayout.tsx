@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import MobileNav from './mobile-nav';
 import { useParams, useRouter } from 'next/navigation'; // Add this
+import { useTranslations } from 'next-intl';
 
 interface RoleLayoutProps {
   children: React.ReactNode;
@@ -17,6 +18,7 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
   const params = useParams();
   const locale = (params?.locale as string) || 'en';
   const { user, isLoading } = useAuth();
+  const tLayout = useTranslations('layout');
 
   if (isLoading) {
     return (
@@ -65,7 +67,7 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
       <div className="lg:pl-72">
         <Header />
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 sm:px-6 lg:px-8">
-          The system is currently under maintenance. Some features may be temporarily unavailable while improvements are being completed.
+          {tLayout('maintenance')}
         </div>
         
         <main className="py-8">

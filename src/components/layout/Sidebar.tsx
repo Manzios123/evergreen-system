@@ -26,6 +26,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
 interface SidebarProps {
   role: 'admin' | 'coordinator' | 'volunteer' | 'facilitator';
@@ -33,6 +34,7 @@ interface SidebarProps {
 
 interface NavigationItem {
   name: string;
+  labelKey: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   exact?: boolean;
@@ -91,6 +93,8 @@ export default function Sidebar({ role }: SidebarProps) {
   const router = useRouter();
   const locale = params.locale as string;
   const { logout, user } = useAuth();
+  const tNav = useTranslations('navigation');
+  const tLayout = useTranslations('layout');
 
   const { data: pendingData } = useApiQuery<{
     pendingActivities: number;
@@ -111,36 +115,36 @@ export default function Sidebar({ role }: SidebarProps) {
 
   const navigation: Record<string, NavigationItem[]> = {
     admin: [
-      { name: 'Dashboard', href: '/admin/dashboard', icon: HomeIcon, exact: true },
-      { name: 'Users', href: '/admin/users', icon: UsersIcon },
-      { name: 'Pilots', href: '/admin/pilots', icon: ChartBarIcon },
-      { name: 'Schools', href: '/admin/schools', icon: BuildingLibraryIcon },
-      { name: 'Activities', href: '/admin/activities', icon: CalendarIcon },
-      { name: 'Surveys', href: '/admin/surveys', icon: ClipboardDocumentListIcon },
-      { name: 'Media', href: '/admin/media', icon: PhotoIcon },
-      { name: 'Exports', href: '/admin/exports', icon: ArrowDownTrayIcon },
-      { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
+      { name: 'Dashboard', labelKey: 'dashboard', href: '/admin/dashboard', icon: HomeIcon, exact: true },
+      { name: 'Users', labelKey: 'users', href: '/admin/users', icon: UsersIcon },
+      { name: 'Pilots', labelKey: 'pilots', href: '/admin/pilots', icon: ChartBarIcon },
+      { name: 'Schools', labelKey: 'schools', href: '/admin/schools', icon: BuildingLibraryIcon },
+      { name: 'Activities', labelKey: 'activities', href: '/admin/activities', icon: CalendarIcon },
+      { name: 'Surveys', labelKey: 'surveys', href: '/admin/surveys', icon: ClipboardDocumentListIcon },
+      { name: 'Media', labelKey: 'media', href: '/admin/media', icon: PhotoIcon },
+      { name: 'Exports', labelKey: 'exports', href: '/admin/exports', icon: ArrowDownTrayIcon },
+      { name: 'Reports', labelKey: 'reports', href: '/admin/reports', icon: ChartBarIcon },
     ],
     coordinator: [
-      { name: 'Dashboard', href: '/coordinator/dashboard', icon: HomeIcon, exact: true },
-      { name: 'Activities', href: '/coordinator/activities', icon: CalendarIcon },
-      { name: 'Assign Activity', href: '/coordinator/assign', icon: PlusCircleIcon },
-      { name: 'Approvals', href: '/coordinator/approvals', icon: CheckCircleIcon, badge: 'count' },
-      { name: 'Volunteers', href: '/coordinator/volunteers', icon: UserGroupIcon },
-      { name: 'Schools', href: '/coordinator/schools', icon: AcademicCapIcon },
-      { name: 'Surveys', href: '/coordinator/surveys', icon: DocumentTextIcon },
-      { name: 'Media', href: '/coordinator/media', icon: PhotoIcon },
-      { name: 'Exports', href: '/coordinator/exports', icon: ArrowDownTrayIcon },
+      { name: 'Dashboard', labelKey: 'dashboard', href: '/coordinator/dashboard', icon: HomeIcon, exact: true },
+      { name: 'Activities', labelKey: 'activities', href: '/coordinator/activities', icon: CalendarIcon },
+      { name: 'Assign Activity', labelKey: 'assignActivity', href: '/coordinator/assign', icon: PlusCircleIcon },
+      { name: 'Approvals', labelKey: 'approvals', href: '/coordinator/approvals', icon: CheckCircleIcon, badge: 'count' },
+      { name: 'Volunteers', labelKey: 'volunteers', href: '/coordinator/volunteers', icon: UserGroupIcon },
+      { name: 'Schools', labelKey: 'schools', href: '/coordinator/schools', icon: AcademicCapIcon },
+      { name: 'Surveys', labelKey: 'surveys', href: '/coordinator/surveys', icon: DocumentTextIcon },
+      { name: 'Media', labelKey: 'media', href: '/coordinator/media', icon: PhotoIcon },
+      { name: 'Exports', labelKey: 'exports', href: '/coordinator/exports', icon: ArrowDownTrayIcon },
     ],
     volunteer: [
-      { name: 'Dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
-      { name: 'My Activities', href: '/volunteer/activities', icon: CalendarIcon },
-      { name: 'Feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
+      { name: 'Dashboard', labelKey: 'dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
+      { name: 'My Activities', labelKey: 'myActivities', href: '/volunteer/activities', icon: CalendarIcon },
+      { name: 'Feedback', labelKey: 'feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
     ],
     facilitator: [
-      { name: 'Dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
-      { name: 'My Activities', href: '/volunteer/activities', icon: CalendarIcon },
-      { name: 'Feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
+      { name: 'Dashboard', labelKey: 'dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
+      { name: 'My Activities', labelKey: 'myActivities', href: '/volunteer/activities', icon: CalendarIcon },
+      { name: 'Feedback', labelKey: 'feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
     ],
   };
 
@@ -163,7 +167,7 @@ export default function Sidebar({ role }: SidebarProps) {
 
   const profileHref = `/${locale}/${role}/profile`;
   const displayName = user?.full_name || user?.name || user?.email || user?.phone || 'User';
-  const secondaryText = user?.email || user?.phone || 'View profile & settings';
+  const secondaryText = user?.email || user?.phone || tLayout('viewProfileSettings');
 
   return (
     <div className="flex grow flex-col overflow-y-auto bg-white border-r border-gray-100 shadow-sm">
@@ -221,7 +225,7 @@ export default function Sidebar({ role }: SidebarProps) {
                     }`}
                     aria-hidden="true"
                   />
-                  <span className="flex-1 truncate">{item.name}</span>
+                  <span className="flex-1 truncate">{tNav(item.labelKey)}</span>
                   {badgeCount !== null && badgeCount > 0 && (
                     <span className={`
                       inline-flex items-center justify-center min-w-[20px] h-5 px-1.5
@@ -266,7 +270,7 @@ export default function Sidebar({ role }: SidebarProps) {
             className="w-full flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
           >
             <ArrowRightOnRectangleIcon className="h-5 w-5 text-gray-400 group-hover:text-red-500" />
-            Sign out
+            {tNav('signOut')}
           </button>
         </div>
       </nav>

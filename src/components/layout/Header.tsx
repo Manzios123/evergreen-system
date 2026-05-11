@@ -4,7 +4,8 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { BellIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Bars3Icon } from '@heroicons/react/24/solid';
@@ -13,6 +14,7 @@ import { notificationsApi, NotificationItem } from '@/lib/api/notifications';
 // Days and months for display
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SUPPORTED_LOCALES = ['en', 'fr', 'rw'];
 
 function LiveClock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -132,6 +134,42 @@ function UserAvatar({ user }: { user: any }) {
   );
 }
 
+function LanguageSwitcher() {
+  const params = useParams();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const t = useTranslations('common');
+  const currentLocale = (params?.locale as string) || 'en';
+
+  const switchLanguage = (nextLocale: string) => {
+    const segments = (pathname || '/').split('/');
+    if (SUPPORTED_LOCALES.includes(segments[1])) {
+      segments[1] = nextLocale;
+    } else {
+      segments.splice(1, 0, nextLocale);
+    }
+
+    const queryString = searchParams.toString();
+    router.push(`${segments.join('/') || `/${nextLocale}`}${queryString ? `?${queryString}` : ''}`);
+  };
+
+  return (
+    <label className="block px-4 py-2 text-sm text-gray-700">
+      <span className="mb-1 block text-xs font-medium text-gray-500">{t('language')}</span>
+      <select
+        value={currentLocale}
+        onChange={(event) => switchLanguage(event.target.value)}
+        className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+      >
+        <option value="en">{t('english')}</option>
+        <option value="fr">{t('french')}</option>
+        <option value="rw">{t('kinyarwanda')}</option>
+      </select>
+    </label>
+  );
+}
+
 export default function Header() {
   const { user, logout } = useAuth();
   const params = useParams();
@@ -142,6 +180,7 @@ export default function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const tLayout = useTranslations('layout');
   const role = user?.role || 'volunteer';
   const profileHref = `/${locale}/${role}/profile`;
   const dashboardHref = `/${locale}/${role === 'facilitator' ? 'volunteer' : role}/dashboard`;
@@ -280,8 +319,8 @@ export default function Header() {
             <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black/5">
               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900">Notifications</h2>
-                  <p className="text-xs text-gray-500">{unreadCount} unread</p>
+                  <h2 className="text-sm font-semibold text-gray-900">{tLayout('notifications')}</h2>
+                  <p className="text-xs text-gray-500">{unreadCount} {tLayout('unread')}</p>
                 </div>
                 <button
                   type="button"
@@ -289,7 +328,7 @@ export default function Header() {
                   disabled={unreadCount === 0}
                   className="text-xs font-medium text-green-700 hover:text-green-800 disabled:text-gray-400"
                 >
-                  Mark all read
+                  {tLayout('markAllRead')}
                 </button>
               </div>
 
@@ -310,7 +349,7 @@ export default function Header() {
                 )}
 
                 {!notificationsLoading && !notificationsError && notifications.length === 0 && (
-                  <div className="p-6 text-center text-sm text-gray-500">No notifications yet</div>
+                  <div className="p-6 text-center text-sm text-gray-500">{tLayout('noNotifications')}</div>
                 )}
 
                 {!notificationsLoading && !notificationsError && notifications.map((notification) => (
@@ -372,15 +411,16 @@ export default function Header() {
                 onClick={() => setProfileMenuOpen(false)}
                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
-                Profile
+                {tLayout('profile')}
               </Link>
               <Link
                 href={dashboardHref}
                 onClick={() => setProfileMenuOpen(false)}
                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
-                Dashboard
+                {tLayout('dashboard')}
               </Link>
+              <LanguageSwitcher />
               <button
                 type="button"
                 onClick={() => {
@@ -389,7 +429,7 @@ export default function Header() {
                 }}
                 className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
               >
-                Logout
+                {tLayout('logout')}
               </button>
             </div>
           )}

@@ -113,9 +113,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    const currentLocale = typeof window !== 'undefined'
+      ? window.location.pathname.split('/').filter(Boolean)[0]
+      : 'en';
+    const locale = ['en', 'fr', 'rw'].includes(currentLocale) ? currentLocale : 'en';
     apiLogout();
     setUser(null);
-    router.push('/login');
+    router.push(`/${locale}/login`);
   };
 
   return (

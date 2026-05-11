@@ -8,39 +8,40 @@ import Image from 'next/image';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { usePathname, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 const navigation = {
   admin: [
-    { name: 'Dashboard', href: '/admin/dashboard' },
-    { name: 'Users', href: '/admin/users' },
-    { name: 'Pilots', href: '/admin/pilots' },
-    { name: 'Schools', href: '/admin/schools' },
-    { name: 'Activities', href: '/admin/activities' },
-    { name: 'Surveys', href: '/admin/surveys' },
-    { name: 'Media', href: '/admin/media' },
-    { name: 'Exports', href: '/admin/exports' },
-    { name: 'Reports', href: '/admin/reports' },
+    { name: 'Dashboard', labelKey: 'dashboard', href: '/admin/dashboard' },
+    { name: 'Users', labelKey: 'users', href: '/admin/users' },
+    { name: 'Pilots', labelKey: 'pilots', href: '/admin/pilots' },
+    { name: 'Schools', labelKey: 'schools', href: '/admin/schools' },
+    { name: 'Activities', labelKey: 'activities', href: '/admin/activities' },
+    { name: 'Surveys', labelKey: 'surveys', href: '/admin/surveys' },
+    { name: 'Media', labelKey: 'media', href: '/admin/media' },
+    { name: 'Exports', labelKey: 'exports', href: '/admin/exports' },
+    { name: 'Reports', labelKey: 'reports', href: '/admin/reports' },
   ],
   coordinator: [
-    { name: 'Dashboard', href: '/coordinator/dashboard' },
-    { name: 'Activities', href: '/coordinator/activities' },
-    { name: 'Assign Activity', href: '/coordinator/assign' },
-    { name: 'Approvals', href: '/coordinator/approvals' },
-    { name: 'Volunteers', href: '/coordinator/volunteers' },
-    { name: 'Schools', href: '/coordinator/schools' },
-    { name: 'Surveys', href: '/coordinator/surveys' },
-    { name: 'Media', href: '/coordinator/media' },
-    { name: 'Exports', href: '/coordinator/exports' },
+    { name: 'Dashboard', labelKey: 'dashboard', href: '/coordinator/dashboard' },
+    { name: 'Activities', labelKey: 'activities', href: '/coordinator/activities' },
+    { name: 'Assign Activity', labelKey: 'assignActivity', href: '/coordinator/assign' },
+    { name: 'Approvals', labelKey: 'approvals', href: '/coordinator/approvals' },
+    { name: 'Volunteers', labelKey: 'volunteers', href: '/coordinator/volunteers' },
+    { name: 'Schools', labelKey: 'schools', href: '/coordinator/schools' },
+    { name: 'Surveys', labelKey: 'surveys', href: '/coordinator/surveys' },
+    { name: 'Media', labelKey: 'media', href: '/coordinator/media' },
+    { name: 'Exports', labelKey: 'exports', href: '/coordinator/exports' },
   ],
   volunteer: [
-    { name: 'Dashboard', href: '/volunteer/dashboard' },
-    { name: 'My Activities', href: '/volunteer/activities' },
-    { name: 'Feedback', href: '/volunteer/surveys/volunteer' },
+    { name: 'Dashboard', labelKey: 'dashboard', href: '/volunteer/dashboard' },
+    { name: 'My Activities', labelKey: 'myActivities', href: '/volunteer/activities' },
+    { name: 'Feedback', labelKey: 'feedback', href: '/volunteer/surveys/volunteer' },
   ],
   facilitator: [
-    { name: 'Dashboard', href: '/volunteer/dashboard' },
-    { name: 'My Activities', href: '/volunteer/activities' },
-    { name: 'Feedback', href: '/volunteer/surveys/volunteer' },
+    { name: 'Dashboard', labelKey: 'dashboard', href: '/volunteer/dashboard' },
+    { name: 'My Activities', labelKey: 'myActivities', href: '/volunteer/activities' },
+    { name: 'Feedback', labelKey: 'feedback', href: '/volunteer/surveys/volunteer' },
   ],
 };
 
@@ -89,13 +90,15 @@ export default function MobileNav() {
   const pathname = usePathname();
   const params = useParams();
   const locale = params.locale as string;
+  const tNav = useTranslations('navigation');
+  const tLayout = useTranslations('layout');
 
   if (!user) return null;
 
   const userNav = navigation[user.role as keyof typeof navigation] || [];
   const profileHref = `/${locale}/${user.role}/profile`;
   const displayName = user.full_name || user.name || user.email || user.phone || 'User';
-  const secondaryText = user.email || user.phone || 'Profile & settings';
+  const secondaryText = user.email || user.phone || tLayout('profileSettings');
 
   return (
     <>
@@ -182,7 +185,7 @@ export default function MobileNav() {
                                 }`}
                               onClick={() => setSidebarOpen(false)}
                             >
-                              {item.name}
+                              {tNav(item.labelKey)}
                             </Link>
                           </li>
                         );
@@ -207,7 +210,7 @@ export default function MobileNav() {
                         onClick={() => { logout(); setSidebarOpen(false); }}
                         className="w-full flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
                       >
-                        Sign out
+                        {tNav('signOut')}
                       </button>
                     </div>
                   </nav>
