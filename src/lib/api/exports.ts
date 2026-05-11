@@ -7,7 +7,7 @@ const exportDownload = async <T>(
   params?: Record<string, any>
 ): Promise<Blob | any> => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  
+
   // Construct URL with query parameters
   let url = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}${endpoint}`;
   if (params) {
@@ -22,7 +22,7 @@ const exportDownload = async <T>(
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -42,7 +42,7 @@ const exportDownload = async <T>(
       } else {
         errorData = { message: await response.text() };
       }
-      
+
       throw {
         status: response.status,
         message: errorData.error || errorData.message || 'An error occurred',
@@ -65,7 +65,7 @@ const exportDownload = async <T>(
 
 export const exportsApi = {
   // Immediate export endpoints
-  
+
   // Export activities with filters
   exportActivities: (
     filters?: {
@@ -183,19 +183,19 @@ export const exportsApi = {
       format: 'csv', // Default to CSV for reports
       ...filters
     };
-    
+
     // For pilot-specific reports, add pilot_id
     if (reportType === 'pilot' && filters?.pilotId) {
       params.pilot_id = filters.pilotId;
     }
-    
+
     // For time-based reports, ensure date range is set
     if (['monthly', 'quarterly', 'annual'].includes(reportType)) {
       if (!params.start_date || !params.end_date) {
         // Calculate date range based on report type
         const now = new Date();
         let startDate = new Date();
-        
+
         switch (reportType) {
           case 'monthly':
             startDate.setMonth(now.getMonth() - 1);
@@ -207,12 +207,12 @@ export const exportsApi = {
             startDate.setFullYear(now.getFullYear() - 1);
             break;
         }
-        
+
         params.start_date = startDate.toISOString().split('T')[0];
         params.end_date = now.toISOString().split('T')[0];
       }
     }
-    
+
     return exportDownload(`/exports/activities`, params);
   },
 

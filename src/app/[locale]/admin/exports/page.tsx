@@ -45,16 +45,16 @@ interface SystemStats {
 const downloadBlob = (blob: Blob, filename: string) => {
   // Create a temporary URL for the blob
   const url = window.URL.createObjectURL(blob);
-  
+
   // Create a temporary anchor element
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
-  
+
   // Append to body, click, and remove
   document.body.appendChild(a);
   a.click();
-  
+
   // Cleanup
   setTimeout(() => {
     document.body.removeChild(a);
@@ -69,10 +69,10 @@ export default function AdminExportsPage() {
   const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json' | ''>('');
 
   // Fetch system stats from admin dashboard
-  const { 
-    data: systemStats, 
-    isLoading: statsLoading, 
-    error: statsError 
+  const {
+    data: systemStats,
+    isLoading: statsLoading,
+    error: statsError
   } = useApiQuery<SystemStats>(
     ['system-stats'],
     async () => {
@@ -90,15 +90,15 @@ export default function AdminExportsPage() {
   const handleExport = async (type: string, format: 'csv' | 'json', options?: any) => {
     setIsCreatingExport(true);
     try {
-      const params: any = { 
+      const params: any = {
         format,
-        ...options 
+        ...options
       };
-      
+
       // Call the appropriate export API function
       let result: Blob | any;
       const timestamp = new Date().toISOString().slice(0, 10);
-      
+
       switch (type) {
         case 'activities':
           result = await exportsApi.exportActivities(params, format);
@@ -125,33 +125,24 @@ export default function AdminExportsPage() {
         default:
           throw new Error(`Unsupported export type: ${type}`);
       }
-      
+
       console.log('Export result:', result);
       console.log('Result type:', typeof result);
-      
-      // Handle the result based on format
-      if (format === 'csv') {
-        // Result should be a Blob for CSV
-        if (result instanceof Blob) {
-          const blob = result;
-          const filename = `${type}-export-${timestamp}.csv`;
-          downloadBlob(blob, filename);
-        } else {
-          // If it's not a blob, try to convert it
-          console.log('Result is not a Blob, converting...', result);
-          const csvString = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-          const blob = new Blob([csvString], { type: 'text/csv' });
-          const filename = `${type}-export-${timestamp}.csv`;
-          downloadBlob(blob, filename);
-        }
+
+      const extension = format === 'csv' ? 'csv' : 'json';
+      const filename = `${type}-export-${timestamp}.${extension}`;
+
+      // Export API returns a Blob for both CSV and JSON so protected downloads keep Authorization headers.
+      if (result instanceof Blob) {
+        downloadBlob(result, filename);
       } else {
-        // For JSON, convert to blob and download
-        const jsonString = JSON.stringify(result, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const filename = `${type}-export-${timestamp}.json`;
+        const content = format === 'csv'
+          ? (typeof result === 'string' ? result : JSON.stringify(result, null, 2))
+          : JSON.stringify(result, null, 2);
+        const blob = new Blob([content], { type: format === 'csv' ? 'text/csv' : 'application/json' });
         downloadBlob(blob, filename);
       }
-      
+
       // Show success message
       alert(`${type.charAt(0).toUpperCase() + type.slice(1)} export completed. The file will download automatically.`);
     } catch (error: any) {
@@ -161,7 +152,7 @@ export default function AdminExportsPage() {
         status: error?.status,
         stack: error?.stack
       });
-      
+
       let errorMessage = 'Unknown error';
       if (error?.message) {
         errorMessage = error.message;
@@ -170,7 +161,7 @@ export default function AdminExportsPage() {
       } else if (error?.toString) {
         errorMessage = error.toString();
       }
-      
+
       alert(`Failed to create export. Please try again. Error: ${errorMessage}`);
     } finally {
       setIsCreatingExport(false);
@@ -188,53 +179,53 @@ export default function AdminExportsPage() {
   };
 
   const exportTypes = [
-    { 
-      id: 'all', 
-      label: 'Full System Backup', 
-      icon: CircleStackIcon, 
+    {
+      id: 'all',
+      label: 'Full System Backup',
+      icon: CircleStackIcon,
       color: 'bg-red-100 text-red-600',
       description: 'Complete database backup including all data',
       requiresConfirmation: true,
     },
-    { 
-      id: 'activities', 
-      label: 'All Activities', 
-      icon: CalendarIcon, 
+    {
+      id: 'activities',
+      label: 'All Activities',
+      icon: CalendarIcon,
       color: 'bg-blue-100 text-blue-600',
       description: 'All activities across all pilot programs',
     },
-    { 
-      id: 'surveys', 
-      label: 'All Surveys', 
-      icon: DocumentTextIcon, 
+    {
+      id: 'surveys',
+      label: 'All Surveys',
+      icon: DocumentTextIcon,
       color: 'bg-purple-100 text-purple-600',
       description: 'All survey responses and results',
     },
-    { 
-      id: 'users', 
-      label: 'User Directory', 
-      icon: UserGroupIcon, 
+    {
+      id: 'users',
+      label: 'User Directory',
+      icon: UserGroupIcon,
       color: 'bg-orange-100 text-orange-600',
       description: 'All user accounts and profiles',
     },
-    { 
-      id: 'schools', 
-      label: 'Schools Directory', 
-      icon: BuildingOfficeIcon, 
+    {
+      id: 'schools',
+      label: 'Schools Directory',
+      icon: BuildingOfficeIcon,
       color: 'bg-indigo-100 text-indigo-600',
       description: 'All schools and their information',
     },
-    { 
-      id: 'pilots', 
-      label: 'Pilot Programs', 
-      icon: ChartBarIcon, 
+    {
+      id: 'pilots',
+      label: 'Pilot Programs',
+      icon: ChartBarIcon,
       color: 'bg-teal-100 text-teal-600',
       description: 'All pilot programs and their configurations',
     },
-    { 
-      id: 'activity-templates', 
-      label: 'Activity Templates', 
-      icon: DocumentTextIcon, 
+    {
+      id: 'activity-templates',
+      label: 'Activity Templates',
+      icon: DocumentTextIcon,
       color: 'bg-green-100 text-green-600',
       description: 'All activity templates and their configurations',
     },
@@ -344,7 +335,7 @@ export default function AdminExportsPage() {
                     <p className="text-sm text-gray-500 mt-1">{exportTypeItem.description}</p>
                   </div>
                 </div>
-                
+
                 <div className="mt-auto pt-3 border-t">
                   {exportTypeItem.id === 'all' ? (
                     <Button
@@ -372,7 +363,7 @@ export default function AdminExportsPage() {
                           </option>
                         ))}
                       </select>
-                      
+
                       {selectedExportType === exportTypeItem.id && selectedFormat && (
                         <Button
                           variant="default"
