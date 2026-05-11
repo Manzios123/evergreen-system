@@ -8,6 +8,7 @@ import { useParams } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { BellIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Bars3Icon } from '@heroicons/react/24/solid';
+import { notificationsApi, NotificationItem } from '@/lib/api/notifications';
 
 // Days and months for display
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -136,10 +137,94 @@ export default function Header() {
   const params = useParams();
   const locale = params?.locale as string || 'en';
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const role = user?.role || 'volunteer';
   const profileHref = `/${locale}/${role}/profile`;
   const dashboardHref = `/${locale}/${role === 'facilitator' ? 'volunteer' : role}/dashboard`;
   const displayName = getDisplayName(user);
+
+  const loadUnreadCount = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await notificationsApi.unreadCount();
+      setUnreadCount(response.count || 0);
+    } catch {
+      setUnreadCount(0);
+    }
+  };
+
+  const loadNotifications = async () => {
+    if (!user?.id) return;
+    setNotificationsLoading(true);
+    setNotificationsError(null);
+    try {
+      const response = await notificationsApi.list(10);
+      setNotifications(Array.isArray(response.data) ? response.data : []);
+    } catch (error: any) {
+      setNotificationsError(error?.message || 'Unable to load notifications');
+      setNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUnreadCount();
+    const interval = window.setInterval(loadUnreadCount, 45000);
+    return () => window.clearInterval(interval);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (notificationsOpen) {
+      loadNotifications();
+    }
+  }, [notificationsOpen]);
+
+  const notificationHref = (notification: NotificationItem) => {
+    const uiRole = role === 'facilitator' ? 'volunteer' : role;
+    if (notification.entity_type === 'activity' && notification.entity_id) {
+      return `/${locale}/${uiRole}/activities/${notification.entity_id}`;
+    }
+    if (notification.entity_type === 'survey_assignment' && notification.entity_id) {
+      if (role === 'admin' || role === 'coordinator') {
+        return `/${locale}/${role}/surveys/assignments/${notification.entity_id}`;
+      }
+      return `/${locale}/volunteer/surveys/volunteer`;
+    }
+    return dashboardHref;
+  };
+
+  const markNotificationRead = async (notification: NotificationItem) => {
+    if (!notification.read_at) {
+      try {
+        await notificationsApi.markRead(notification.id);
+        setNotifications((current) =>
+          current.map((item) =>
+            item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
+          )
+        );
+        setUnreadCount((count) => Math.max(count - 1, 0));
+      } catch {
+        // Keep navigation responsive even if the read update fails.
+      }
+    }
+    setNotificationsOpen(false);
+  };
+
+  const markAllRead = async () => {
+    try {
+      await notificationsApi.markAllRead();
+      const now = new Date().toISOString();
+      setNotifications((current) => current.map((item) => ({ ...item, read_at: item.read_at || now })));
+      setUnreadCount(0);
+    } catch (error: any) {
+      setNotificationsError(error?.message || 'Unable to mark notifications read');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 flex items-center gap-x-4 bg-white/95 backdrop-blur-sm px-4 py-3 border-b border-gray-100 shadow-sm sm:px-6">
@@ -173,20 +258,95 @@ export default function Header() {
         <LiveClock />
 
         {/* Notifications */}
-        <button
-          type="button"
-          className="relative rounded-full p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
-        >
-          <span className="sr-only">View notifications</span>
-          <BellIcon className="h-5 w-5" aria-hidden="true" />
-          <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white" />
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setNotificationsOpen((open) => !open);
+              setProfileMenuOpen(false);
+            }}
+            className="relative rounded-full p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+          >
+            <span className="sr-only">View notifications</span>
+            <BellIcon className="h-5 w-5" aria-hidden="true" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {notificationsOpen && (
+            <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black/5">
+              <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Notifications</h2>
+                  <p className="text-xs text-gray-500">{unreadCount} unread</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={markAllRead}
+                  disabled={unreadCount === 0}
+                  className="text-xs font-medium text-green-700 hover:text-green-800 disabled:text-gray-400"
+                >
+                  Mark all read
+                </button>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto">
+                {notificationsLoading && (
+                  <div className="space-y-3 p-4">
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="animate-pulse space-y-2">
+                        <div className="h-4 w-3/4 rounded bg-gray-100" />
+                        <div className="h-3 w-full rounded bg-gray-100" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!notificationsLoading && notificationsError && (
+                  <div className="p-4 text-sm text-red-700">{notificationsError}</div>
+                )}
+
+                {!notificationsLoading && !notificationsError && notifications.length === 0 && (
+                  <div className="p-6 text-center text-sm text-gray-500">No notifications yet</div>
+                )}
+
+                {!notificationsLoading && !notificationsError && notifications.map((notification) => (
+                  <Link
+                    key={notification.id}
+                    href={notificationHref(notification)}
+                    onClick={() => markNotificationRead(notification)}
+                    className={`block border-b border-gray-100 px-4 py-3 last:border-b-0 hover:bg-gray-50 ${
+                      notification.read_at ? 'bg-white' : 'bg-green-50/70'
+                    }`}
+                  >
+                    <div className="flex gap-3">
+                      {!notification.read_at && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-green-600" />}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-900">{notification.title}</p>
+                        <p className="mt-1 max-h-8 overflow-hidden text-xs text-gray-600">{notification.message}</p>
+                        <p className="mt-1 text-[11px] text-gray-400">
+                          {notification.created_at ? new Date(notification.created_at).toLocaleString() : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* User avatar + name */}
         <div className="relative hidden lg:block">
           <button
             type="button"
-            onClick={() => setProfileMenuOpen((open) => !open)}
+            onClick={() => {
+              setProfileMenuOpen((open) => !open);
+              setNotificationsOpen(false);
+            }}
             className="flex items-center gap-x-2.5 rounded-full pl-1 pr-3 py-1 hover:bg-gray-50 transition-colors group"
           >
             <UserAvatar user={user} />
