@@ -192,6 +192,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
   }
 
   const assignment = apiResponse.assignment;
+  const surveyPeriodLabel = (assignment.survey_period || 'survey').replace('_', ' ');
   const isVolunteerSurvey = assignment.survey_type === 'volunteer';
   const isStudentSurvey = assignment.survey_type === 'student';
 
@@ -284,7 +285,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
               </h1>
             </div>
             <p className="mt-2 text-gray-600">
-              {assignment.survey_description || `Please complete this ${assignment.survey_period.replace('_', ' ')} survey`}
+              {assignment.survey_description || `Please complete this ${surveyPeriodLabel} survey`}
             </p>
           </div>
           {isOverdue && (

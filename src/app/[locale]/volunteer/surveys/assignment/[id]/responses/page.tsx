@@ -95,6 +95,7 @@ export default function SurveyResponsesPage({ params }: SurveyAssignmentPageProp
   const assignment = assignmentData.assignment;
   const questions = assignmentData.questions || [];
   const response = responseData;
+  const surveyPeriodLabel = (assignment.survey_period || 'survey').replace('_', ' ');
   
   // Fix the type error by properly handling the value
   const renderResponseValue = (value: any): ReactNode => {
@@ -147,7 +148,7 @@ export default function SurveyResponsesPage({ params }: SurveyAssignmentPageProp
           </div>
           <div className="flex items-center">
             <span className="capitalize">
-              {assignment.survey_period.replace('_', ' ')}
+              {surveyPeriodLabel}
             </span>
           </div>
           {response?.submitted_at && (

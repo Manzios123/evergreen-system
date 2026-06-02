@@ -159,6 +159,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
   const isOverdue = assignmentData.due_date && new Date(assignmentData.due_date) < new Date();
   const isVolunteerSurvey = assignmentData.assignment_type === 'volunteer_personal';
   const isStudentSurvey = assignmentData.assignment_type === 'student_survey';
+  const surveyPeriodLabel = (assignmentData.survey_period || 'survey').replace('_', ' ');
 
   // Create survey object for SurveyForm component
   const survey = {
@@ -230,7 +231,7 @@ export default function SurveyAssignmentPage({ params }: SurveyAssignmentPagePro
               </div>
             </div>
             <p className="text-gray-600">
-              {assignmentData.survey_description || `Please complete this ${assignmentData.survey_period.replace('_', ' ')} survey`}
+              {assignmentData.survey_description || `Please complete this ${surveyPeriodLabel} survey`}
             </p>
           </div>
         </div>
