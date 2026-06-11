@@ -103,15 +103,15 @@ function KpiCard({
   accent: string;
 }) {
   return (
-    <Card>
-      <CardContent>
-        <div className="flex items-center gap-4">
+    <Card className="h-full">
+      <CardContent className="h-full">
+        <div className="flex min-h-[88px] items-center gap-4">
           <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${accent}`}>
             <Icon className="h-6 w-6" />
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-gray-500" title={title}>{title}</p>
+            <p className="mt-1 truncate text-2xl font-bold text-gray-900" title={String(value)}>{value}</p>
           </div>
         </div>
       </CardContent>
@@ -178,6 +178,7 @@ export default function AdminAnalyticsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [showAllQuestions, setShowAllQuestions] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -257,7 +258,22 @@ export default function AdminAnalyticsPage() {
     [templates]
   );
 
-  const topQuestions = useMemo(() => questions.slice(0, 8), [questions]);
+  const visibleQuestions = useMemo(
+    () => (showAllQuestions ? questions : questions.slice(0, 8)),
+    [questions, showAllQuestions]
+  );
+  const textResponses = useMemo(() => (
+    questions
+      .flatMap((question) => question.recent_responses.map((response) => ({
+        question: question.question_text || 'Unknown question',
+        template: question.template_name || 'Unknown template',
+        value: response.value,
+        submitted_at: response.submitted_at,
+      })))
+      .filter((response) => response.value.trim().length > 0)
+      .sort((a, b) => String(b.submitted_at || '').localeCompare(String(a.submitted_at || '')))
+      .slice(0, 30)
+  ), [questions]);
   const highestQualityCount = useMemo(
     () => Math.max(1, ...qualityAlerts.map((alert) => alert.count)),
     [qualityAlerts]
@@ -376,7 +392,7 @@ export default function AdminAnalyticsPage() {
         <SkeletonLoader type="dashboard" />
       ) : (
         <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+          <section className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <KpiCard title="Total Templates" value={formatNumber(kpis.totalTemplates)} icon={DocumentTextIcon} accent="bg-green-50 text-green-700" />
             <KpiCard title="Assignments" value={formatNumber(kpis.totalAssignments)} icon={UsersIcon} accent="bg-blue-50 text-blue-700" />
             <KpiCard title="Submissions" value={formatNumber(kpis.totalSubmissions)} icon={ClipboardDocumentCheckIcon} accent="bg-emerald-50 text-emerald-700" />
@@ -392,9 +408,9 @@ export default function AdminAnalyticsPage() {
                 {templates.length === 0 ? (
                   <div className="px-6 py-8 text-sm text-gray-500">No template performance data yet.</div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[360px] overflow-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50">
+                      <thead className="sticky top-0 z-10 bg-gray-50">
                         <tr>
                           <th className="px-4 py-3 text-left font-semibold text-gray-700">Template</th>
                           <th className="px-4 py-3 text-left font-semibold text-gray-700">Assignments</th>
@@ -408,7 +424,7 @@ export default function AdminAnalyticsPage() {
                         {templates.map((template) => (
                           <tr key={template.template_id}>
                             <td className="px-4 py-3">
-                              <div className="font-medium text-gray-900">{template.template_name || 'Unknown template'}</div>
+                              <div className="max-w-64 truncate font-medium text-gray-900" title={template.template_name || 'Unknown template'}>{template.template_name || 'Unknown template'}</div>
                               <div className="text-xs capitalize text-gray-500">
                                 {formatLabel(template.survey_type, 'survey')} / {formatLabel(template.survey_period, 'period')}
                               </div>
@@ -459,18 +475,32 @@ export default function AdminAnalyticsPage() {
 
           <section className="grid gap-6 xl:grid-cols-5">
             <Card className="xl:col-span-3">
-              <CardHeader title="Question Analysis" />
-              <CardContent>
-                {topQuestions.length === 0 ? (
+              <CardHeader
+                title="Question Analysis"
+                action={questions.length > 8 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllQuestions((current) => !current)}
+                    className="text-sm font-medium text-green-700 hover:text-green-800"
+                  >
+                    {showAllQuestions ? 'Show fewer' : 'View all questions'}
+                  </button>
+                ) : (
+                  <span className="text-sm font-medium text-green-700">Showing {visibleQuestions.length}</span>
+                )}
+              />
+              <CardContent className="min-h-0">
+                {visibleQuestions.length === 0 ? (
                   <div className="py-8 text-sm text-gray-500">No question response data yet.</div>
                 ) : (
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    {topQuestions.map((question) => (
+                  <div className="max-h-[560px] overflow-y-auto pr-2">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                    {visibleQuestions.map((question) => (
                       <div key={question.question_id} className="rounded-lg border border-gray-200 p-4">
                         <div className="flex items-start gap-3">
                           <QuestionMarkCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
                           <div className="min-w-0">
-                            <p className="font-semibold text-gray-900">{question.question_text || 'Unknown question'}</p>
+                            <p className="max-h-12 overflow-hidden font-semibold text-gray-900">{question.question_text || 'Unknown question'}</p>
                             <p className="mt-1 text-xs capitalize text-gray-500">
                               {question.template_name || 'Unknown template'} / {formatLabel(question.question_type, 'text')}
                             </p>
@@ -526,7 +556,7 @@ export default function AdminAnalyticsPage() {
                         {question.recent_responses.length > 0 && (
                           <div className="mt-4 space-y-2">
                             {question.recent_responses.slice(0, 3).map((response, index) => (
-                              <div key={`${question.question_id}-${index}`} className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                              <div key={`${question.question_id}-${index}`} className="max-h-20 overflow-hidden rounded-md bg-gray-50 p-3 text-sm text-gray-700">
                                 {response.value}
                               </div>
                             ))}
@@ -534,6 +564,7 @@ export default function AdminAnalyticsPage() {
                         )}
                       </div>
                     ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -541,17 +572,17 @@ export default function AdminAnalyticsPage() {
 
             <Card className="xl:col-span-2">
               <CardHeader title="Completion by School / Group" />
-              <CardContent>
+              <CardContent className="min-h-0">
                 {overview.completionBySchool.length === 0 ? (
                   <div className="py-8 text-sm text-gray-500">No school or group completion data yet.</div>
                 ) : (
-                  <div className="space-y-4">
-                    {overview.completionBySchool.slice(0, 8).map((school) => {
+                  <div className="max-h-[560px] space-y-4 overflow-y-auto pr-2">
+                    {overview.completionBySchool.map((school) => {
                       const total = Math.max(1, school.completed + school.pending + school.notStarted);
                       return (
                         <div key={school.school_id || school.school_name} className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium text-gray-900">{school.school_name}</span>
+                            <span className="truncate pr-3 font-medium text-gray-900" title={school.school_name}>{school.school_name}</span>
                             <span className="text-gray-500">{school.completionRate}%</span>
                           </div>
                           <div className="flex h-3 overflow-hidden rounded-full bg-gray-100">
@@ -574,6 +605,26 @@ export default function AdminAnalyticsPage() {
           </section>
 
           <section className="grid gap-6 xl:grid-cols-5">
+            <Card className="xl:col-span-2">
+              <CardHeader title="What participants are saying" />
+              <CardContent className="min-h-0">
+                {textResponses.length === 0 ? (
+                  <div className="py-8 text-sm text-gray-500">No text responses yet.</div>
+                ) : (
+                  <div className="max-h-[360px] space-y-3 overflow-y-auto pr-2">
+                    {textResponses.map((response, index) => (
+                      <div key={`${response.template}-${response.question}-${index}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <p className="max-h-24 overflow-hidden text-sm text-gray-800">{response.value}</p>
+                        <p className="mt-2 truncate text-xs text-gray-500" title={`${response.template} / ${response.question}`}>
+                          {response.template} / {response.question}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card className="xl:col-span-2">
               <CardHeader title="Question Type Mix" />
               <CardContent>
@@ -609,11 +660,11 @@ export default function AdminAnalyticsPage() {
 
             <Card className="xl:col-span-3">
               <CardHeader title="Data Quality Alerts" />
-              <CardContent>
+              <CardContent className="min-h-0">
                 {qualityAlerts.length === 0 ? (
                   <div className="py-8 text-sm text-gray-500">No data quality checks available yet.</div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="max-h-[420px] space-y-3 overflow-y-auto pr-2">
                     {qualityAlerts.map((alert) => (
                       <div key={alert.id} className={`rounded-lg border p-4 ${qualityTone[alert.severity]}`}>
                         <div className="flex items-start justify-between gap-4">
