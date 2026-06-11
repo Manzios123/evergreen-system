@@ -73,6 +73,10 @@ function getPagination(response: unknown): ApiResponse<SurveyAssignment[]>['pagi
   return undefined;
 }
 
+function formatAssignmentLabel(value: string | null | undefined, fallback: string) {
+  return (value || fallback).replace(/_/g, ' ');
+}
+
 export default function AdminSurveyAssignmentsPage() {
   const params = useParams();
   const locale = (params?.locale as string) || 'en';
@@ -111,11 +115,11 @@ export default function AdminSurveyAssignmentsPage() {
             {assignment.survey_name}
           </p>
           <div className="flex items-center text-sm text-gray-500">
-            <span className="capitalize">{assignment.survey_period.replace('_', ' ')}</span>
+            <span className="capitalize">{formatAssignmentLabel(assignment.survey_period, 'survey')}</span>
             <span className="mx-2">•</span>
-            <span className="capitalize">{assignment.survey_type}</span>
+            <span className="capitalize">{formatAssignmentLabel(assignment.survey_type, 'survey')}</span>
             <span className="mx-2">•</span>
-            <span>{assignment.pilot_name}</span>
+            <span>{assignment.pilot_name || 'Unknown pilot'}</span>
           </div>
           <div className="flex items-center text-xs text-gray-400 mt-1">
             <ClockIcon className="h-3 w-3 mr-1" />

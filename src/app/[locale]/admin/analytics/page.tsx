@@ -1,164 +1,183 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import {
+  ArrowDownTrayIcon,
+  BuildingLibraryIcon,
+  CalendarDaysIcon,
+  ChartBarIcon,
+  CheckCircleIcon,
+  ClipboardDocumentCheckIcon,
+  ClockIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  FunnelIcon,
+  QuestionMarkCircleIcon,
+  UsersIcon,
+} from '@heroicons/react/24/outline';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
-import { analyticsApi, type AnalyticsFilters, type AnalyticsOverview, type ReportAnalytics, type SurveyAnalytics } from '@/lib/api/analytics';
-import { api } from '@/lib/api';
-
-type Option = { id: string; name: string };
+import {
+  analyticsApi,
+  type AnalyticsFilters,
+  type AnalyticsOverview,
+  type AnalyticsOption,
+  type DataQualityAlert,
+  type QuestionAnalyticsRow,
+  type TemplateAnalyticsRow,
+} from '@/lib/api/analytics';
 
 const emptyOverview: AnalyticsOverview = {
-  totalActivities: 0,
-  submittedReports: 0,
-  activityStatuses: [],
-  surveyTemplates: 0,
-  surveyAssignments: 0,
-  surveyResponses: 0,
-  activeSchools: 0,
-  activePilots: 0,
+  filters: {
+    pilots: [],
+    schools: [],
+    templates: [],
+    facilitators: [],
+    questionTypes: [],
+  },
+  kpis: {
+    totalTemplates: 0,
+    totalAssignments: 0,
+    totalSubmissions: 0,
+    completionRate: 0,
+    pendingSubmissions: 0,
+    activeSchools: 0,
+  },
+  submissionTrend: [],
+  completionBySchool: [],
 };
 
-const emptyReports: ReportAnalytics = {
-  byStatus: [],
-  bySchool: [],
-  byPilot: [],
-  byFacilitator: [],
-  overTime: [],
+const qualityTone: Record<DataQualityAlert['severity'], string> = {
+  ok: 'text-green-700 bg-green-50 border-green-100',
+  low: 'text-blue-700 bg-blue-50 border-blue-100',
+  medium: 'text-amber-700 bg-amber-50 border-amber-100',
+  high: 'text-red-700 bg-red-50 border-red-100',
 };
-
-const emptySurveys: SurveyAnalytics = {
-  assignmentStatus: [],
-  responsesByTemplate: [],
-  questionBreakdown: [],
-};
-
-function normalizeArray<T>(value: any): T[] {
-  if (Array.isArray(value)) return value;
-  if (Array.isArray(value?.data)) return value.data;
-  if (Array.isArray(value?.results)) return value.results;
-  if (Array.isArray(value?.items)) return value.items;
-  return [];
-}
-
-function parseAnswer(value: string | null): string | number {
-  if (value === null || value === undefined || value === '') return 'Blank';
-  try {
-    const parsed = JSON.parse(value);
-    if (typeof parsed === 'number' || typeof parsed === 'string') return parsed;
-    return JSON.stringify(parsed);
-  } catch {
-    return value;
-  }
-}
 
 function formatNumber(value: number | string | null | undefined) {
   return Number(value || 0).toLocaleString();
 }
 
-function DataTable({
+function formatPercent(value: number | string | null | undefined) {
+  return `${Number(value || 0).toFixed(1)}%`;
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return 'No activity yet';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString();
+}
+
+function formatLabel(value: string | null | undefined, fallback = 'Unknown') {
+  return (value || fallback).replace(/_/g, ' ');
+}
+
+function optionName(option: AnalyticsOption) {
+  return option.name || option.id || 'Unknown';
+}
+
+function KpiCard({
   title,
-  subtitle,
-  columns,
-  rows,
+  value,
+  icon: Icon,
+  accent,
 }: {
   title: string;
-  subtitle?: string;
-  columns: string[];
-  rows: Array<Array<string | number | null | undefined>>;
+  value: string | number;
+  icon: ComponentType<{ className?: string }>;
+  accent: string;
 }) {
   return (
     <Card>
-      <CardHeader title={title} subtitle={subtitle} />
-      <CardContent className="p-0">
-        {rows.length === 0 ? (
-          <div className="px-6 py-8 text-sm text-gray-500">No analytics data found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  {columns.map((column) => (
-                    <th key={column} className="px-4 py-3 text-left font-semibold text-gray-700">
-                      {column}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {rows.map((row, rowIndex) => (
-                  <tr key={rowIndex}>
-                    {row.map((cell, cellIndex) => (
-                      <td key={`${rowIndex}-${cellIndex}`} className="max-w-xs px-4 py-3 text-gray-700">
-                        <span className="block truncate" title={String(cell ?? '')}>
-                          {cell ?? 'Unknown'}
-                        </span>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <CardContent>
+        <div className="flex items-center gap-4">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${accent}`}>
+            <Icon className="h-6 w-6" />
           </div>
-        )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-500">{title}</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
+function FilterSelect({
+  label,
+  value,
+  options,
+  allLabel,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: AnalyticsOption[];
+  allLabel: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-1 text-sm">
+      <span className="font-semibold text-gray-700">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+      >
+        <option value="">{allLabel}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {optionName(option)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ProgressBar({
+  value,
+  max,
+  className = 'bg-green-500',
+}: {
+  value: number;
+  max: number;
+  className?: string;
+}) {
+  const width = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+      <div className={`h-full rounded-full ${className}`} style={{ width: `${width}%` }} />
+    </div>
+  );
+}
+
 export default function AdminAnalyticsPage() {
   const [overview, setOverview] = useState<AnalyticsOverview>(emptyOverview);
-  const [reports, setReports] = useState<ReportAnalytics>(emptyReports);
-  const [surveys, setSurveys] = useState<SurveyAnalytics>(emptySurveys);
-  const [pilots, setPilots] = useState<Option[]>([]);
-  const [schools, setSchools] = useState<Option[]>([]);
-  const [templates, setTemplates] = useState<Option[]>([]);
+  const [templates, setTemplates] = useState<TemplateAnalyticsRow[]>([]);
+  const [questions, setQuestions] = useState<QuestionAnalyticsRow[]>([]);
+  const [qualityAlerts, setQualityAlerts] = useState<DataQualityAlert[]>([]);
   const [filters, setFilters] = useState<AnalyticsFilters>({});
+  const [draftFilters, setDraftFilters] = useState<AnalyticsFilters>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadOptions() {
-      try {
-        const [pilotResponse, schoolResponse, templateResponse] = await Promise.all([
-          api.get<any>('/pilots', { isActive: true, limit: 100 }),
-          api.get<any>('/schools', { limit: 200 }),
-          api.get<any>('/survey-templates'),
-        ]);
-
-        if (!isMounted) return;
-
-        setPilots(normalizeArray<any>(pilotResponse).map((item) => ({
-          id: item.id,
-          name: item.name || item.title || item.id,
-        })));
-        setSchools(normalizeArray<any>(schoolResponse).map((item) => ({
-          id: item.id,
-          name: item.name || item.school_name || item.id,
-        })));
-        setTemplates(normalizeArray<any>(templateResponse).map((item) => ({
-          id: item.id,
-          name: item.name || item.title || item.id,
-        })));
-      } catch {
-        if (isMounted) {
-          setPilots([]);
-          setSchools([]);
-          setTemplates([]);
-        }
-      }
-    }
-
-    loadOptions();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -167,11 +186,13 @@ export default function AdminAnalyticsPage() {
       setIsLoading(true);
       setError(null);
       setWarnings([]);
+
       try {
-        const [overviewResult, reportResult, surveyResult] = await Promise.allSettled([
-          analyticsApi.overview(),
-          analyticsApi.reports(filters),
-          analyticsApi.surveys(filters),
+        const [overviewResult, templatesResult, questionsResult, qualityResult] = await Promise.allSettled([
+          analyticsApi.overview(filters),
+          analyticsApi.templates(filters),
+          analyticsApi.questions(filters),
+          analyticsApi.dataQuality(filters),
         ]);
 
         if (!isMounted) return;
@@ -187,25 +208,33 @@ export default function AdminAnalyticsPage() {
           setOverview(emptyOverview);
         }
 
-        if (reportResult.status === 'fulfilled') {
-          setReports(reportResult.value.data || emptyReports);
-          nextWarnings.push(...(reportResult.value.warnings || []).map((warning) => warning.message));
+        if (templatesResult.status === 'fulfilled') {
+          setTemplates(Array.isArray(templatesResult.value.data) ? templatesResult.value.data : []);
+          nextWarnings.push(...(templatesResult.value.warnings || []).map((warning) => warning.message));
         } else {
           failedSections += 1;
-          setReports(emptyReports);
+          setTemplates([]);
         }
 
-        if (surveyResult.status === 'fulfilled') {
-          setSurveys(surveyResult.value.data || emptySurveys);
-          nextWarnings.push(...(surveyResult.value.warnings || []).map((warning) => warning.message));
+        if (questionsResult.status === 'fulfilled') {
+          setQuestions(Array.isArray(questionsResult.value.data) ? questionsResult.value.data : []);
+          nextWarnings.push(...(questionsResult.value.warnings || []).map((warning) => warning.message));
         } else {
           failedSections += 1;
-          setSurveys(emptySurveys);
+          setQuestions([]);
+        }
+
+        if (qualityResult.status === 'fulfilled') {
+          setQualityAlerts(Array.isArray(qualityResult.value.data) ? qualityResult.value.data : []);
+          nextWarnings.push(...(qualityResult.value.warnings || []).map((warning) => warning.message));
+        } else {
+          failedSections += 1;
+          setQualityAlerts([]);
         }
 
         setWarnings(Array.from(new Set(nextWarnings)));
-        if (failedSections === 3) {
-          setError('Unable to load analytics right now. Please try again.');
+        if (failedSections === 4) {
+          setError('Unable to load analytics right now.');
         } else if (failedSections > 0) {
           setError('Some analytics sections could not be loaded.');
         }
@@ -220,176 +249,121 @@ export default function AdminAnalyticsPage() {
     };
   }, [filters]);
 
-  const questionBreakdowns = useMemo(() => {
-    const grouped = new Map<string, {
-      question: string;
-      type: string;
-      template: string;
-      total: number;
-      answers: Array<{ answer: string; count: number }>;
-      numericValues: Array<{ value: number; count: number }>;
-    }>();
+  const kpis = overview.kpis;
+  const filterOptions = overview.filters || emptyOverview.filters;
 
-    for (const row of surveys.questionBreakdown) {
-      const key = row.question_id;
-      const parsed = parseAnswer(row.answer_value);
-      const count = Number(row.count || 0);
-      const answerText = String(parsed);
-      const existing = grouped.get(key) || {
-        question: row.question_text,
-        type: row.question_type,
-        template: row.template_name,
-        total: 0,
-        answers: [],
-        numericValues: [],
-      };
+  const maxTemplateAssignments = useMemo(
+    () => Math.max(1, ...templates.map((template) => template.assignments_count)),
+    [templates]
+  );
 
-      existing.total += count;
-      existing.answers.push({ answer: answerText, count });
+  const topQuestions = useMemo(() => questions.slice(0, 8), [questions]);
+  const highestQualityCount = useMemo(
+    () => Math.max(1, ...qualityAlerts.map((alert) => alert.count)),
+    [qualityAlerts]
+  );
 
-      const numeric = typeof parsed === 'number' ? parsed : Number(answerText);
-      if (!Number.isNaN(numeric) && answerText.trim() !== '') {
-        existing.numericValues.push({ value: numeric, count });
-      }
-
-      grouped.set(key, existing);
-    }
-
-    return Array.from(grouped.values()).map((item) => {
-      const numericTotal = item.numericValues.reduce((sum, value) => sum + value.count, 0);
-      const weightedSum = item.numericValues.reduce((sum, value) => sum + value.value * value.count, 0);
-      return {
-        ...item,
-        average: numericTotal > 0 ? weightedSum / numericTotal : null,
-        topAnswers: item.answers.slice(0, 5),
-      };
-    });
-  }, [surveys.questionBreakdown]);
-
-  const updateFilter = (key: keyof AnalyticsFilters, value: string) => {
-    setFilters((current) => ({
-      ...current,
-      [key]: value || undefined,
-    }));
+  const updateDraftFilter = (key: keyof AnalyticsFilters, value: string) => {
+    setDraftFilters((current) => ({ ...current, [key]: value || undefined }));
   };
 
-  const clearFilters = () => setFilters({});
-
-  const overviewCards = [
-    ['Total activities/reports', overview.totalActivities],
-    ['Submitted reports', overview.submittedReports],
-    ['Survey templates', overview.surveyTemplates],
-    ['Survey assignments', overview.surveyAssignments],
-    ['Survey responses', overview.surveyResponses],
-    ['Active schools', overview.activeSchools],
-    ['Active pilots', overview.activePilots],
-  ];
+  const applyFilters = () => setFilters(draftFilters);
+  const clearFilters = () => {
+    setDraftFilters({});
+    setFilters({});
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Report and Survey Analytics</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Admin-only overview of activity/report submissions and survey responses.
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-sm text-gray-500">Admin / Analytics</div>
+          <h1 className="mt-1 text-3xl font-bold text-gray-900">Evergreen Analytics</h1>
+          <p className="mt-1 text-sm text-gray-600">Pilot Survey Performance &amp; Insights</p>
+        </div>
+        <Button type="button" variant="outline" disabled title="Analytics export is not wired yet.">
+          <ArrowDownTrayIcon className="mr-2 h-4 w-4" />
+          Export Report
+        </Button>
       </div>
 
       <Card>
-        <CardHeader title="Filters" subtitle="Filter report and survey analytics without changing underlying data." />
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+            <FilterSelect
+              label="Pilot"
+              value={draftFilters.pilot_id || ''}
+              options={filterOptions.pilots || []}
+              allLabel="All pilots"
+              onChange={(value) => updateDraftFilter('pilot_id', value)}
+            />
+            <FilterSelect
+              label="Template"
+              value={draftFilters.template_id || ''}
+              options={filterOptions.templates || []}
+              allLabel="All templates"
+              onChange={(value) => updateDraftFilter('template_id', value)}
+            />
+            <FilterSelect
+              label="Question Type"
+              value={draftFilters.question_type || ''}
+              options={filterOptions.questionTypes || []}
+              allLabel="All types"
+              onChange={(value) => updateDraftFilter('question_type', value)}
+            />
+            <FilterSelect
+              label="School / Group"
+              value={draftFilters.school_id || ''}
+              options={filterOptions.schools || []}
+              allLabel="All schools"
+              onChange={(value) => updateDraftFilter('school_id', value)}
+            />
+            <FilterSelect
+              label="Facilitator"
+              value={draftFilters.facilitator_id || ''}
+              options={filterOptions.facilitators || []}
+              allLabel="All facilitators"
+              onChange={(value) => updateDraftFilter('facilitator_id', value)}
+            />
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">Pilot</span>
-              <select
-                value={filters.pilot_id || ''}
-                onChange={(event) => updateFilter('pilot_id', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-              >
-                <option value="">All pilots</option>
-                {pilots.map((pilot) => (
-                  <option key={pilot.id} value={pilot.id}>{pilot.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">School</span>
-              <select
-                value={filters.school_id || ''}
-                onChange={(event) => updateFilter('school_id', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-              >
-                <option value="">All schools</option>
-                {schools.map((school) => (
-                  <option key={school.id} value={school.id}>{school.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">Status</span>
-              <select
-                value={filters.status || ''}
-                onChange={(event) => updateFilter('status', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-              >
-                <option value="">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="pending">Pending</option>
-                <option value="in_edit">Returned/In edit</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="assigned">Assigned</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">Survey template</span>
-              <select
-                value={filters.template_id || ''}
-                onChange={(event) => updateFilter('template_id', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-              >
-                <option value="">All templates</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">From</span>
+              <span className="font-semibold text-gray-700">From</span>
               <input
                 type="date"
-                value={filters.date_from || ''}
-                onChange={(event) => updateFilter('date_from', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                value={draftFilters.date_from || ''}
+                onChange={(event) => updateDraftFilter('date_from', event.target.value)}
+                className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
               />
             </label>
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">To</span>
+              <span className="font-semibold text-gray-700">To</span>
               <input
                 type="date"
-                value={filters.date_to || ''}
-                onChange={(event) => updateFilter('date_to', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                value={draftFilters.date_to || ''}
+                onChange={(event) => updateDraftFilter('date_to', event.target.value)}
+                className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
               />
             </label>
           </div>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button type="button" onClick={applyFilters}>
+              <FunnelIcon className="mr-2 h-4 w-4" />
+              Apply Filters
+            </Button>
             <Button type="button" variant="outline" onClick={clearFilters}>
-              Clear filters
+              Clear
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {error && (
-        <Alert type="error" title="Unable to load analytics">
+        <Alert type="warning" title="Analytics partially unavailable">
           {error}
         </Alert>
       )}
 
       {warnings.length > 0 && (
-        <Alert type="warning" title="Some analytics are unavailable">
+        <Alert type="info" title="Analytics schema notes">
           <ul className="list-disc space-y-1 pl-5">
             {warnings.map((warning) => (
               <li key={warning}>{warning}</li>
@@ -402,99 +376,277 @@ export default function AdminAnalyticsPage() {
         <SkeletonLoader type="dashboard" />
       ) : (
         <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {overviewCards.map(([label, value]) => (
-              <Card key={label}>
-                <CardContent>
-                  <p className="text-sm font-medium text-gray-500">{label}</p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900">{formatNumber(value)}</p>
-                </CardContent>
-              </Card>
-            ))}
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+            <KpiCard title="Total Templates" value={formatNumber(kpis.totalTemplates)} icon={DocumentTextIcon} accent="bg-green-50 text-green-700" />
+            <KpiCard title="Assignments" value={formatNumber(kpis.totalAssignments)} icon={UsersIcon} accent="bg-blue-50 text-blue-700" />
+            <KpiCard title="Submissions" value={formatNumber(kpis.totalSubmissions)} icon={ClipboardDocumentCheckIcon} accent="bg-emerald-50 text-emerald-700" />
+            <KpiCard title="Completion Rate" value={formatPercent(kpis.completionRate)} icon={ChartBarIcon} accent="bg-lime-50 text-lime-700" />
+            <KpiCard title="Pending" value={formatNumber(kpis.pendingSubmissions)} icon={ClockIcon} accent="bg-orange-50 text-orange-700" />
+            <KpiCard title="Active Schools" value={formatNumber(kpis.activeSchools)} icon={BuildingLibraryIcon} accent="bg-teal-50 text-teal-700" />
           </section>
 
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Reports / Activities</h2>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <DataTable
-                title="By status"
-                columns={['Status', 'Count']}
-                rows={reports.byStatus.map((item) => [item.status, formatNumber(item.count)])}
-              />
-              <DataTable
-                title="Over time"
-                subtitle="Grouped by scheduled, actual, or created date."
-                columns={['Date', 'Count']}
-                rows={reports.overTime.map((item) => [item.date, formatNumber(item.count)])}
-              />
-              <DataTable
-                title="By school"
-                columns={['School', 'Count']}
-                rows={reports.bySchool.map((item) => [item.school_name, formatNumber(item.count)])}
-              />
-              <DataTable
-                title="By pilot"
-                columns={['Pilot', 'Count']}
-                rows={reports.byPilot.map((item) => [item.pilot_name, formatNumber(item.count)])}
-              />
-              <DataTable
-                title="By assigned facilitator"
-                subtitle="Uses the legacy activities.volunteer_id field as the assigned user."
-                columns={['Facilitator / user', 'Count']}
-                rows={reports.byFacilitator.map((item) => [item.user_name, formatNumber(item.count)])}
-              />
-            </div>
-          </section>
-
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Survey Analytics</h2>
-            <div className="grid gap-4 xl:grid-cols-2">
-              <DataTable
-                title="Assignments by status"
-                columns={['Status', 'Count']}
-                rows={surveys.assignmentStatus.map((item) => [item.status, formatNumber(item.count)])}
-              />
-              <DataTable
-                title="Responses by template"
-                columns={['Template', 'Responses']}
-                rows={surveys.responsesByTemplate.map((item) => [item.template_name, formatNumber(item.response_count)])}
-              />
-            </div>
-            <Card>
-              <CardHeader
-                title="Per-question answer breakdown"
-                subtitle="Top answer counts are shown first. Numeric answers include a simple weighted average."
-              />
-              <CardContent className="space-y-4">
-                {questionBreakdowns.length === 0 ? (
-                  <p className="text-sm text-gray-500">No survey answer data found.</p>
+          <section className="grid gap-6 xl:grid-cols-5">
+            <Card className="xl:col-span-3">
+              <CardHeader title="Template Performance" />
+              <CardContent className="p-0">
+                {templates.length === 0 ? (
+                  <div className="px-6 py-8 text-sm text-gray-500">No template performance data yet.</div>
                 ) : (
-                  questionBreakdowns.map((question) => (
-                    <div key={`${question.template}-${question.question}`} className="rounded-lg border border-gray-200 p-4">
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{question.question}</p>
-                          <p className="text-xs text-gray-500">{question.template} · {question.type}</p>
-                        </div>
-                        <span className="text-xs font-medium text-gray-500">{formatNumber(question.total)} responses</span>
-                      </div>
-                      {question.average !== null && (
-                        <p className="mt-2 text-sm text-gray-700">Average: {question.average.toFixed(2)}</p>
-                      )}
-                      <div className="mt-3 grid gap-2 md:grid-cols-2">
-                        {question.topAnswers.map((answer) => (
-                          <div key={`${answer.answer}-${answer.count}`} className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm">
-                            <span className="truncate pr-3" title={answer.answer}>{answer.answer}</span>
-                            <span className="font-semibold text-gray-700">{formatNumber(answer.count)}</span>
-                          </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Template</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Assignments</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Completed</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Pending</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Completion</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Last Activity</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {templates.map((template) => (
+                          <tr key={template.template_id}>
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-gray-900">{template.template_name || 'Unknown template'}</div>
+                              <div className="text-xs capitalize text-gray-500">
+                                {formatLabel(template.survey_type, 'survey')} / {formatLabel(template.survey_period, 'period')}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{formatNumber(template.assignments_count)}</td>
+                            <td className="px-4 py-3 text-gray-700">{formatNumber(template.completed_count)}</td>
+                            <td className="px-4 py-3 text-gray-700">{formatNumber(template.pending_count)}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex min-w-32 items-center gap-3">
+                                <ProgressBar value={template.assignments_count} max={maxTemplateAssignments} />
+                                <span className="w-14 text-right font-semibold text-gray-700">
+                                  {formatPercent(template.completion_percentage)}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{formatDate(template.last_activity_at)}</td>
+                          </tr>
                         ))}
-                      </div>
-                    </div>
-                  ))
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="xl:col-span-2">
+              <CardHeader title="Submission Trend" />
+              <CardContent>
+                {overview.submissionTrend.length === 0 ? (
+                  <div className="py-10 text-sm text-gray-500">No submission trend data yet.</div>
+                ) : (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={overview.submissionTrend}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="submissions" stroke="#15803d" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="movingAverage" stroke="#2563eb" strokeWidth={2} dot={false} strokeDasharray="4 4" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </section>
+
+          <section className="grid gap-6 xl:grid-cols-5">
+            <Card className="xl:col-span-3">
+              <CardHeader title="Question Analysis" />
+              <CardContent>
+                {topQuestions.length === 0 ? (
+                  <div className="py-8 text-sm text-gray-500">No question response data yet.</div>
+                ) : (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {topQuestions.map((question) => (
+                      <div key={question.question_id} className="rounded-lg border border-gray-200 p-4">
+                        <div className="flex items-start gap-3">
+                          <QuestionMarkCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-900">{question.question_text || 'Unknown question'}</p>
+                            <p className="mt-1 text-xs capitalize text-gray-500">
+                              {question.template_name || 'Unknown template'} / {formatLabel(question.question_type, 'text')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                          <div className="rounded-md bg-gray-50 p-3">
+                            <div className="text-gray-500">Answered</div>
+                            <div className="mt-1 text-lg font-bold text-gray-900">{formatNumber(question.answered_count)}</div>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-3">
+                            <div className="text-gray-500">Skipped</div>
+                            <div className="mt-1 text-lg font-bold text-gray-900">{formatNumber(question.skipped_count)}</div>
+                          </div>
+                        </div>
+
+                        {question.distribution.length > 0 && (
+                          <div className="mt-4 space-y-2">
+                            {question.distribution.slice(0, 5).map((item) => (
+                              <div key={item.option} className="space-y-1">
+                                <div className="flex justify-between text-xs text-gray-600">
+                                  <span className="truncate pr-3">{item.option}</span>
+                                  <span>{formatNumber(item.count)} ({formatPercent(item.percentage)})</span>
+                                </div>
+                                <ProgressBar value={item.count} max={Math.max(1, question.answered_count)} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {question.numeric.average !== null && (
+                          <div className="mt-4 grid grid-cols-4 gap-2 text-center text-sm">
+                            <div className="rounded-md border border-gray-100 p-2">
+                              <div className="text-gray-500">Total</div>
+                              <div className="font-semibold text-gray-900">{formatNumber(question.numeric.total)}</div>
+                            </div>
+                            <div className="rounded-md border border-gray-100 p-2">
+                              <div className="text-gray-500">Avg</div>
+                              <div className="font-semibold text-gray-900">{question.numeric.average}</div>
+                            </div>
+                            <div className="rounded-md border border-gray-100 p-2">
+                              <div className="text-gray-500">Min</div>
+                              <div className="font-semibold text-gray-900">{question.numeric.min}</div>
+                            </div>
+                            <div className="rounded-md border border-gray-100 p-2">
+                              <div className="text-gray-500">Max</div>
+                              <div className="font-semibold text-gray-900">{question.numeric.max}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {question.recent_responses.length > 0 && (
+                          <div className="mt-4 space-y-2">
+                            {question.recent_responses.slice(0, 3).map((response, index) => (
+                              <div key={`${question.question_id}-${index}`} className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+                                {response.value}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="xl:col-span-2">
+              <CardHeader title="Completion by School / Group" />
+              <CardContent>
+                {overview.completionBySchool.length === 0 ? (
+                  <div className="py-8 text-sm text-gray-500">No school or group completion data yet.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {overview.completionBySchool.slice(0, 8).map((school) => {
+                      const total = Math.max(1, school.completed + school.pending + school.notStarted);
+                      return (
+                        <div key={school.school_id || school.school_name} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-gray-900">{school.school_name}</span>
+                            <span className="text-gray-500">{school.completionRate}%</span>
+                          </div>
+                          <div className="flex h-3 overflow-hidden rounded-full bg-gray-100">
+                            <div className="bg-green-500" style={{ width: `${(school.completed / total) * 100}%` }} />
+                            <div className="bg-orange-400" style={{ width: `${(school.pending / total) * 100}%` }} />
+                            <div className="bg-gray-300" style={{ width: `${(school.notStarted / total) * 100}%` }} />
+                          </div>
+                          <div className="flex gap-4 text-xs text-gray-500">
+                            <span>Completed {school.completed}</span>
+                            <span>Pending {school.pending}</span>
+                            <span>Not started {school.notStarted}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-5">
+            <Card className="xl:col-span-2">
+              <CardHeader title="Question Type Mix" />
+              <CardContent>
+                {questions.length === 0 ? (
+                  <div className="py-8 text-sm text-gray-500">No question type data yet.</div>
+                ) : (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={Object.entries(
+                          questions.reduce<Record<string, number>>((acc, question) => {
+                            const key = formatLabel(question.normalized_type, 'text');
+                            acc[key] = (acc[key] || 0) + 1;
+                            return acc;
+                          }, {})
+                        ).map(([type, count]) => ({ type, count }))}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="type" tick={{ fontSize: 11 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <Tooltip />
+                        <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                          {questions.map((question, index) => (
+                            <Cell key={`${question.question_id}-${index}`} fill={index % 2 === 0 ? '#16a34a' : '#2563eb'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="xl:col-span-3">
+              <CardHeader title="Data Quality Alerts" />
+              <CardContent>
+                {qualityAlerts.length === 0 ? (
+                  <div className="py-8 text-sm text-gray-500">No data quality checks available yet.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {qualityAlerts.map((alert) => (
+                      <div key={alert.id} className={`rounded-lg border p-4 ${qualityTone[alert.severity]}`}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex gap-3">
+                            {alert.count > 0 ? (
+                              <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                            ) : (
+                              <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                            )}
+                            <div>
+                              <p className="font-semibold">{alert.label}</p>
+                              <p className="mt-1 text-sm opacity-80">{alert.description}</p>
+                            </div>
+                          </div>
+                          <div className="min-w-16 text-right text-lg font-bold">{formatNumber(alert.count)}</div>
+                        </div>
+                        {alert.count > 0 && (
+                          <div className="mt-3">
+                            <ProgressBar value={alert.count} max={highestQualityCount} className={alert.severity === 'high' ? 'bg-red-500' : alert.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'} />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <CalendarDaysIcon className="h-4 w-4" />
+            <span>All times shown in your local time zone.</span>
+          </div>
         </>
       )}
     </div>
