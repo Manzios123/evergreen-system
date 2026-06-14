@@ -3,25 +3,15 @@
 
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
-import DataTable from '@/components/ui/data-table';
-import StatusBadge from '@/components/ui/status-badge';
 import SearchFilter from '@/components/ui/search-filter';
-import { Progress } from '@/components/ui/proggress';
-import EmptyState from '@/components/ui/empty-state';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import Alert from '@/components/ui/alert';
-import { useApiQuery, useApiMutation } from '@/lib/hooks/use-api';
-import { ExportJob, ActivityStatus } from '@/lib/types';
-import { api } from '@/lib/api';
+import { useApiQuery } from '@/lib/hooks/use-api';
 import { exportsApi } from '@/lib/api/exports';
 import { dashboardApi } from '@/lib/api/dashboard';
 import {
-  ArrowDownTrayIcon,
   CalendarIcon,
   DocumentArrowDownIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  XCircleIcon,
   DocumentTextIcon,
   PhotoIcon,
   UserGroupIcon,
@@ -30,8 +20,7 @@ import {
   ServerIcon,
   CircleStackIcon,
 } from '@heroicons/react/24/outline';
-import { useState, useMemo } from 'react';
-import { format } from 'date-fns';
+import { useState } from 'react';
 
 interface SystemStats {
   totalUsers: number;
@@ -40,6 +29,43 @@ interface SystemStats {
   totalPilots: number;
   totalSchools: number;
 }
+
+interface ExportTypeItem {
+  id: string;
+  label: string;
+  icon: typeof CircleStackIcon;
+  color: string;
+  description: string;
+  requiresConfirmation?: boolean;
+  csvOnly?: boolean;
+  disabledReason?: string;
+}
+
+interface ExportFilters {
+  pilot_id: string;
+  survey_template_id: string;
+  activity_template_id: string;
+  activity_id: string;
+  school_id: string;
+  user_id: string;
+  status: string;
+  source_type: '' | 'student' | 'volunteer' | 'all';
+  date_from: string;
+  date_to: string;
+}
+
+const emptyExportFilters: ExportFilters = {
+  pilot_id: '',
+  survey_template_id: '',
+  activity_template_id: '',
+  activity_id: '',
+  school_id: '',
+  user_id: '',
+  status: '',
+  source_type: '',
+  date_from: '',
+  date_to: '',
+};
 
 // Helper function to download blob as file
 const downloadBlob = (blob: Blob, filename: string) => {
@@ -67,6 +93,7 @@ export default function AdminExportsPage() {
   const [isCreatingExport, setIsCreatingExport] = useState(false);
   const [selectedExportType, setSelectedExportType] = useState<string>('');
   const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json' | ''>('');
+  const [exportFilters, setExportFilters] = useState<ExportFilters>(emptyExportFilters);
 
   // Fetch system stats from admin dashboard
   const {
@@ -89,6 +116,8 @@ export default function AdminExportsPage() {
 
   const handleExport = async (type: string, format: 'csv' | 'json', options?: any) => {
     setIsCreatingExport(true);
+    setSelectedExportType(type);
+    setSelectedFormat(format);
     try {
       const params: any = {
         format,
@@ -118,6 +147,18 @@ export default function AdminExportsPage() {
         case 'activity-templates':
           result = await exportsApi.exportActivityTemplates(params, format);
           break;
+        case 'survey-answers':
+          result = await exportsApi.exportSurveyAnswers(options);
+          break;
+        case 'survey-matrix':
+          result = await exportsApi.exportSurveyMatrix(options);
+          break;
+        case 'activity-survey-answers':
+          result = await exportsApi.exportActivitySurveyAnswers(options);
+          break;
+        case 'activities-detailed':
+          result = await exportsApi.exportActivitiesDetailed(options);
+          break;
         case 'full_backup':
         case 'all':
           result = await exportsApi.exportAll(params, format);
@@ -125,9 +166,6 @@ export default function AdminExportsPage() {
         default:
           throw new Error(`Unsupported export type: ${type}`);
       }
-
-      console.log('Export result:', result);
-      console.log('Result type:', typeof result);
 
       const extension = format === 'csv' ? 'csv' : 'json';
       const filename = `${type}-export-${timestamp}.${extension}`;
@@ -178,7 +216,52 @@ export default function AdminExportsPage() {
     }
   };
 
-  const exportTypes = [
+  const updateFilter = <K extends keyof ExportFilters>(key: K, value: ExportFilters[K]) => {
+    setExportFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setExportFilters(emptyExportFilters);
+  };
+
+  const activeFilters = Object.entries(exportFilters).filter(([, value]) => value);
+
+  const buildAnalyticsExportFilters = (type: string) => {
+    const base = {
+      pilot_id: exportFilters.pilot_id,
+      school_id: exportFilters.school_id,
+      date_from: exportFilters.date_from,
+      date_to: exportFilters.date_to,
+    };
+
+    if (type === 'survey-answers' || type === 'survey-matrix') {
+      return {
+        ...base,
+        survey_template_id: exportFilters.survey_template_id,
+        submitted_by_id: exportFilters.user_id,
+        source_type: exportFilters.source_type,
+      };
+    }
+
+    if (type === 'activity-survey-answers') {
+      return {
+        ...base,
+        survey_template_id: exportFilters.survey_template_id,
+        activity_template_id: exportFilters.activity_template_id,
+        activity_id: exportFilters.activity_id,
+        volunteer_id: exportFilters.user_id,
+      };
+    }
+
+    return {
+      ...base,
+      activity_template_id: exportFilters.activity_template_id,
+      volunteer_id: exportFilters.user_id,
+      status: exportFilters.status,
+    };
+  };
+
+  const exportTypes: ExportTypeItem[] = [
     {
       id: 'all',
       label: 'Full System Backup',
@@ -202,6 +285,14 @@ export default function AdminExportsPage() {
       description: 'All survey responses and results',
     },
     {
+      id: 'photos',
+      label: 'Photo Metadata',
+      icon: PhotoIcon,
+      color: 'bg-green-100 text-green-600',
+      description: 'Photo information and metadata (not actual files)',
+      disabledReason: 'No immediate photo export endpoint is available yet.',
+    },
+    {
       id: 'users',
       label: 'User Directory',
       icon: UserGroupIcon,
@@ -223,11 +314,51 @@ export default function AdminExportsPage() {
       description: 'All pilot programs and their configurations',
     },
     {
+      id: 'system_logs',
+      label: 'System Logs',
+      icon: ServerIcon,
+      color: 'bg-gray-100 text-gray-600',
+      description: 'System audit logs and activity history',
+      disabledReason: 'No immediate system logs export endpoint is available yet.',
+    },
+    {
       id: 'activity-templates',
       label: 'Activity Templates',
       icon: DocumentTextIcon,
       color: 'bg-green-100 text-green-600',
       description: 'All activity templates and their configurations',
+    },
+    {
+      id: 'survey-answers',
+      label: 'Raw Survey Q&A CSV',
+      icon: DocumentArrowDownIcon,
+      color: 'bg-emerald-100 text-emerald-700',
+      description: 'Best for analysis, pivot tables, and per-question answer review',
+      csvOnly: true,
+    },
+    {
+      id: 'survey-matrix',
+      label: 'Survey Response Matrix CSV',
+      icon: DocumentArrowDownIcon,
+      color: 'bg-sky-100 text-sky-700',
+      description: 'One row per submitted survey response, with questions as Excel columns. Best for quick review in Excel.',
+      csvOnly: true,
+    },
+    {
+      id: 'activity-survey-answers',
+      label: 'Activity Survey Answers CSV',
+      icon: DocumentArrowDownIcon,
+      color: 'bg-cyan-100 text-cyan-700',
+      description: 'Activity-related question responses with activity, school, and volunteer context',
+      csvOnly: true,
+    },
+    {
+      id: 'activities-detailed',
+      label: 'Detailed Activities CSV',
+      icon: CalendarIcon,
+      color: 'bg-lime-100 text-lime-700',
+      description: 'Activity assignment and completion tracking for pilot analysis',
+      csvOnly: true,
     },
   ];
 
@@ -288,6 +419,132 @@ export default function AdminExportsPage() {
         Full system backups and large data exports may take several minutes to process. Please schedule these during off-peak hours.
       </Alert>
 
+      {/* Export Filters */}
+      <Card>
+        <div className="p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">CSV Export Filters</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                These filters apply to the three analytics-ready CSV exports.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Pilot ID</span>
+              <input
+                value={exportFilters.pilot_id}
+                onChange={(event) => updateFilter('pilot_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="pilot_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Survey Template ID</span>
+              <input
+                value={exportFilters.survey_template_id}
+                onChange={(event) => updateFilter('survey_template_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="survey_template_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Activity Template ID</span>
+              <input
+                value={exportFilters.activity_template_id}
+                onChange={(event) => updateFilter('activity_template_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="activity_template_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Activity ID</span>
+              <input
+                value={exportFilters.activity_id}
+                onChange={(event) => updateFilter('activity_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="activity_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">School ID</span>
+              <input
+                value={exportFilters.school_id}
+                onChange={(event) => updateFilter('school_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="school_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Volunteer/User ID</span>
+              <input
+                value={exportFilters.user_id}
+                onChange={(event) => updateFilter('user_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="user_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Status</span>
+              <select
+                value={exportFilters.status}
+                onChange={(event) => updateFilter('status', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+              >
+                <option value="">All statuses</option>
+                <option value="planned">Planned</option>
+                <option value="assigned">Assigned</option>
+                <option value="in_progress">In progress</option>
+                <option value="submitted">Submitted</option>
+                <option value="approved">Approved</option>
+                <option value="completed">Completed</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Source Type</span>
+              <select
+                value={exportFilters.source_type}
+                onChange={(event) => updateFilter('source_type', event.target.value as ExportFilters['source_type'])}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+              >
+                <option value="">All sources</option>
+                <option value="student">Student</option>
+                <option value="volunteer">Volunteer</option>
+                <option value="all">All</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Date From</span>
+              <input
+                type="date"
+                value={exportFilters.date_from}
+                onChange={(event) => updateFilter('date_from', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Date To</span>
+              <input
+                type="date"
+                value={exportFilters.date_to}
+                onChange={(event) => updateFilter('date_to', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+              />
+            </label>
+          </div>
+
+          <p className="mt-3 text-xs text-gray-500">
+            Current filters: {activeFilters.length ? `${activeFilters.length} active` : 'none'}
+          </p>
+        </div>
+      </Card>
+
       {/* System Statistics */}
       {systemStats && (
         <Card>
@@ -308,7 +565,7 @@ export default function AdminExportsPage() {
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-indigo-600">{systemStats.totalSchools}</p>
-                <p className="text-sm text-gray500">Total Schools</p>
+                <p className="text-sm text-gray-500">Total Schools</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-teal-600">{systemStats.totalPilots}</p>
@@ -337,7 +594,16 @@ export default function AdminExportsPage() {
                 </div>
 
                 <div className="mt-auto pt-3 border-t">
-                  {exportTypeItem.id === 'all' ? (
+                  {exportTypeItem.disabledReason ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled
+                      title={exportTypeItem.disabledReason}
+                    >
+                      Unavailable
+                    </Button>
+                  ) : exportTypeItem.id === 'all' ? (
                     <Button
                       variant="outline"
                       className="w-full"
@@ -345,6 +611,15 @@ export default function AdminExportsPage() {
                       loading={isCreatingExport && selectedExportType === exportTypeItem.id}
                     >
                       Create Backup
+                    </Button>
+                  ) : exportTypeItem.csvOnly ? (
+                    <Button
+                      variant="default"
+                      className="w-full"
+                      onClick={() => handleExport(exportTypeItem.id, 'csv', buildAnalyticsExportFilters(exportTypeItem.id))}
+                      loading={isCreatingExport && selectedExportType === exportTypeItem.id}
+                    >
+                      Export CSV
                     </Button>
                   ) : (
                     <div className="space-y-2">

@@ -8,10 +8,47 @@ import Alert from '@/components/ui/alert';
 import { exportsApi } from '@/lib/api/exports';
 import {
   CalendarIcon,
+  DocumentArrowDownIcon,
   DocumentTextIcon,
   BuildingOfficeIcon,
+  PhotoIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
+
+interface ExportTypeItem {
+  id: string;
+  label: string;
+  icon: typeof CalendarIcon;
+  color: string;
+  description: string;
+  csvOnly?: boolean;
+  disabledReason?: string;
+}
+
+interface ExportFilters {
+  survey_template_id: string;
+  activity_template_id: string;
+  activity_id: string;
+  school_id: string;
+  user_id: string;
+  status: string;
+  source_type: '' | 'student' | 'volunteer' | 'all';
+  date_from: string;
+  date_to: string;
+}
+
+const emptyExportFilters: ExportFilters = {
+  survey_template_id: '',
+  activity_template_id: '',
+  activity_id: '',
+  school_id: '',
+  user_id: '',
+  status: '',
+  source_type: '',
+  date_from: '',
+  date_to: '',
+};
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = window.URL.createObjectURL(blob);
@@ -30,6 +67,7 @@ export default function CoordinatorExportsPage() {
   const [selectedExportType, setSelectedExportType] = useState<string>('');
   const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json' | ''>('');
   const [error, setError] = useState<string | null>(null);
+  const [exportFilters, setExportFilters] = useState<ExportFilters>(emptyExportFilters);
 
   const handleExport = async (type: string, format: 'csv' | 'json', options?: Record<string, any>) => {
     setIsCreatingExport(true);
@@ -53,6 +91,18 @@ export default function CoordinatorExportsPage() {
           break;
         case 'activity-templates':
           result = await exportsApi.exportActivityTemplates(params, format);
+          break;
+        case 'survey-answers':
+          result = await exportsApi.exportSurveyAnswers(options);
+          break;
+        case 'survey-matrix':
+          result = await exportsApi.exportSurveyMatrix(options);
+          break;
+        case 'activity-survey-answers':
+          result = await exportsApi.exportActivitySurveyAnswers(options);
+          break;
+        case 'activities-detailed':
+          result = await exportsApi.exportActivitiesDetailed(options);
           break;
         default:
           throw new Error(`Unsupported export type: ${type}`);
@@ -82,7 +132,51 @@ export default function CoordinatorExportsPage() {
     }
   };
 
-  const exportTypes = [
+  const updateFilter = <K extends keyof ExportFilters>(key: K, value: ExportFilters[K]) => {
+    setExportFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setExportFilters(emptyExportFilters);
+  };
+
+  const activeFilters = Object.entries(exportFilters).filter(([, value]) => value);
+
+  const buildAnalyticsExportFilters = (type: string) => {
+    const base = {
+      school_id: exportFilters.school_id,
+      date_from: exportFilters.date_from,
+      date_to: exportFilters.date_to,
+    };
+
+    if (type === 'survey-answers' || type === 'survey-matrix') {
+      return {
+        ...base,
+        survey_template_id: exportFilters.survey_template_id,
+        submitted_by_id: exportFilters.user_id,
+        source_type: exportFilters.source_type,
+      };
+    }
+
+    if (type === 'activity-survey-answers') {
+      return {
+        ...base,
+        survey_template_id: exportFilters.survey_template_id,
+        activity_template_id: exportFilters.activity_template_id,
+        activity_id: exportFilters.activity_id,
+        volunteer_id: exportFilters.user_id,
+      };
+    }
+
+    return {
+      ...base,
+      activity_template_id: exportFilters.activity_template_id,
+      volunteer_id: exportFilters.user_id,
+      status: exportFilters.status,
+    };
+  };
+
+  const exportTypes: ExportTypeItem[] = [
     {
       id: 'activities',
       label: 'Activities',
@@ -98,6 +192,22 @@ export default function CoordinatorExportsPage() {
       description: 'Survey responses for your assigned pilot only',
     },
     {
+      id: 'photos',
+      label: 'Photos',
+      icon: PhotoIcon,
+      color: 'bg-green-100 text-green-600',
+      description: 'Photo metadata for your assigned pilot only',
+      disabledReason: 'No immediate photo export endpoint is available yet.',
+    },
+    {
+      id: 'volunteers',
+      label: 'Volunteers',
+      icon: UserGroupIcon,
+      color: 'bg-orange-100 text-orange-600',
+      description: 'Volunteer data for your assigned pilot only',
+      disabledReason: 'No immediate volunteer export endpoint is available yet.',
+    },
+    {
       id: 'schools',
       label: 'Schools',
       icon: BuildingOfficeIcon,
@@ -110,6 +220,38 @@ export default function CoordinatorExportsPage() {
       icon: DocumentTextIcon,
       color: 'bg-green-100 text-green-600',
       description: 'Activity templates for your assigned pilot only',
+    },
+    {
+      id: 'survey-answers',
+      label: 'Raw Survey Q&A CSV',
+      icon: DocumentArrowDownIcon,
+      color: 'bg-emerald-100 text-emerald-700',
+      description: 'Per-question survey answers for your assigned pilot only',
+      csvOnly: true,
+    },
+    {
+      id: 'survey-matrix',
+      label: 'Survey Response Matrix CSV',
+      icon: DocumentArrowDownIcon,
+      color: 'bg-sky-100 text-sky-700',
+      description: 'One row per submitted survey response, with questions as Excel columns. Best for quick review in Excel.',
+      csvOnly: true,
+    },
+    {
+      id: 'activity-survey-answers',
+      label: 'Activity Survey Answers CSV',
+      icon: DocumentArrowDownIcon,
+      color: 'bg-cyan-100 text-cyan-700',
+      description: 'Activity-related question responses for your assigned pilot only',
+      csvOnly: true,
+    },
+    {
+      id: 'activities-detailed',
+      label: 'Detailed Activities CSV',
+      icon: CalendarIcon,
+      color: 'bg-lime-100 text-lime-700',
+      description: 'Activity assignment and completion tracking for your assigned pilot only',
+      csvOnly: true,
     },
   ];
 
@@ -163,6 +305,125 @@ export default function CoordinatorExportsPage() {
         </Alert>
       )}
 
+      {/* Export Filters */}
+      <Card>
+        <div className="p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">CSV Export Filters</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                These filters apply to the three analytics-ready CSV exports.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Survey Template ID</span>
+              <input
+                value={exportFilters.survey_template_id}
+                onChange={(event) => updateFilter('survey_template_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="survey_template_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Activity Template ID</span>
+              <input
+                value={exportFilters.activity_template_id}
+                onChange={(event) => updateFilter('activity_template_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="activity_template_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Activity ID</span>
+              <input
+                value={exportFilters.activity_id}
+                onChange={(event) => updateFilter('activity_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="activity_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">School ID</span>
+              <input
+                value={exportFilters.school_id}
+                onChange={(event) => updateFilter('school_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="school_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Volunteer/User ID</span>
+              <input
+                value={exportFilters.user_id}
+                onChange={(event) => updateFilter('user_id', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                placeholder="user_id"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Status</span>
+              <select
+                value={exportFilters.status}
+                onChange={(event) => updateFilter('status', event.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+              >
+                <option value="">All statuses</option>
+                <option value="planned">Planned</option>
+                <option value="assigned">Assigned</option>
+                <option value="in_progress">In progress</option>
+                <option value="submitted">Submitted</option>
+                <option value="approved">Approved</option>
+                <option value="completed">Completed</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-gray-700">Source Type</span>
+              <select
+                value={exportFilters.source_type}
+                onChange={(event) => updateFilter('source_type', event.target.value as ExportFilters['source_type'])}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+              >
+                <option value="">All sources</option>
+                <option value="student">Student</option>
+                <option value="volunteer">Volunteer</option>
+                <option value="all">All</option>
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1 text-sm">
+                <span className="font-medium text-gray-700">Date From</span>
+                <input
+                  type="date"
+                  value={exportFilters.date_from}
+                  onChange={(event) => updateFilter('date_from', event.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="font-medium text-gray-700">Date To</span>
+                <input
+                  type="date"
+                  value={exportFilters.date_to}
+                  onChange={(event) => updateFilter('date_to', event.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                />
+              </label>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs text-gray-500">
+            Current filters: {activeFilters.length ? `${activeFilters.length} active` : 'none'}
+          </p>
+        </div>
+      </Card>
+
       {/* Quick Export Cards */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Exports</h2>
@@ -181,34 +442,54 @@ export default function CoordinatorExportsPage() {
                 </div>
 
                 <div className="mt-auto pt-3 border-t">
-                  <div className="space-y-2">
-                    <select
-                      value={selectedExportType === exportTypeItem.id ? selectedFormat : ''}
-                      onChange={(e) => {
-                        setSelectedExportType(exportTypeItem.id);
-                        setSelectedFormat(e.target.value as 'csv' | 'json' | '');
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  {exportTypeItem.disabledReason ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled
+                      title={exportTypeItem.disabledReason}
                     >
-                      <option value="">Select format...</option>
-                      {exportFormats.map((format) => (
-                        <option key={format.id} value={format.id}>
-                          {format.label} ({format.description})
-                        </option>
-                      ))}
-                    </select>
-
-                    {selectedExportType === exportTypeItem.id && selectedFormat && (
-                      <Button
-                        variant="default"
-                        className="w-full"
-                        onClick={() => handleExport(exportTypeItem.id, selectedFormat)}
-                        loading={isCreatingExport && selectedExportType === exportTypeItem.id}
+                      Unavailable
+                    </Button>
+                  ) : exportTypeItem.csvOnly ? (
+                    <Button
+                      variant="default"
+                      className="w-full"
+                      onClick={() => handleExport(exportTypeItem.id, 'csv', buildAnalyticsExportFilters(exportTypeItem.id))}
+                      loading={isCreatingExport && selectedExportType === exportTypeItem.id}
+                    >
+                      Export CSV
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <select
+                        value={selectedExportType === exportTypeItem.id ? selectedFormat : ''}
+                        onChange={(e) => {
+                          setSelectedExportType(exportTypeItem.id);
+                          setSelectedFormat(e.target.value as 'csv' | 'json' | '');
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       >
-                        Export as {selectedFormat.toUpperCase()}
-                      </Button>
-                    )}
-                  </div>
+                        <option value="">Select format...</option>
+                        {exportFormats.map((format) => (
+                          <option key={format.id} value={format.id}>
+                            {format.label} ({format.description})
+                          </option>
+                        ))}
+                      </select>
+
+                      {selectedExportType === exportTypeItem.id && selectedFormat && (
+                        <Button
+                          variant="default"
+                          className="w-full"
+                          onClick={() => handleExport(exportTypeItem.id, selectedFormat)}
+                          loading={isCreatingExport && selectedExportType === exportTypeItem.id}
+                        >
+                          Export as {selectedFormat.toUpperCase()}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>

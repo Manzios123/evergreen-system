@@ -12,7 +12,7 @@ const exportDownload = async <T>(
   let url = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}${endpoint}`;
   if (params) {
     const queryString = new URLSearchParams(
-      Object.entries(params).filter(([_, value]) => value !== undefined && value !== null)
+      Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
     ).toString();
     if (queryString) {
       url += `?${queryString}`;
@@ -172,6 +172,51 @@ export const exportsApi = {
     };
     return exportDownload(`/exports/all`, params);
   },
+
+  exportSurveyAnswers: (filters?: {
+    pilot_id?: string;
+    survey_template_id?: string;
+    school_id?: string;
+    submitted_by_id?: string;
+    user_id?: string;
+    volunteer_id?: string;
+    date_from?: string;
+    date_to?: string;
+    source_type?: 'student' | 'volunteer' | 'all';
+  }) => exportDownload(`/exports/survey-answers`, filters),
+
+  exportSurveyMatrix: (filters?: {
+    pilot_id?: string;
+    survey_template_id?: string;
+    school_id?: string;
+    submitted_by_id?: string;
+    user_id?: string;
+    volunteer_id?: string;
+    date_from?: string;
+    date_to?: string;
+    source_type?: 'student' | 'volunteer' | 'all';
+  }) => exportDownload(`/exports/survey-matrix`, filters),
+
+  exportActivitySurveyAnswers: (filters?: {
+    pilot_id?: string;
+    survey_template_id?: string;
+    activity_template_id?: string;
+    activity_id?: string;
+    school_id?: string;
+    volunteer_id?: string;
+    date_from?: string;
+    date_to?: string;
+  }) => exportDownload(`/exports/activity-survey-answers`, filters),
+
+  exportActivitiesDetailed: (filters?: {
+    pilot_id?: string;
+    activity_template_id?: string;
+    school_id?: string;
+    volunteer_id?: string;
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+  }) => exportDownload(`/exports/activities-detailed`, filters),
 
   // Export reports - Keep for compatibility but implement with existing backend
   exportReports: (

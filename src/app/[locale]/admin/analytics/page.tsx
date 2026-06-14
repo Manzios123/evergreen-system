@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import Link from 'next/link';
 import {
   ArrowDownTrayIcon,
   BuildingLibraryIcon,
@@ -297,10 +298,12 @@ export default function AdminAnalyticsPage() {
           <h1 className="mt-1 text-3xl font-bold text-gray-900">Evergreen Analytics</h1>
           <p className="mt-1 text-sm text-gray-600">Pilot Survey Performance &amp; Insights</p>
         </div>
-        <Button type="button" variant="outline" disabled title="Analytics export is not wired yet.">
-          <ArrowDownTrayIcon className="mr-2 h-4 w-4" />
-          Export Report
-        </Button>
+        <Link href="/admin/exports">
+          <Button type="button" variant="outline">
+            <ArrowDownTrayIcon className="mr-2 h-4 w-4" />
+            Export Report
+          </Button>
+        </Link>
       </div>
 
       <Card>
