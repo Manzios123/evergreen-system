@@ -5,7 +5,13 @@ import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import SearchFilter from '@/components/ui/search-filter';
 import Alert from '@/components/ui/alert';
+import { useApiQuery } from '@/lib/hooks/use-api';
+import { activitiesApi } from '@/lib/api/activities';
+import { activityTemplatesApi } from '@/lib/api/activity-templates';
+import { api } from '@/lib/api/api';
 import { exportsApi } from '@/lib/api/exports';
+import { surveyTemplatesApi } from '@/lib/api/survey-templates';
+import { usersApi } from '@/lib/api/users';
 import {
   CalendarIcon,
   DocumentArrowDownIcon,
@@ -50,6 +56,38 @@ const emptyExportFilters: ExportFilters = {
   date_to: '',
 };
 
+interface ExportFilterOption {
+  id: string;
+  label: string;
+}
+
+const selectClassName =
+  'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100';
+
+const responseArray = (response: any, keyedArray?: string): any[] => {
+  if (Array.isArray(response)) return response;
+  if (keyedArray && Array.isArray(response?.[keyedArray])) return response[keyedArray];
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.data?.data)) return response.data.data;
+  return [];
+};
+
+const sortOptions = (options: ExportFilterOption[]) =>
+  options.sort((a, b) => a.label.localeCompare(b.label));
+
+const buildOptions = (
+  items: any[],
+  getLabel: (item: any) => string | undefined
+): ExportFilterOption[] =>
+  sortOptions(
+    items
+      .map((item) => ({
+        id: String(item.id || ''),
+        label: getLabel(item) || 'Unnamed',
+      }))
+      .filter((item) => item.id)
+  );
+
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -68,6 +106,47 @@ export default function CoordinatorExportsPage() {
   const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json' | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [exportFilters, setExportFilters] = useState<ExportFilters>(emptyExportFilters);
+
+  const { data: surveyTemplateOptions = [] } = useApiQuery<ExportFilterOption[]>(
+    ['coordinator-export-filter-survey-templates'],
+    async () => buildOptions(await surveyTemplatesApi.list(), (template) => template.name)
+  );
+
+  const { data: activityTemplateOptions = [] } = useApiQuery<ExportFilterOption[]>(
+    ['coordinator-export-filter-activity-templates'],
+    async () => buildOptions(await activityTemplatesApi.list(), (template) => template.name)
+  );
+
+  const { data: activityOptions = [] } = useApiQuery<ExportFilterOption[]>(
+    ['coordinator-export-filter-activities'],
+    async () => {
+      const response = await activitiesApi.list();
+      return buildOptions(responseArray(response), (activity) => {
+        const date = activity.scheduled_date ? ` (${activity.scheduled_date})` : '';
+        const school = activity.school_name ? ` - ${activity.school_name}` : '';
+        return `${activity.title || 'Untitled activity'}${school}${date}`;
+      });
+    }
+  );
+
+  const { data: schoolOptions = [] } = useApiQuery<ExportFilterOption[]>(
+    ['coordinator-export-filter-schools'],
+    async () => {
+      const response = await api.get<any>('/schools', { limit: 500, is_active: true });
+      return buildOptions(responseArray(response), (school) => school.name);
+    }
+  );
+
+  const { data: userOptions = [] } = useApiQuery<ExportFilterOption[]>(
+    ['coordinator-export-filter-users'],
+    async () => {
+      const response = await usersApi.list();
+      return buildOptions(responseArray(response, 'users'), (user) => {
+        const email = user.email ? ` (${user.email})` : '';
+        return `${user.full_name || user.email || 'Unnamed user'}${email}`;
+      });
+    }
+  );
 
   const handleExport = async (type: string, format: 'csv' | 'json', options?: Record<string, any>) => {
     setIsCreatingExport(true);
@@ -176,6 +255,30 @@ export default function CoordinatorExportsPage() {
     };
   };
 
+  const renderDropdownFilter = (
+    label: string,
+    key: keyof Pick<ExportFilters, 'survey_template_id' | 'activity_template_id' | 'activity_id' | 'school_id' | 'user_id'>,
+    options: ExportFilterOption[],
+    allLabel: string
+  ) => (
+    <label className="space-y-1 text-sm">
+      <span className="font-medium text-gray-700">{label}</span>
+      <select
+        value={exportFilters[key]}
+        onChange={(event) => updateFilter(key, event.target.value)}
+        className={selectClassName}
+        disabled={!options.length && !exportFilters[key]}
+      >
+        <option value="">{options.length ? allLabel : 'No options available'}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   const exportTypes: ExportTypeItem[] = [
     {
       id: 'activities',
@@ -226,7 +329,7 @@ export default function CoordinatorExportsPage() {
       label: 'Raw Survey Q&A CSV',
       icon: DocumentArrowDownIcon,
       color: 'bg-emerald-100 text-emerald-700',
-      description: 'Per-question survey answers for your assigned pilot only',
+      description: 'English-only report export. One row per answer. Untranslated free-text responses appear blank.',
       csvOnly: true,
     },
     {
@@ -234,7 +337,7 @@ export default function CoordinatorExportsPage() {
       label: 'Survey Response Matrix CSV',
       icon: DocumentArrowDownIcon,
       color: 'bg-sky-100 text-sky-700',
-      description: 'One row per submitted survey response, with questions as Excel columns. Best for quick review in Excel.',
+      description: 'English-only Excel review format. One row per survey submission, with questions as columns.',
       csvOnly: true,
     },
     {
@@ -242,7 +345,7 @@ export default function CoordinatorExportsPage() {
       label: 'Activity Survey Answers CSV',
       icon: DocumentArrowDownIcon,
       color: 'bg-cyan-100 text-cyan-700',
-      description: 'Activity-related question responses for your assigned pilot only',
+      description: 'English-only activity answer export.',
       csvOnly: true,
     },
     {
@@ -250,7 +353,7 @@ export default function CoordinatorExportsPage() {
       label: 'Detailed Activities CSV',
       icon: CalendarIcon,
       color: 'bg-lime-100 text-lime-700',
-      description: 'Activity assignment and completion tracking for your assigned pilot only',
+      description: 'Activity assignment and completion tracking with total, boys, and girls counts.',
       csvOnly: true,
     },
   ];
@@ -312,7 +415,7 @@ export default function CoordinatorExportsPage() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">CSV Export Filters</h2>
               <p className="mt-1 text-sm text-gray-500">
-                These filters apply to the three analytics-ready CSV exports.
+                These filters apply to the analytics-ready CSV exports.
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={clearFilters}>
@@ -321,57 +424,17 @@ export default function CoordinatorExportsPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">Survey Template ID</span>
-              <input
-                value={exportFilters.survey_template_id}
-                onChange={(event) => updateFilter('survey_template_id', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
-                placeholder="survey_template_id"
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">Activity Template ID</span>
-              <input
-                value={exportFilters.activity_template_id}
-                onChange={(event) => updateFilter('activity_template_id', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
-                placeholder="activity_template_id"
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">Activity ID</span>
-              <input
-                value={exportFilters.activity_id}
-                onChange={(event) => updateFilter('activity_id', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
-                placeholder="activity_id"
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">School ID</span>
-              <input
-                value={exportFilters.school_id}
-                onChange={(event) => updateFilter('school_id', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
-                placeholder="school_id"
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="font-medium text-gray-700">Volunteer/User ID</span>
-              <input
-                value={exportFilters.user_id}
-                onChange={(event) => updateFilter('user_id', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
-                placeholder="user_id"
-              />
-            </label>
+            {renderDropdownFilter('Survey Template', 'survey_template_id', surveyTemplateOptions, 'All survey templates')}
+            {renderDropdownFilter('Activity Template', 'activity_template_id', activityTemplateOptions, 'All activity templates')}
+            {renderDropdownFilter('Activity', 'activity_id', activityOptions, 'All activities')}
+            {renderDropdownFilter('School', 'school_id', schoolOptions, 'All schools')}
+            {renderDropdownFilter('Participant / Volunteer', 'user_id', userOptions, 'All people')}
             <label className="space-y-1 text-sm">
               <span className="font-medium text-gray-700">Status</span>
               <select
                 value={exportFilters.status}
                 onChange={(event) => updateFilter('status', event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                className={selectClassName}
               >
                 <option value="">All statuses</option>
                 <option value="planned">Planned</option>
@@ -388,7 +451,7 @@ export default function CoordinatorExportsPage() {
               <select
                 value={exportFilters.source_type}
                 onChange={(event) => updateFilter('source_type', event.target.value as ExportFilters['source_type'])}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                className={selectClassName}
               >
                 <option value="">All sources</option>
                 <option value="student">Student</option>
@@ -403,7 +466,7 @@ export default function CoordinatorExportsPage() {
                   type="date"
                   value={exportFilters.date_from}
                   onChange={(event) => updateFilter('date_from', event.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                  className={selectClassName}
                 />
               </label>
               <label className="space-y-1 text-sm">
@@ -412,7 +475,7 @@ export default function CoordinatorExportsPage() {
                   type="date"
                   value={exportFilters.date_to}
                   onChange={(event) => updateFilter('date_to', event.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100"
+                  className={selectClassName}
                 />
               </label>
             </div>

@@ -204,7 +204,7 @@ export default function ActivityViewPage() {
                 <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Engagement Level</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {typeof activity.engagement_level === 'number' 
+                    {typeof activity.engagement_level === 'number'
                       ? `${activity.engagement_level}/10`
                       : activity.engagement_level}
                   </dd>
@@ -218,6 +218,18 @@ export default function ActivityViewPage() {
                   </dd>
                 </div>
               )}
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Number of Boys</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {activity.number_of_boys ?? 'Not recorded'}
+                </dd>
+              </div>
+              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt className="text-sm font-medium text-gray-500">Number of Girls</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {activity.number_of_girls ?? 'Not recorded'}
+                </dd>
+              </div>
               {activity.coordinator_feedback && (
                 <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Coordinator Feedback</dt>

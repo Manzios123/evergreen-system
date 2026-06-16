@@ -40,7 +40,10 @@ export default function ActivityCard({ activity, showActions = true, onAction }:
           {activity.number_of_participants !== undefined && (
             <div className="flex items-center text-sm text-gray-500">
               <UsersIcon className="shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
-              <span>{activity.number_of_participants} participants</span>
+              <span>
+                {activity.number_of_participants} participants
+                {' '}({activity.number_of_boys ?? 'Not recorded'} boys, {activity.number_of_girls ?? 'Not recorded'} girls)
+              </span>
             </div>
           )}
           {activity.pilot?.name && ( // Fixed: activity.pilot_name -> activity.pilot?.name

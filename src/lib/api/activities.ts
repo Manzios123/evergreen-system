@@ -20,6 +20,8 @@ export interface CreateActivityData {
   volunteer_id: string;
   activity_template_id?: string;
   number_of_participants?: number;
+  number_of_boys?: number | null;
+  number_of_girls?: number | null;
   volunteer_notes?: string;
   engagement_level?: 'low' | 'medium' | 'high'; // ADDED: for frontend form
   student_quotes?: string; // ADDED: for beautified form
@@ -32,6 +34,8 @@ export interface UpdateActivityData {
   actual_date?: string;
   status?: ActivityStatus;
   number_of_participants?: number;
+  number_of_boys?: number | null;
+  number_of_girls?: number | null;
   engagement_level?: 'low' | 'medium' | 'high' | number | string; // UPDATED: unified type
   volunteer_notes?: string;
   student_quotes?: string;
@@ -84,6 +88,9 @@ export const activitiesApi = {
     scheduled_date: string;
     description?: string;
     assignment_notes?: string;
+    number_of_participants?: number;
+    number_of_boys?: number | null;
+    number_of_girls?: number | null;
   }) => apiRequest<{ 
     success: boolean; 
     data: Activity; 

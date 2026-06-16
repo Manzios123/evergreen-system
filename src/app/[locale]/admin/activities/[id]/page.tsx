@@ -365,7 +365,10 @@ export default function ActivityReportPage() {
                 <UsersIcon className="h-4 w-4" />
                 Participants
               </h3>
-              <p className="text-gray-900">{activity.number_of_participants || '—'}</p>
+              <p className="text-gray-900">{activity.number_of_participants ?? 'Not recorded'}</p>
+              <p className="mt-1 text-sm text-gray-500">
+                Boys: {activity.number_of_boys ?? 'Not recorded'} | Girls: {activity.number_of_girls ?? 'Not recorded'}
+              </p>
             </div>
 
             <div>

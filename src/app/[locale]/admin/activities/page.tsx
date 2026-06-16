@@ -160,11 +160,14 @@ export default function AdminActivitiesPage() {
       key: 'participants',
       header: 'Participants',
       render: (activity) => (
-        <div className="flex items-center">
-          <UsersIcon className="h-4 w-4 text-gray-400 mr-2" />
-          <span className="text-sm text-gray-900">
-            {activity.number_of_participants || '—'}
-          </span>
+        <div className="flex items-start">
+          <UsersIcon className="h-4 w-4 text-gray-400 mr-2 mt-0.5" />
+          <div className="text-sm text-gray-900">
+            <div>Total: {activity.number_of_participants ?? 'Not recorded'}</div>
+            <div className="text-xs text-gray-500">
+              Boys: {activity.number_of_boys ?? 'Not recorded'} | Girls: {activity.number_of_girls ?? 'Not recorded'}
+            </div>
+          </div>
         </div>
       ),
     },
@@ -174,18 +177,18 @@ export default function AdminActivitiesPage() {
       render: (activity) => {
         const engagement = activity.engagement_level;
         if (!engagement) return <span className="text-gray-400">—</span>;
-        
+
         let displayText = String(engagement);
         if (engagement === 'low') displayText = 'Low';
         if (engagement === 'medium') displayText = 'Medium';
         if (engagement === 'high') displayText = 'High';
-        
+
         const getColor = (level: any) => {
           if (level === 'high' || level === 3) return 'text-green-600 bg-green-100';
           if (level === 'medium' || level === 2) return 'text-yellow-600 bg-yellow-100';
           return 'text-red-600 bg-red-100';
         };
-        
+
         return (
           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getColor(engagement)}`}>
             {displayText}

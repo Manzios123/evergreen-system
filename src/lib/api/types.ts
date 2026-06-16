@@ -29,6 +29,8 @@ export interface Activity {
   volunteer_notes: string | null;
   student_quotes?: string | null; // Added for beautified form
   number_of_participants: number | null;
+  number_of_boys: number | null;
+  number_of_girls: number | null;
   engagement_level: 'low' | 'medium' | 'high' | null;
   coordinator_feedback: string | null;
   created_at: string;

@@ -139,6 +139,8 @@ export default function AssignActivityPage() {
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
   const [currentBatchIndex, setCurrentBatchIndex] = useState(0);
   const [numberOfParticipants, setNumberOfParticipants] = useState<number>(25);
+  const [numberOfBoys, setNumberOfBoys] = useState<number | null>(null);
+  const [numberOfGirls, setNumberOfGirls] = useState<number | null>(null);
 
   const {
     register,
@@ -266,6 +268,8 @@ export default function AssignActivityPage() {
           volunteer_id: volunteerId,
           volunteer_ids: undefined, // Remove array for single assignment; legacy API field name
           number_of_participants: numberOfParticipants,
+          number_of_boys: numberOfBoys,
+          number_of_girls: numberOfGirls,
         };
         
         await api.post('/activities/assign', payload);
@@ -315,11 +319,18 @@ export default function AssignActivityPage() {
       alert('Please select at least one facilitator');
       return;
     }
+
+    if (numberOfBoys !== null && numberOfGirls !== null && numberOfBoys + numberOfGirls !== numberOfParticipants) {
+      alert('Boys plus girls must equal total participants');
+      return;
+    }
     
     // Prepare form data with number of participants
     const formData = {
       ...data,
       number_of_participants: numberOfParticipants,
+      number_of_boys: numberOfBoys,
+      number_of_girls: numberOfGirls,
     };
     
     // Single facilitator assignment through the legacy volunteer_id field
@@ -341,6 +352,8 @@ export default function AssignActivityPage() {
   // Get selected template details
   const selectedTemplateId = watch('activity_template_id');
   const selectedTemplate = templatesArr.find(t => t.id === selectedTemplateId);
+  const hasFullSplit = numberOfBoys !== null && numberOfGirls !== null;
+  const splitTotal = (numberOfBoys ?? 0) + (numberOfGirls ?? 0);
 
   // Create options with default placeholder option
   const templateOptions = [
@@ -557,18 +570,43 @@ export default function AssignActivityPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Number of Participants *
                     </label>
-                    <div className="relative">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                        <Users className="h-5 w-5 text-gray-400" />
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                          <Users className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                          type="number"
+                          min="1"
+                          value={numberOfParticipants}
+                          onChange={(e) => setNumberOfParticipants(parseInt(e.target.value) || 25)}
+                          className="block w-full rounded-md border border-gray-300 pl-10 pr-3 py-2 text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-green-500 sm:text-sm"
+                          required
+                        />
                       </div>
-                      <input
-                        type="number"
-                        min="1"
-                        value={numberOfParticipants}
-                        onChange={(e) => setNumberOfParticipants(parseInt(e.target.value) || 25)}
-                        className="block w-full rounded-md border border-gray-300 pl-10 pr-3 py-2 text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-green-500 sm:text-sm"
-                        required
-                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input
+                          label="Number of boys"
+                          type="number"
+                          min="0"
+                          value={numberOfBoys ?? ''}
+                          onChange={(e) => setNumberOfBoys(e.target.value === '' ? null : Number(e.target.value))}
+                          placeholder="Leave blank if not recorded"
+                        />
+                        <Input
+                          label="Number of girls"
+                          type="number"
+                          min="0"
+                          value={numberOfGirls ?? ''}
+                          onChange={(e) => setNumberOfGirls(e.target.value === '' ? null : Number(e.target.value))}
+                          placeholder="Leave blank if not recorded"
+                        />
+                      </div>
+                      {hasFullSplit && (
+                        <p className={`text-sm ${splitTotal === numberOfParticipants ? 'text-green-700' : 'text-red-700'}`}>
+                          Boys + girls: {splitTotal}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -736,6 +774,18 @@ export default function AssignActivityPage() {
                     <span className="text-sm text-gray-500">Participants:</span>
                     <span className="text-sm font-medium text-gray-900">
                       {numberOfParticipants}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Boys:</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {numberOfBoys ?? 'Not recorded'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Girls:</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {numberOfGirls ?? 'Not recorded'}
                     </span>
                   </div>
                 </div>

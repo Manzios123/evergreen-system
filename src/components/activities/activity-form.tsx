@@ -14,6 +14,11 @@ import { api } from '@/lib/api';
 import { Activity, School } from '@/lib/types';
 import { CalendarIcon, MapPinIcon } from '@heroicons/react/24/outline';
 
+const optionalParticipantCount = z.preprocess(
+  (value) => value === '' || value === null || Number.isNaN(value) ? null : Number(value),
+  z.number().int().min(0, 'Must be a non-negative whole number').nullable()
+);
+
 const activitySchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
@@ -21,8 +26,21 @@ const activitySchema = z.object({
   scheduled_date: z.string().min(1, 'Date is required'),
   duration: z.number().min(0.5, 'Duration must be at least 0.5 hours'),
   number_of_participants: z.number().min(1, 'Number of students is required'),
+  number_of_boys: optionalParticipantCount,
+  number_of_girls: optionalParticipantCount,
   objectives: z.string().optional(),
   materials: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.number_of_boys !== null && data.number_of_girls !== null) {
+    const splitTotal = data.number_of_boys + data.number_of_girls;
+    if (splitTotal !== data.number_of_participants) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['number_of_girls'],
+        message: 'Boys plus girls must equal total participants',
+      });
+    }
+  }
 });
 
 type ActivityFormData = z.infer<typeof activitySchema>;
@@ -55,6 +73,8 @@ export function ActivityForm({ activity, onSubmitSuccess }: ActivityFormProps) {
       scheduled_date: activity.scheduled_date?.split('T')[0],
       duration: 2,
       number_of_participants: activity.number_of_participants || 0,
+      number_of_boys: activity.number_of_boys ?? null,
+      number_of_girls: activity.number_of_girls ?? null,
       objectives: activity.volunteer_notes || '',
       materials: activity.assignment_notes || '',
     } : undefined,
@@ -85,6 +105,11 @@ export function ActivityForm({ activity, onSubmitSuccess }: ActivityFormProps) {
   };
 
   const mutation = activity ? updateMutation : createMutation;
+  const participantTotal = Number(watch('number_of_participants') || 0);
+  const boysCount = watch('number_of_boys');
+  const girlsCount = watch('number_of_girls');
+  const splitTotal = (boysCount ?? 0) + (girlsCount ?? 0);
+  const hasFullSplit = boysCount !== null && boysCount !== undefined && girlsCount !== null && girlsCount !== undefined;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -156,6 +181,30 @@ export function ActivityForm({ activity, onSubmitSuccess }: ActivityFormProps) {
                 required
               />
 
+              <Input
+                label="Number of boys"
+                type="number"
+                min="0"
+                {...register('number_of_boys', {
+                  setValueAs: (value) => value === '' ? null : Number(value),
+                })}
+                placeholder="Leave blank if not recorded"
+                error={errors.number_of_boys?.message}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input
+                label="Number of girls"
+                type="number"
+                min="0"
+                {...register('number_of_girls', {
+                  setValueAs: (value) => value === '' ? null : Number(value),
+                })}
+                placeholder="Leave blank if not recorded"
+                error={errors.number_of_girls?.message}
+              />
+
               <Select
                 label="School"
                 {...register('school_id')}
@@ -174,6 +223,12 @@ export function ActivityForm({ activity, onSubmitSuccess }: ActivityFormProps) {
                 disabled={schoolsLoading}
               />
             </div>
+
+            {hasFullSplit && (
+              <p className={`text-sm ${splitTotal === participantTotal ? 'text-green-700' : 'text-red-700'}`}>
+                Boys + girls: {splitTotal}
+              </p>
+            )}
 
             <Textarea
               label="Learning Objectives"

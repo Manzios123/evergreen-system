@@ -60,20 +60,40 @@ const reverseMapEngagementLevel = (value: string | number | undefined): string =
   return mapped;
 };
 
+const optionalParticipantCount = z.preprocess(
+  (value) => value === '' || value === null || Number.isNaN(value) ? null : Number(value),
+  z.number().int().min(0, 'Must be a non-negative whole number').nullable()
+);
+
 // Simplified schema without invalid_type_error
 const submissionSchema = z.object({
   actual_date: z.string().min(1, 'Actual date is required'),
   number_of_participants: z.coerce.number().min(1, 'Number of participants is required'),
+  number_of_boys: optionalParticipantCount,
+  number_of_girls: optionalParticipantCount,
   engagement_level: z.enum(['low', 'medium', 'high'], {
     
   }),
   volunteer_notes: z.string().min(1, 'Please provide activity notes'),
+}).superRefine((data, ctx) => {
+  if (data.number_of_boys !== null && data.number_of_girls !== null) {
+    const splitTotal = data.number_of_boys + data.number_of_girls;
+    if (splitTotal !== data.number_of_participants) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['number_of_girls'],
+        message: 'Boys plus girls must equal total participants',
+      });
+    }
+  }
 });
 
 // Define the form data type explicitly to match schema
 type SubmissionFormData = {
   actual_date: string;
   number_of_participants: number;
+  number_of_boys: number | null;
+  number_of_girls: number | null;
   engagement_level: 'low' | 'medium' | 'high';
   volunteer_notes: string;
 };
@@ -100,6 +120,8 @@ interface ActivitySubmissionFormProps {
     actual_date?: string;
     volunteer_notes?: string;
     number_of_participants?: number;
+    number_of_boys?: number | null;
+    number_of_girls?: number | null;
     engagement_level?: string | number;
     school_name?: string;
     pilot_name?: string;
@@ -148,6 +170,8 @@ export function ActivitySubmissionForm({
     defaultValues: {
       actual_date: activity.actual_date || activity.scheduled_date || new Date().toISOString().split('T')[0],
       number_of_participants: activity.number_of_participants || 1,
+      number_of_boys: activity.number_of_boys ?? null,
+      number_of_girls: activity.number_of_girls ?? null,
       engagement_level: reverseMapEngagementLevel(activity.engagement_level) as 'low' | 'medium' | 'high',
       volunteer_notes: activity.volunteer_notes || '',
     },
@@ -159,6 +183,8 @@ export function ActivitySubmissionForm({
       const updateData: UpdateActivityData = {
         actual_date: data.actual_date,
         number_of_participants: data.number_of_participants,
+        number_of_boys: data.number_of_boys,
+        number_of_girls: data.number_of_girls,
         engagement_level: data.engagement_level, // Now this is 'low' | 'medium' | 'high'
         volunteer_notes: data.volunteer_notes,
         // Keep status as draft when saving
@@ -176,6 +202,8 @@ export function ActivitySubmissionForm({
           reset({
             actual_date: data.data.actual_date || activity.scheduled_date,
             number_of_participants: data.data.number_of_participants || 1,
+            number_of_boys: data.data.number_of_boys ?? null,
+            number_of_girls: data.data.number_of_girls ?? null,
             engagement_level: reverseMapEngagementLevel(data.data.engagement_level) as 'low' | 'medium' | 'high',
             volunteer_notes: data.data.volunteer_notes || '',
           });
@@ -197,6 +225,8 @@ export function ActivitySubmissionForm({
       const updateData: UpdateActivityData = {
         actual_date: data.actual_date,
         number_of_participants: data.number_of_participants,
+        number_of_boys: data.number_of_boys,
+        number_of_girls: data.number_of_girls,
         engagement_level: data.engagement_level, // Now this is 'low' | 'medium' | 'high'
         volunteer_notes: data.volunteer_notes,
       };
@@ -252,6 +282,11 @@ export function ActivitySubmissionForm({
   ];
 
   const engagementValue = watch('engagement_level');
+  const participantTotal = Number(watch('number_of_participants') || 0);
+  const boysCount = watch('number_of_boys');
+  const girlsCount = watch('number_of_girls');
+  const splitTotal = (boysCount ?? 0) + (girlsCount ?? 0);
+  const hasFullSplit = boysCount !== null && boysCount !== undefined && girlsCount !== null && girlsCount !== undefined;
   const isSubmittingForm = isSubmitting || saveDraftMutation.isPending || submitForApprovalMutation.isPending;
 
   return (
@@ -360,23 +395,54 @@ export function ActivitySubmissionForm({
                   Number of Participants
                   <span className="text-red-500 ml-1">*</span>
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserGroupIcon className="h-5 w-5 text-gray-400" />
+                <div className="space-y-4">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <UserGroupIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <Input
+                      type="number"
+                      min="1"
+                      {...register('number_of_participants', {
+                        valueAsNumber: true,
+                        setValueAs: (value) => Number(value) || 1,
+                      })}
+                      placeholder="e.g., 25"
+                      error={errors.number_of_participants?.message}
+                      className="pl-10"
+                      required
+                      disabled={!isOwner && submissionType === 'save'}
+                    />
                   </div>
-                  <Input
-                    type="number"
-                    min="1"
-                    {...register('number_of_participants', {
-                      valueAsNumber: true,
-                      setValueAs: (value) => Number(value) || 1,
-                    })}
-                    placeholder="e.g., 25"
-                    error={errors.number_of_participants?.message}
-                    className="pl-10"
-                    required
-                    disabled={!isOwner && submissionType === 'save'}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Number of boys"
+                      type="number"
+                      min="0"
+                      {...register('number_of_boys', {
+                        setValueAs: (value) => value === '' ? null : Number(value),
+                      })}
+                      placeholder="Leave blank if not recorded"
+                      error={errors.number_of_boys?.message}
+                      disabled={!isOwner && submissionType === 'save'}
+                    />
+                    <Input
+                      label="Number of girls"
+                      type="number"
+                      min="0"
+                      {...register('number_of_girls', {
+                        setValueAs: (value) => value === '' ? null : Number(value),
+                      })}
+                      placeholder="Leave blank if not recorded"
+                      error={errors.number_of_girls?.message}
+                      disabled={!isOwner && submissionType === 'save'}
+                    />
+                  </div>
+                  {hasFullSplit && (
+                    <p className={`text-sm ${splitTotal === participantTotal ? 'text-green-700' : 'text-red-700'}`}>
+                      Boys + girls: {splitTotal}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

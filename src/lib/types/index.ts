@@ -36,6 +36,8 @@ export interface Activity {
   activity_template_id?: string;
   activity_template_name?: string;
   number_of_participants?: number;
+  number_of_boys?: number | null;
+  number_of_girls?: number | null;
   engagement_level?: 'low' | 'medium' | 'high' | number | string;
   volunteer_notes?: string;
   student_quotes?: string;

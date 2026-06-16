@@ -292,6 +292,8 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
             volunteer_notes: activity.volunteer_notes,
             student_quotes: activity.student_quotes,
             number_of_participants: activity.number_of_participants,
+            number_of_boys: activity.number_of_boys,
+            number_of_girls: activity.number_of_girls,
             engagement_level: activity.engagement_level as string,
             school_name: activity.school_name,
             pilot_name: activity.pilot_name,
@@ -382,6 +384,9 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                         <p className="text-sm text-gray-900">
                           {activity.number_of_participants} student{activity.number_of_participants !== 1 ? 's' : ''}
                         </p>
+                        <p className="text-xs text-gray-500">
+                          Boys: {activity.number_of_boys ?? 'Not recorded'} | Girls: {activity.number_of_girls ?? 'Not recorded'}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -424,6 +429,9 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                       {activity.number_of_participants !== undefined && (
                         <div className="mt-2 text-xs text-gray-500">
                           <span className="font-medium">Participants:</span> {activity.number_of_participants}
+                          <span className="ml-2">
+                            Boys: {activity.number_of_boys ?? 'Not recorded'} | Girls: {activity.number_of_girls ?? 'Not recorded'}
+                          </span>
                         </div>
                       )}
                     </div>

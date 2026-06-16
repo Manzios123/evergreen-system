@@ -21,6 +21,8 @@ export interface Activity {
   coordinator_feedback?: string;
   rejection_reason?: string;
   number_of_participants?: number;
+  number_of_boys?: number | null;
+  number_of_girls?: number | null;
   engagement_level?: EngagementLevel;
   created_at: string;
   updated_at: string;

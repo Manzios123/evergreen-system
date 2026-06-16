@@ -43,6 +43,11 @@ function normalizeEngagementLevel(level?: string | number): 'low' | 'medium' | '
   return 'medium';
 }
 
+const optionalParticipantCount = z.preprocess(
+  (value) => value === '' || value === null || Number.isNaN(value) ? null : Number(value),
+  z.number().int().min(0, 'Must be a non-negative whole number').nullable()
+);
+
 // Enhanced schema with student quotes - SIMPLIFIED to avoid type issues
 const submissionSchema = z.object({
   actual_date: z.string().min(1, 'Actual date is required'),
@@ -54,6 +59,8 @@ const submissionSchema = z.object({
   }).refine((val) => !isNaN(val) && val <= 500, {
     message: 'Maximum 500 participants allowed'
   }),
+  number_of_boys: optionalParticipantCount,
+  number_of_girls: optionalParticipantCount,
   engagement_level: z.enum(['low', 'medium', 'high']),
   volunteer_notes: z.string()
     .min(1, 'Please provide activity notes')
@@ -61,6 +68,18 @@ const submissionSchema = z.object({
   student_quotes: z.string()
     .max(2000, 'Student quotes cannot exceed 2000 characters')
     .optional(),
+}).superRefine((data, ctx) => {
+  if (data.number_of_boys !== null && data.number_of_girls !== null) {
+    const total = Number(data.number_of_participants);
+    const splitTotal = data.number_of_boys + data.number_of_girls;
+    if (splitTotal !== total) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['number_of_girls'],
+        message: 'Boys plus girls must equal total participants',
+      });
+    }
+  }
 });
 
 type SubmissionFormData = z.infer<typeof submissionSchema>;
@@ -76,6 +95,8 @@ interface ActivitySubmissionFormV2Props {
     volunteer_notes?: string;
     student_quotes?: string;
     number_of_participants?: number;
+    number_of_boys?: number | null;
+    number_of_girls?: number | null;
     engagement_level?: string | number;
     school_name?: string;
     pilot_name?: string;
@@ -180,6 +201,8 @@ export function ActivitySubmissionFormV2({
     defaultValues: {
       actual_date: activity.actual_date || activity.scheduled_date || new Date().toISOString().split('T')[0],
       number_of_participants: activity.number_of_participants || 1,
+      number_of_boys: activity.number_of_boys ?? null,
+      number_of_girls: activity.number_of_girls ?? null,
       engagement_level: normalizeEngagementLevel(activity.engagement_level),
       volunteer_notes: activity.volunteer_notes || '',
       student_quotes: activity.student_quotes || '',
@@ -222,6 +245,8 @@ export function ActivitySubmissionFormV2({
         number_of_participants: typeof data.number_of_participants === 'string' 
           ? parseInt(data.number_of_participants, 10) 
           : data.number_of_participants,
+        number_of_boys: data.number_of_boys,
+        number_of_girls: data.number_of_girls,
         engagement_level: data.engagement_level,
         volunteer_notes: data.volunteer_notes,
         student_quotes: data.student_quotes,
@@ -238,6 +263,8 @@ export function ActivitySubmissionFormV2({
           // Reset form with updated values
           setValue('actual_date', data.data.actual_date || activity.scheduled_date);
           setValue('number_of_participants', data.data.number_of_participants || 1);
+          setValue('number_of_boys', data.data.number_of_boys ?? null);
+          setValue('number_of_girls', data.data.number_of_girls ?? null);
           setValue('engagement_level', normalizeEngagementLevel(data.data.engagement_level));
           setValue('volunteer_notes', data.data.volunteer_notes || '');
           setValue('student_quotes', data.data.student_quotes || '');
@@ -253,6 +280,8 @@ export function ActivitySubmissionFormV2({
         number_of_participants: typeof data.number_of_participants === 'string' 
           ? parseInt(data.number_of_participants, 10) 
           : data.number_of_participants,
+        number_of_boys: data.number_of_boys,
+        number_of_girls: data.number_of_girls,
         engagement_level: data.engagement_level,
         volunteer_notes: data.volunteer_notes,
         student_quotes: data.student_quotes,
@@ -285,7 +314,7 @@ export function ActivitySubmissionFormV2({
     
     switch (currentStep) {
       case 'details':
-        fieldsToValidate = ['actual_date', 'number_of_participants', 'engagement_level'];
+        fieldsToValidate = ['actual_date', 'number_of_participants', 'number_of_boys', 'number_of_girls', 'engagement_level'];
         break;
       case 'notes':
         fieldsToValidate = ['volunteer_notes'];
@@ -311,6 +340,11 @@ export function ActivitySubmissionFormV2({
   };
 
   const engagementValue = watch('engagement_level');
+  const participantTotal = Number(watch('number_of_participants') || 0);
+  const boysCount = watch('number_of_boys');
+  const girlsCount = watch('number_of_girls');
+  const splitTotal = (boysCount ?? 0) + (girlsCount ?? 0);
+  const hasFullSplit = boysCount !== null && boysCount !== undefined && girlsCount !== null && girlsCount !== undefined;
   const isSubmittingForm = isSubmitting || saveDraftMutation.isPending || submitForApprovalMutation.isPending;
 
   return (
@@ -362,22 +396,53 @@ export function ActivitySubmissionFormV2({
 
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">How many students participated?</h3>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <UserGroupIcon className="h-5 w-5 text-gray-400" />
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <UserGroupIcon className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="500"
+                        {...register('number_of_participants', {
+                          setValueAs: (value) => value === '' ? 0 : Number(value),
+                        })}
+                        placeholder="e.g., 25"
+                        error={errors.number_of_participants?.message}
+                        className="pl-10"
+                        required
+                      />
                     </div>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="500"
-                      {...register('number_of_participants', {
-                        setValueAs: (value) => value === '' ? 0 : Number(value),
-                      })}
-                      placeholder="e.g., 25"
-                      error={errors.number_of_participants?.message}
-                      className="pl-10"
-                      required
-                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        label="Number of boys"
+                        type="number"
+                        min="0"
+                        {...register('number_of_boys', {
+                          setValueAs: (value) => value === '' ? null : Number(value),
+                        })}
+                        placeholder="Leave blank if not recorded"
+                        error={errors.number_of_boys?.message}
+                      />
+                      <Input
+                        label="Number of girls"
+                        type="number"
+                        min="0"
+                        {...register('number_of_girls', {
+                          setValueAs: (value) => value === '' ? null : Number(value),
+                        })}
+                        placeholder="Leave blank if not recorded"
+                        error={errors.number_of_girls?.message}
+                      />
+                    </div>
+
+                    {hasFullSplit && (
+                      <p className={`text-sm ${splitTotal === participantTotal ? 'text-green-700' : 'text-red-700'}`}>
+                        Boys + girls: {splitTotal}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -478,6 +543,14 @@ export function ActivitySubmissionFormV2({
                       <div>
                         <p className="text-sm font-medium text-gray-500">Participants</p>
                         <p className="text-sm">{watch('number_of_participants') || 'Not set'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Boys</p>
+                        <p className="text-sm">{watch('number_of_boys') ?? 'Not recorded'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Girls</p>
+                        <p className="text-sm">{watch('number_of_girls') ?? 'Not recorded'}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500">Engagement Level</p>

@@ -7,6 +7,8 @@ export type { Activity };
 export interface ActivitySubmission {
   volunteer_notes: string;
   number_of_participants: number;
+  number_of_boys?: number | null;
+  number_of_girls?: number | null;
   engagement_level: 'low' | 'medium' | 'high';
   actual_date: string;
 }
