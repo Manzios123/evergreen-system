@@ -546,12 +546,12 @@ export default function AdminExportsPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {renderDropdownFilter('Pilot', 'pilot_id', pilotOptions, 'All pilots')}
-            {renderDropdownFilter('Survey Template', 'survey_template_id', surveyTemplateOptions, 'All survey templates')}
-            {renderDropdownFilter('Activity Template', 'activity_template_id', activityTemplateOptions, 'All activity templates')}
+            {renderDropdownFilter('Pilot name', 'pilot_id', pilotOptions, 'All pilots')}
+            {renderDropdownFilter('Survey Template name', 'survey_template_id', surveyTemplateOptions, 'All survey templates')}
+            {renderDropdownFilter('Activity Template name', 'activity_template_id', activityTemplateOptions, 'All activity templates')}
             {renderDropdownFilter('Activity', 'activity_id', activityOptions, 'All activities')}
-            {renderDropdownFilter('School', 'school_id', schoolOptions, 'All schools')}
-            {renderDropdownFilter('Participant / Volunteer', 'user_id', userOptions, 'All people')}
+            {renderDropdownFilter('School name', 'school_id', schoolOptions, 'All schools')}
+            {renderDropdownFilter('Volunteer/User name', 'user_id', userOptions, 'All people')}
             <label className="space-y-1 text-sm">
               <span className="font-medium text-gray-700">Status</span>
               <select
