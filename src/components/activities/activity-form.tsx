@@ -15,7 +15,11 @@ import { Activity, School } from '@/lib/types';
 import { CalendarIcon, MapPinIcon } from '@heroicons/react/24/outline';
 
 const optionalParticipantCount = z.preprocess(
-  (value) => value === '' || value === null || Number.isNaN(value) ? null : Number(value),
+  (value) => {
+    if (value === '' || value === null || value === undefined) return null;
+    const numberValue = Number(value);
+    return Number.isNaN(numberValue) ? value : numberValue;
+  },
   z.number().int().min(0, 'Must be a non-negative whole number').nullable()
 );
 
@@ -43,7 +47,8 @@ const activitySchema = z.object({
   }
 });
 
-type ActivityFormData = z.infer<typeof activitySchema>;
+type ActivityFormValues = z.input<typeof activitySchema>;
+type ActivityFormData = z.output<typeof activitySchema>;
 
 interface ActivityFormProps {
   activity?: Activity;
@@ -64,7 +69,7 @@ export function ActivityForm({ activity, onSubmitSuccess }: ActivityFormProps) {
     formState: { errors },
     setValue,
     watch,
-  } = useForm<ActivityFormData>({
+  } = useForm<ActivityFormValues, unknown, ActivityFormData>({
     resolver: zodResolver(activitySchema),
     defaultValues: activity ? {
       title: activity.title,
@@ -108,8 +113,10 @@ export function ActivityForm({ activity, onSubmitSuccess }: ActivityFormProps) {
   const participantTotal = Number(watch('number_of_participants') || 0);
   const boysCount = watch('number_of_boys');
   const girlsCount = watch('number_of_girls');
-  const splitTotal = (boysCount ?? 0) + (girlsCount ?? 0);
-  const hasFullSplit = boysCount !== null && boysCount !== undefined && girlsCount !== null && girlsCount !== undefined;
+  const boysValue = typeof boysCount === 'number' ? boysCount : null;
+  const girlsValue = typeof girlsCount === 'number' ? girlsCount : null;
+  const splitTotal = (boysValue ?? 0) + (girlsValue ?? 0);
+  const hasFullSplit = boysValue !== null && girlsValue !== null;
 
   return (
     <div className="max-w-2xl mx-auto">
