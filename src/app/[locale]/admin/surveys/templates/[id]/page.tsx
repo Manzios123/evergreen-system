@@ -74,6 +74,7 @@ const getSurveyPeriodDisplay = (period: string): string => {
 const getQuestionTypeDisplay = (type: string): string => {
   const typeMap: Record<string, string> = {
     text: 'Text',
+    media: 'Media Upload',
     multiple_choice: 'Multiple Choice',
     checkbox: 'Checkbox',
     scale: 'Scale',

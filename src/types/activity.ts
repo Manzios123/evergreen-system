@@ -52,7 +52,7 @@ export interface ActivityTemplate {
 export interface SurveyQuestion {
   id: string;
   question_text: string;
-  question_type: 'agree_disagree_unsure' | 'scale_1_5' | 'scale_1_10' | 'text' | 'number';
+  question_type: 'agree_disagree_unsure' | 'scale_1_5' | 'scale_1_10' | 'text' | 'number' | 'media';
   order_index: number;
   is_required: boolean;
 }

@@ -7,11 +7,23 @@ import Alert from '@/components/ui/alert';
 import { api } from '@/lib/api/api';
 import { useRouter } from 'next/navigation';
 
+const SURVEY_MEDIA_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const SURVEY_MEDIA_ACCEPT = SURVEY_MEDIA_ALLOWED_TYPES.join(',');
+const SURVEY_MEDIA_MAX_SIZE = 10 * 1024 * 1024;
+
 interface SurveyFormProps {
   survey: any;
   onComplete: () => void;
   assignmentId: string;
   surveyType: string;
+}
+
+interface SurveyMediaAnswer {
+  media_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  media_url: string;
 }
 
 export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: SurveyFormProps) {
@@ -24,6 +36,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   // For student surveys, track aggregated responses
   const [totalStudents, setTotalStudents] = useState<number>(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
+  const [mediaUploadStatus, setMediaUploadStatus] = useState<Record<string, 'uploading' | 'uploaded' | 'error'>>({});
 
   useEffect(() => {
     console.log('SurveyForm received:', { 
@@ -88,6 +101,18 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
         return;
       }
 
+      if (Object.values(mediaUploadStatus).includes('uploading')) {
+        setError('Please wait for media uploads to finish before submitting.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (Object.values(mediaUploadStatus).includes('error')) {
+        setError('Please replace any media files that failed to upload before submitting.');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Prepare final responses
       let finalResponses = { ...responses };
       if (surveyType === 'student' && totalStudents > 0) {
@@ -115,13 +140,14 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
           resetResponses[question.id] = '';
         });
         setResponses(resetResponses);
-        
+        setMediaUploadStatus({});
+
         // Show success message
         setSuccessMessage('Student survey submitted successfully! You can submit another survey.');
-        
+
         // Call onComplete which will refresh stats but not redirect
         onComplete();
-        
+
         // Clear success message after 5 seconds
         setTimeout(() => {
           setSuccessMessage(null);
@@ -150,6 +176,47 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleMediaChange = async (questionId: string, file: File | null) => {
+    setError(null);
+
+    if (!file) {
+      setResponses((current) => ({ ...current, [questionId]: '' }));
+      setMediaUploadStatus((current) => {
+        const next = { ...current };
+        delete next[questionId];
+        return next;
+      });
+      return;
+    }
+
+    if (!SURVEY_MEDIA_ALLOWED_TYPES.includes(file.type)) {
+      setResponses((current) => ({ ...current, [questionId]: '' }));
+      setMediaUploadStatus((current) => ({ ...current, [questionId]: 'error' }));
+      setError('Invalid file type. Upload a JPG, PNG, WebP, or PDF file.');
+      return;
+    }
+
+    if (file.size > SURVEY_MEDIA_MAX_SIZE) {
+      setResponses((current) => ({ ...current, [questionId]: '' }));
+      setMediaUploadStatus((current) => ({ ...current, [questionId]: 'error' }));
+      setError('File is too large. Maximum size is 10MB.');
+      return;
+    }
+
+    try {
+      setMediaUploadStatus((current) => ({ ...current, [questionId]: 'uploading' }));
+      const formData = new FormData();
+      formData.append('media', file);
+      const uploaded = await api.upload<SurveyMediaAnswer>('/survey-media', formData);
+      setResponses((current) => ({ ...current, [questionId]: uploaded }));
+      setMediaUploadStatus((current) => ({ ...current, [questionId]: 'uploaded' }));
+    } catch (err: any) {
+      setResponses((current) => ({ ...current, [questionId]: '' }));
+      setMediaUploadStatus((current) => ({ ...current, [questionId]: 'error' }));
+      setError(err?.message || 'Failed to upload media. Please try again.');
     }
   };
 
@@ -228,6 +295,32 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                 </label>
               ))}
             </div>
+          </div>
+        );
+
+      case 'media':
+        return (
+          <div className="space-y-3">
+            <input
+              type="file"
+              accept={SURVEY_MEDIA_ACCEPT}
+              onChange={(e) => handleMediaChange(question.id, e.target.files?.[0] || null)}
+              className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+              disabled={isSubmitting || mediaUploadStatus[question.id] === 'uploading'}
+              required={question.is_required && !value}
+            />
+            <div className="text-xs text-gray-500">
+              JPG, PNG, WebP, or PDF. Maximum size 10MB.
+            </div>
+            {mediaUploadStatus[question.id] === 'uploading' && (
+              <p className="text-sm text-blue-700">Uploading media...</p>
+            )}
+            {mediaUploadStatus[question.id] === 'uploaded' && value?.file_name && (
+              <p className="text-sm text-green-700">Uploaded: {value.file_name}</p>
+            )}
+            {mediaUploadStatus[question.id] === 'error' && (
+              <p className="text-sm text-red-600">Upload failed. Choose another file.</p>
+            )}
           </div>
         );
 

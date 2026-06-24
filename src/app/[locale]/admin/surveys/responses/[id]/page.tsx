@@ -15,6 +15,10 @@ interface ResponseAnswer {
   question_text: string;
   question_type: string;
   answer: any;
+  media_file_name?: string;
+  media_type?: string;
+  media_file_size?: number;
+  media_url?: string;
 }
 
 interface ResponseDetailData {
@@ -78,7 +82,27 @@ export default function SurveyResponseDetailPage() {
     }
   };
   
-  const renderAnswer = (answer: any, questionType: string) => {
+  const renderAnswer = (responseAnswer: ResponseAnswer) => {
+    const answer = responseAnswer.answer;
+    const questionType = responseAnswer.question_type;
+    if (questionType === 'media') {
+      const fileName = responseAnswer.media_file_name || answer?.file_name || 'Uploaded media';
+      const mediaUrl = responseAnswer.media_url || answer?.media_url;
+
+      if (!mediaUrl) return fileName;
+
+      return (
+        <a
+          href={mediaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-700 underline hover:text-blue-900"
+        >
+          {fileName}
+        </a>
+      );
+    }
+
     if (answer === null || answer === undefined) {
       return 'No answer provided';
     }
@@ -259,9 +283,9 @@ export default function SurveyResponseDetailPage() {
                 </div>
                 
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-900 whitespace-pre-wrap">
-                    {renderAnswer(answer.answer, answer.question_type)}
-                  </p>
+                  <div className="text-gray-900 whitespace-pre-wrap">
+                    {renderAnswer(answer)}
+                  </div>
                 </div>
               </div>
             ))

@@ -49,6 +49,7 @@ const formatDate = (dateString: string): string => {
 const QUESTION_TYPES = [
   { value: 'text', label: 'Text' },
   { value: 'number', label: 'Number' },
+  { value: 'media', label: 'Media Upload' },
   { value: 'agree_disagree_unsure', label: 'Agree / Disagree / Unsure' },
   { value: 'scale_1_5', label: 'Scale (1-5)' },
   { value: 'scale_1_10', label: 'Scale (1-10)' },
