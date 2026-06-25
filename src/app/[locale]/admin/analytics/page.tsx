@@ -115,9 +115,60 @@ const USEFUL_QUESTION_TYPES = new Set([
   'text',
 ]);
 
+const KINYARWANDA_LANGUAGE_HINTS = [
+  'abanyeshuri',
+  'amakuru',
+  'ariko',
+  'bana',
+  'cyane',
+  'gukunda',
+  'ibikorwa',
+  'kandi',
+  'kubera',
+  'muri',
+  'nize',
+  'rwose',
+  'ubumenyi',
+  'yego',
+];
+
+const FRENCH_LANGUAGE_HINTS = [
+  'avec',
+  'bonjour',
+  'dans',
+  'des',
+  'ecole',
+  'environnement',
+  'est',
+  'merci',
+  'nous',
+  'parce',
+  'pour',
+  'que',
+  'qui',
+  'sante',
+  'sont',
+  'sur',
+  'une',
+  'vous',
+];
+
 function isMetadataQuestion(questionText: string | null | undefined) {
   const text = String(questionText || '').trim();
   return METADATA_QUESTION_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function hasNonEnglishLanguageHints(value: string) {
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  return (
+    KINYARWANDA_LANGUAGE_HINTS.some((hint) => new RegExp(`\\b${hint}\\b`, 'i').test(normalized)) ||
+    /[éèêàçôù]/i.test(value) ||
+    FRENCH_LANGUAGE_HINTS.some((hint) => new RegExp(`\\b${hint}\\b`, 'i').test(normalized))
+  );
 }
 
 function isCleanReflection(question: QuestionAnalyticsRow, value: string) {
@@ -126,6 +177,7 @@ function isCleanReflection(question: QuestionAnalyticsRow, value: string) {
   if (question.normalized_type !== 'text') return false;
   if (text.length < 24) return false;
   if (!/^[\x00-\x7F]+$/.test(text)) return false;
+  if (hasNonEnglishLanguageHints(text)) return false;
   if (/^\d{1,4}([/-]\d{1,2}){1,2}$/.test(text)) return false;
   if (/^[\w.+-]+@[\w.-]+\.\w+$/.test(text)) return false;
   if (/^\+?\d[\d\s().-]{5,}$/.test(text)) return false;
