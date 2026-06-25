@@ -7,11 +7,9 @@ import {
   BuildingLibraryIcon,
   CalendarDaysIcon,
   ChartBarIcon,
-  CheckCircleIcon,
   ClipboardDocumentCheckIcon,
   ClockIcon,
   DocumentTextIcon,
-  ExclamationTriangleIcon,
   FunnelIcon,
   QuestionMarkCircleIcon,
   UsersIcon,
@@ -37,7 +35,6 @@ import {
   type AnalyticsFilters,
   type AnalyticsOverview,
   type AnalyticsOption,
-  type DataQualityAlert,
   type QuestionAnalyticsRow,
   type TemplateAnalyticsRow,
 } from '@/lib/api/analytics';
@@ -62,13 +59,6 @@ const emptyOverview: AnalyticsOverview = {
   completionBySchool: [],
 };
 
-const qualityTone: Record<DataQualityAlert['severity'], string> = {
-  ok: 'text-green-700 bg-green-50 border-green-100',
-  low: 'text-blue-700 bg-blue-50 border-blue-100',
-  medium: 'text-amber-700 bg-amber-50 border-amber-100',
-  high: 'text-red-700 bg-red-50 border-red-100',
-};
-
 function formatNumber(value: number | string | null | undefined) {
   return Number(value || 0).toLocaleString();
 }
@@ -90,6 +80,56 @@ function formatLabel(value: string | null | undefined, fallback = 'Unknown') {
 
 function optionName(option: AnalyticsOption) {
   return option.name || option.id || 'Unknown';
+}
+
+const METADATA_QUESTION_PATTERNS = [
+  /\bname\b/i,
+  /\bizina\b/i,
+  /\bschool name\b/i,
+  /\bname of school\b/i,
+  /\bizina ry'ishuri\b/i,
+  /\bdate\b/i,
+  /\bitariki\b/i,
+  /\bgrade\b/i,
+  /\bclass\b/i,
+  /\bemail\b/i,
+  /\bphone\b/i,
+  /\btelephone\b/i,
+  /\bid\b/i,
+];
+
+const USEFUL_QUESTION_TYPES = new Set([
+  'agree_disagree_unsure',
+  'single_choice',
+  'multiple_choice',
+  'yes_no',
+  'radio',
+  'select',
+  'checkbox',
+  'number',
+  'scale_1_5',
+  'scale_1_10',
+  'rating',
+  'scale',
+  'media',
+  'text',
+]);
+
+function isMetadataQuestion(questionText: string | null | undefined) {
+  const text = String(questionText || '').trim();
+  return METADATA_QUESTION_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function isCleanReflection(question: QuestionAnalyticsRow, value: string) {
+  const text = value.trim();
+  if (isMetadataQuestion(question.question_text)) return false;
+  if (question.normalized_type !== 'text') return false;
+  if (text.length < 24) return false;
+  if (!/^[\x00-\x7F]+$/.test(text)) return false;
+  if (/^\d{1,4}([/-]\d{1,2}){1,2}$/.test(text)) return false;
+  if (/^[\w.+-]+@[\w.-]+\.\w+$/.test(text)) return false;
+  if (/^\+?\d[\d\s().-]{5,}$/.test(text)) return false;
+  return true;
 }
 
 function KpiCard({
@@ -173,12 +213,10 @@ export default function AdminAnalyticsPage() {
   const [overview, setOverview] = useState<AnalyticsOverview>(emptyOverview);
   const [templates, setTemplates] = useState<TemplateAnalyticsRow[]>([]);
   const [questions, setQuestions] = useState<QuestionAnalyticsRow[]>([]);
-  const [qualityAlerts, setQualityAlerts] = useState<DataQualityAlert[]>([]);
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [draftFilters, setDraftFilters] = useState<AnalyticsFilters>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
   const [showAllQuestions, setShowAllQuestions] = useState(false);
 
   useEffect(() => {
@@ -187,24 +225,20 @@ export default function AdminAnalyticsPage() {
     async function loadAnalytics() {
       setIsLoading(true);
       setError(null);
-      setWarnings([]);
 
       try {
-        const [overviewResult, templatesResult, questionsResult, qualityResult] = await Promise.allSettled([
+        const [overviewResult, templatesResult, questionsResult] = await Promise.allSettled([
           analyticsApi.overview(filters),
           analyticsApi.templates(filters),
           analyticsApi.questions(filters),
-          analyticsApi.dataQuality(filters),
         ]);
 
         if (!isMounted) return;
 
-        const nextWarnings: string[] = [];
         let failedSections = 0;
 
         if (overviewResult.status === 'fulfilled') {
           setOverview(overviewResult.value.data || emptyOverview);
-          nextWarnings.push(...(overviewResult.value.warnings || []).map((warning) => warning.message));
         } else {
           failedSections += 1;
           setOverview(emptyOverview);
@@ -212,7 +246,6 @@ export default function AdminAnalyticsPage() {
 
         if (templatesResult.status === 'fulfilled') {
           setTemplates(Array.isArray(templatesResult.value.data) ? templatesResult.value.data : []);
-          nextWarnings.push(...(templatesResult.value.warnings || []).map((warning) => warning.message));
         } else {
           failedSections += 1;
           setTemplates([]);
@@ -220,22 +253,12 @@ export default function AdminAnalyticsPage() {
 
         if (questionsResult.status === 'fulfilled') {
           setQuestions(Array.isArray(questionsResult.value.data) ? questionsResult.value.data : []);
-          nextWarnings.push(...(questionsResult.value.warnings || []).map((warning) => warning.message));
         } else {
           failedSections += 1;
           setQuestions([]);
         }
 
-        if (qualityResult.status === 'fulfilled') {
-          setQualityAlerts(Array.isArray(qualityResult.value.data) ? qualityResult.value.data : []);
-          nextWarnings.push(...(qualityResult.value.warnings || []).map((warning) => warning.message));
-        } else {
-          failedSections += 1;
-          setQualityAlerts([]);
-        }
-
-        setWarnings(Array.from(new Set(nextWarnings)));
-        if (failedSections === 4) {
+        if (failedSections === 3) {
           setError('Unable to load analytics right now.');
         } else if (failedSections > 0) {
           setError('Some analytics sections could not be loaded.');
@@ -259,25 +282,40 @@ export default function AdminAnalyticsPage() {
     [templates]
   );
 
+  const cleanQuestions = useMemo(() => (
+    questions.filter((question) => {
+      if (isMetadataQuestion(question.question_text)) return false;
+      const type = question.normalized_type || question.question_type;
+      return USEFUL_QUESTION_TYPES.has(type);
+    })
+  ), [questions]);
+
   const visibleQuestions = useMemo(
-    () => (showAllQuestions ? questions : questions.slice(0, 8)),
-    [questions, showAllQuestions]
+    () => (showAllQuestions ? cleanQuestions : cleanQuestions.slice(0, 8)),
+    [cleanQuestions, showAllQuestions]
   );
   const textResponses = useMemo(() => (
-    questions
+    cleanQuestions
       .flatMap((question) => question.recent_responses.map((response) => ({
         question: question.question_text || 'Unknown question',
         template: question.template_name || 'Unknown template',
         value: response.value,
         submitted_at: response.submitted_at,
+        sourceQuestion: question,
       })))
-      .filter((response) => response.value.trim().length > 0)
+      .filter((response) => isCleanReflection(response.sourceQuestion, response.value))
       .sort((a, b) => String(b.submitted_at || '').localeCompare(String(a.submitted_at || '')))
-      .slice(0, 30)
-  ), [questions]);
-  const highestQualityCount = useMemo(
-    () => Math.max(1, ...qualityAlerts.map((alert) => alert.count)),
-    [qualityAlerts]
+      .slice(0, 6)
+      .map(({ sourceQuestion, ...response }) => response)
+  ), [cleanQuestions]);
+
+  const namedCompletionBySchool = useMemo(
+    () => overview.completionBySchool.filter((school) => (
+      school.school_id &&
+      school.school_name &&
+      school.school_name.toLowerCase() !== 'unknown school'
+    )),
+    [overview.completionBySchool]
   );
 
   const updateDraftFilter = (key: keyof AnalyticsFilters, value: string) => {
@@ -381,16 +419,6 @@ export default function AdminAnalyticsPage() {
         </Alert>
       )}
 
-      {warnings.length > 0 && (
-        <Alert type="info" title="Analytics schema notes">
-          <ul className="list-disc space-y-1 pl-5">
-            {warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </Alert>
-      )}
-
       {isLoading ? (
         <SkeletonLoader type="dashboard" />
       ) : (
@@ -480,7 +508,7 @@ export default function AdminAnalyticsPage() {
             <Card className="xl:col-span-3">
               <CardHeader
                 title="Question Analysis"
-                action={questions.length > 8 ? (
+                action={cleanQuestions.length > 8 ? (
                   <button
                     type="button"
                     onClick={() => setShowAllQuestions((current) => !current)}
@@ -556,9 +584,18 @@ export default function AdminAnalyticsPage() {
                           </div>
                         )}
 
-                        {question.recent_responses.length > 0 && (
+                        {question.normalized_type === 'media' && (
+                          <div className="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-800">
+                            Media uploaded: {formatNumber(question.answered_count)}
+                          </div>
+                        )}
+
+                        {question.normalized_type === 'text' && question.recent_responses.length > 0 && (
                           <div className="mt-4 space-y-2">
-                            {question.recent_responses.slice(0, 3).map((response, index) => (
+                            {question.recent_responses
+                              .filter((response) => isCleanReflection(question, response.value))
+                              .slice(0, 3)
+                              .map((response, index) => (
                               <div key={`${question.question_id}-${index}`} className="max-h-20 overflow-hidden rounded-md bg-gray-50 p-3 text-sm text-gray-700">
                                 {response.value}
                               </div>
@@ -576,11 +613,11 @@ export default function AdminAnalyticsPage() {
             <Card className="xl:col-span-2">
               <CardHeader title="Completion by School / Group" />
               <CardContent className="min-h-0">
-                {overview.completionBySchool.length === 0 ? (
+                {namedCompletionBySchool.length === 0 ? (
                   <div className="py-8 text-sm text-gray-500">No school or group completion data yet.</div>
                 ) : (
                   <div className="max-h-[560px] space-y-4 overflow-y-auto pr-2">
-                    {overview.completionBySchool.map((school) => {
+                    {namedCompletionBySchool.map((school) => {
                       const total = Math.max(1, school.completed + school.pending + school.notStarted);
                       return (
                         <div key={school.school_id || school.school_name} className="space-y-2">
@@ -631,14 +668,14 @@ export default function AdminAnalyticsPage() {
             <Card className="xl:col-span-2">
               <CardHeader title="Question Type Mix" />
               <CardContent>
-                {questions.length === 0 ? (
+                {cleanQuestions.length === 0 ? (
                   <div className="py-8 text-sm text-gray-500">No question type data yet.</div>
                 ) : (
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={Object.entries(
-                          questions.reduce<Record<string, number>>((acc, question) => {
+                          cleanQuestions.reduce<Record<string, number>>((acc, question) => {
                             const key = formatLabel(question.normalized_type, 'text');
                             acc[key] = (acc[key] || 0) + 1;
                             return acc;
@@ -650,47 +687,12 @@ export default function AdminAnalyticsPage() {
                         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                         <Tooltip />
                         <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                          {questions.map((question, index) => (
+                          {cleanQuestions.map((question, index) => (
                             <Cell key={`${question.question_id}-${index}`} fill={index % 2 === 0 ? '#16a34a' : '#2563eb'} />
                           ))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="xl:col-span-3">
-              <CardHeader title="Data Quality Alerts" />
-              <CardContent className="min-h-0">
-                {qualityAlerts.length === 0 ? (
-                  <div className="py-8 text-sm text-gray-500">No data quality checks available yet.</div>
-                ) : (
-                  <div className="max-h-[420px] space-y-3 overflow-y-auto pr-2">
-                    {qualityAlerts.map((alert) => (
-                      <div key={alert.id} className={`rounded-lg border p-4 ${qualityTone[alert.severity]}`}>
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex gap-3">
-                            {alert.count > 0 ? (
-                              <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                            ) : (
-                              <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                            )}
-                            <div>
-                              <p className="font-semibold">{alert.label}</p>
-                              <p className="mt-1 text-sm opacity-80">{alert.description}</p>
-                            </div>
-                          </div>
-                          <div className="min-w-16 text-right text-lg font-bold">{formatNumber(alert.count)}</div>
-                        </div>
-                        {alert.count > 0 && (
-                          <div className="mt-3">
-                            <ProgressBar value={alert.count} max={highestQualityCount} className={alert.severity === 'high' ? 'bg-red-500' : alert.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
                   </div>
                 )}
               </CardContent>
