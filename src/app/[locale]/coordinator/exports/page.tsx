@@ -6,12 +6,7 @@ import Button from '@/components/ui/button';
 import SearchFilter from '@/components/ui/search-filter';
 import Alert from '@/components/ui/alert';
 import { useApiQuery } from '@/lib/hooks/use-api';
-import { activitiesApi } from '@/lib/api/activities';
-import { activityTemplatesApi } from '@/lib/api/activity-templates';
-import { api } from '@/lib/api/api';
 import { exportsApi } from '@/lib/api/exports';
-import { surveyTemplatesApi } from '@/lib/api/survey-templates';
-import { usersApi } from '@/lib/api/users';
 import {
   CalendarIcon,
   DocumentArrowDownIcon,
@@ -64,14 +59,6 @@ interface ExportFilterOption {
 const selectClassName =
   'w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-100';
 
-const responseArray = (response: any, keyedArray?: string): any[] => {
-  if (Array.isArray(response)) return response;
-  if (keyedArray && Array.isArray(response?.[keyedArray])) return response[keyedArray];
-  if (Array.isArray(response?.data)) return response.data;
-  if (Array.isArray(response?.data?.data)) return response.data.data;
-  return [];
-};
-
 const sortOptions = (options: ExportFilterOption[]) =>
   options.sort((a, b) => a.label.localeCompare(b.label));
 
@@ -106,47 +93,22 @@ export default function CoordinatorExportsPage() {
   const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json' | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [exportFilters, setExportFilters] = useState<ExportFilters>(emptyExportFilters);
+  const [draftExportFilters, setDraftExportFilters] = useState<ExportFilters>(emptyExportFilters);
 
-  const { data: surveyTemplateOptions = [] } = useApiQuery<ExportFilterOption[]>(
-    ['coordinator-export-filter-survey-templates'],
-    async () => buildOptions(await surveyTemplatesApi.list(), (template) => template.name)
+  const {
+    data: filterOptions,
+    isLoading: filterOptionsLoading,
+    error: filterOptionsError,
+  } = useApiQuery(
+    ['coordinator-export-filter-options'],
+    () => exportsApi.getFilterOptions()
   );
 
-  const { data: activityTemplateOptions = [] } = useApiQuery<ExportFilterOption[]>(
-    ['coordinator-export-filter-activity-templates'],
-    async () => buildOptions(await activityTemplatesApi.list(), (template) => template.name)
-  );
-
-  const { data: activityOptions = [] } = useApiQuery<ExportFilterOption[]>(
-    ['coordinator-export-filter-activities'],
-    async () => {
-      const response = await activitiesApi.list();
-      return buildOptions(responseArray(response), (activity) => {
-        const date = activity.scheduled_date ? ` (${activity.scheduled_date})` : '';
-        const school = activity.school_name ? ` - ${activity.school_name}` : '';
-        return `${activity.title || 'Untitled activity'}${school}${date}`;
-      });
-    }
-  );
-
-  const { data: schoolOptions = [] } = useApiQuery<ExportFilterOption[]>(
-    ['coordinator-export-filter-schools'],
-    async () => {
-      const response = await api.get<any>('/schools', { limit: 500, is_active: true });
-      return buildOptions(responseArray(response), (school) => school.name);
-    }
-  );
-
-  const { data: userOptions = [] } = useApiQuery<ExportFilterOption[]>(
-    ['coordinator-export-filter-users'],
-    async () => {
-      const response = await usersApi.list();
-      return buildOptions(responseArray(response, 'users'), (user) => {
-        const email = user.email ? ` (${user.email})` : '';
-        return `${user.full_name || user.email || 'Unnamed user'}${email}`;
-      });
-    }
-  );
+  const surveyTemplateOptions = buildOptions(filterOptions?.surveyTemplates || [], (template) => template.name);
+  const activityTemplateOptions = buildOptions(filterOptions?.activityTemplates || [], (template) => template.name);
+  const activityOptions = buildOptions(filterOptions?.activities || [], (activity) => activity.title);
+  const schoolOptions = buildOptions(filterOptions?.schools || [], (school) => school.name);
+  const userOptions = buildOptions(filterOptions?.volunteers || [], (user) => user.name);
 
   const handleExport = async (type: string, format: 'csv' | 'json', options?: Record<string, any>) => {
     setIsCreatingExport(true);
@@ -212,11 +174,16 @@ export default function CoordinatorExportsPage() {
   };
 
   const updateFilter = <K extends keyof ExportFilters>(key: K, value: ExportFilters[K]) => {
-    setExportFilters((current) => ({ ...current, [key]: value }));
+    setDraftExportFilters((current) => ({ ...current, [key]: value }));
   };
 
   const clearFilters = () => {
     setExportFilters(emptyExportFilters);
+    setDraftExportFilters(emptyExportFilters);
+  };
+
+  const applyFilters = () => {
+    setExportFilters(draftExportFilters);
   };
 
   const activeFilters = Object.entries(exportFilters).filter(([, value]) => value);
@@ -264,12 +231,12 @@ export default function CoordinatorExportsPage() {
     <label className="space-y-1 text-sm">
       <span className="font-medium text-gray-700">{label}</span>
       <select
-        value={exportFilters[key]}
+        value={draftExportFilters[key]}
         onChange={(event) => updateFilter(key, event.target.value)}
         className={selectClassName}
-        disabled={!options.length && !exportFilters[key]}
+        disabled={filterOptionsLoading || (!options.length && !draftExportFilters[key])}
       >
-        <option value="">{options.length ? allLabel : 'No options available'}</option>
+        <option value="">{filterOptionsLoading ? 'Loading options...' : options.length ? allLabel : 'No options found'}</option>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}
@@ -418,21 +385,32 @@ export default function CoordinatorExportsPage() {
                 These filters apply to the analytics-ready CSV exports.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={clearFilters}>
-              Clear Filters
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+              <Button variant="default" size="sm" onClick={applyFilters}>
+                Apply Filters
+              </Button>
+            </div>
           </div>
 
+          {filterOptionsError && (
+            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+              Unable to load filter options. Exports still work with currently applied filters.
+            </p>
+          )}
+
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {renderDropdownFilter('Survey Template', 'survey_template_id', surveyTemplateOptions, 'All survey templates')}
-            {renderDropdownFilter('Activity Template', 'activity_template_id', activityTemplateOptions, 'All activity templates')}
+            {renderDropdownFilter('Survey Template name', 'survey_template_id', surveyTemplateOptions, 'All survey templates')}
+            {renderDropdownFilter('Activity Template name', 'activity_template_id', activityTemplateOptions, 'All activity templates')}
             {renderDropdownFilter('Activity', 'activity_id', activityOptions, 'All activities')}
-            {renderDropdownFilter('School', 'school_id', schoolOptions, 'All schools')}
-            {renderDropdownFilter('Participant / Volunteer', 'user_id', userOptions, 'All people')}
+            {renderDropdownFilter('School name', 'school_id', schoolOptions, 'All schools')}
+            {renderDropdownFilter('Volunteer/User name', 'user_id', userOptions, 'All people')}
             <label className="space-y-1 text-sm">
               <span className="font-medium text-gray-700">Status</span>
               <select
-                value={exportFilters.status}
+                value={draftExportFilters.status}
                 onChange={(event) => updateFilter('status', event.target.value)}
                 className={selectClassName}
               >
@@ -449,7 +427,7 @@ export default function CoordinatorExportsPage() {
             <label className="space-y-1 text-sm">
               <span className="font-medium text-gray-700">Source Type</span>
               <select
-                value={exportFilters.source_type}
+                value={draftExportFilters.source_type}
                 onChange={(event) => updateFilter('source_type', event.target.value as ExportFilters['source_type'])}
                 className={selectClassName}
               >
@@ -464,7 +442,7 @@ export default function CoordinatorExportsPage() {
                 <span className="font-medium text-gray-700">Date From</span>
                 <input
                   type="date"
-                  value={exportFilters.date_from}
+                  value={draftExportFilters.date_from}
                   onChange={(event) => updateFilter('date_from', event.target.value)}
                   className={selectClassName}
                 />
@@ -473,7 +451,7 @@ export default function CoordinatorExportsPage() {
                 <span className="font-medium text-gray-700">Date To</span>
                 <input
                   type="date"
-                  value={exportFilters.date_to}
+                  value={draftExportFilters.date_to}
                   onChange={(event) => updateFilter('date_to', event.target.value)}
                   className={selectClassName}
                 />

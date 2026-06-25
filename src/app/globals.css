@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+html.dark body {
+  background: #020617;
+  color: #f8fafc;
+}
+
 /* Mobile bottom nav padding */
 @media (max-width: 768px) {
   body {

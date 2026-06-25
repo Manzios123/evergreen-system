@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import MobileNav from './mobile-nav';
 import { useParams, useRouter } from 'next/navigation'; // Add this
+import { useEffect, useState } from 'react';
 
 interface RoleLayoutProps {
   children: React.ReactNode;
@@ -17,6 +18,24 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
   const params = useParams();
   const locale = (params?.locale as string) || 'en';
   const { user, isLoading } = useAuth();
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('evergreen-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setTheme(savedTheme === 'dark' || (!savedTheme && prefersDark) ? 'dark' : 'light');
+    setSidebarCollapsed(window.localStorage.getItem('evergreen-sidebar-collapsed') === 'true');
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    window.localStorage.setItem('evergreen-theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem('evergreen-sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   if (isLoading) {
     return (
@@ -56,14 +75,21 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-gray-100">
       <MobileNav />
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <Sidebar role={user.role === 'facilitator' && role === 'volunteer' ? 'facilitator' : role} />
+      <div className={`hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-72'}`}>
+        <Sidebar
+          role={user.role === 'facilitator' && role === 'volunteer' ? 'facilitator' : role}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        />
       </div>
       
-      <div className="lg:pl-72">
-        <Header />
+      <div className={sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'}>
+        <Header
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+        />
         
         <main className="py-8">
           <div className="px-4 sm:px-6 lg:px-8">

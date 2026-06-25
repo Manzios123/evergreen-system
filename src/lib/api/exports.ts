@@ -1,6 +1,25 @@
 import { api } from './api';
 import { ExportConfig, ExportJob, ApiResponse, PaginationParams } from '@/lib/types';
 
+export interface ExportFilterOption {
+  id: string;
+  name: string;
+}
+
+export interface ExportActivityFilterOption {
+  id: string;
+  title: string;
+}
+
+export interface ExportFilterOptions {
+  pilots: ExportFilterOption[];
+  surveyTemplates: ExportFilterOption[];
+  activityTemplates: ExportFilterOption[];
+  activities: ExportActivityFilterOption[];
+  schools: ExportFilterOption[];
+  volunteers: ExportFilterOption[];
+}
+
 // Helper function specifically for export downloads
 const exportDownload = async <T>(
   endpoint: string,
@@ -65,6 +84,9 @@ const exportDownload = async <T>(
 
 export const exportsApi = {
   // Immediate export endpoints
+  getFilterOptions: (filters?: {
+    pilot_id?: string;
+  }) => api.get<ExportFilterOptions>(`/exports/filter-options`, filters),
 
   // Export activities with filters
   exportActivities: (

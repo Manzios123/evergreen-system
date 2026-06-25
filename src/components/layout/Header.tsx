@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { BellIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { BellIcon, ChevronDownIcon, MagnifyingGlassIcon, MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 import { Bars3Icon } from '@heroicons/react/24/solid';
 import { notificationsApi, NotificationItem } from '@/lib/api/notifications';
 
@@ -170,7 +170,12 @@ function LanguageSwitcher() {
   );
 }
 
-export default function Header() {
+interface HeaderProps {
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
+}
+
+export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) {
   const { user, logout } = useAuth();
   const params = useParams();
   const locale = params?.locale as string || 'en';
@@ -266,7 +271,7 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-x-4 bg-white/95 backdrop-blur-sm px-4 py-3 border-b border-gray-100 shadow-sm sm:px-6">
+    <header className="sticky top-0 z-40 flex items-center gap-x-4 bg-white/95 backdrop-blur-sm px-4 py-3 border-b border-gray-100 shadow-sm sm:px-6 dark:border-slate-800 dark:bg-slate-950/90">
       {/* Mobile menu button */}
       <button
         type="button"
@@ -285,7 +290,7 @@ export default function Header() {
           <input
             type="search"
             name="search"
-            className="block w-full rounded-full border-0 bg-gray-50 py-1.5 pl-9 pr-3 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-green-500 text-sm"
+            className="block w-full rounded-full border-0 bg-gray-50 py-1.5 pl-9 pr-3 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-green-500 text-sm dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700 dark:placeholder:text-slate-500"
             placeholder="Search..."
           />
         </div>
@@ -295,6 +300,16 @@ export default function Header() {
       <div className="flex items-center gap-x-3">
         {/* Live clock */}
         <LiveClock />
+
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          className="rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 dark:hover:bg-slate-900 dark:hover:text-slate-200"
+          title={theme === 'dark' ? 'Use light theme' : 'Use dark theme'}
+        >
+          <span className="sr-only">{theme === 'dark' ? 'Use light theme' : 'Use dark theme'}</span>
+          {theme === 'dark' ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+        </button>
 
         {/* Notifications */}
         <div className="relative">

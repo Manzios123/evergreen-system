@@ -23,6 +23,8 @@ import {
   UserCircleIcon,
   Cog6ToothIcon,
   PhotoIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api';
@@ -30,6 +32,8 @@ import { useTranslations } from 'next-intl';
 
 interface SidebarProps {
   role: 'admin' | 'coordinator' | 'volunteer' | 'facilitator';
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
 interface NavigationItem {
@@ -87,7 +91,7 @@ function UserAvatar({ user, size = 'md' }: { user: any; size?: 'sm' | 'md' }) {
   );
 }
 
-export default function Sidebar({ role }: SidebarProps) {
+export default function Sidebar({ role, collapsed = false, onToggleCollapsed }: SidebarProps) {
   const pathname = usePathname();
   const params = useParams();
   const router = useRouter();
@@ -171,9 +175,9 @@ export default function Sidebar({ role }: SidebarProps) {
   const secondaryText = user?.email || user?.phone || tLayout('viewProfileSettings');
 
   return (
-    <div className="flex grow flex-col overflow-y-auto bg-white border-r border-gray-100 shadow-sm">
+    <div className="flex grow flex-col overflow-y-auto border-r border-gray-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
       {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center px-5 border-b border-gray-100">
+      <div className={`flex h-16 shrink-0 items-center border-b border-gray-100 dark:border-slate-800 ${collapsed ? 'justify-center px-3' : 'justify-between px-5'}`}>
         <div className="flex items-center gap-3">
           <div className="relative h-9 w-9 shrink-0">
             <Image
@@ -184,24 +188,35 @@ export default function Sidebar({ role }: SidebarProps) {
               priority
             />
           </div>
-          <span className="text-lg font-bold tracking-tight text-gray-900">
+          {!collapsed && <span className="text-lg font-bold tracking-tight text-gray-900 dark:text-slate-100">
             Evergreen
-          </span>
+          </span>}
         </div>
+        {onToggleCollapsed && (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="hidden rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-green-700 lg:inline-flex dark:hover:bg-slate-900 dark:hover:text-green-400"
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <span className="sr-only">{collapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
+            {collapsed ? <ChevronRightIcon className="h-5 w-5" /> : <ChevronLeftIcon className="h-5 w-5" />}
+          </button>
+        )}
       </div>
 
       {/* Role badge */}
-      <div className="px-5 pt-4 pb-2">
+      {!collapsed && <div className="px-5 pt-4 pb-2">
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize
           ${role === 'admin' ? 'bg-rose-50 text-rose-700' :
             role === 'coordinator' ? 'bg-blue-50 text-blue-700' :
             'bg-green-50 text-green-700'}`}>
           {role}
         </span>
-      </div>
+      </div>}
 
       {/* Navigation */}
-      <nav className="flex flex-1 flex-col px-3 pb-4">
+      <nav className={`flex flex-1 flex-col pb-4 ${collapsed ? 'px-2 pt-4' : 'px-3'}`}>
         <ul role="list" className="flex flex-1 flex-col gap-y-1">
           {navigation[role].map((item) => {
             const active = isActive(item.href, item.exact);
@@ -212,11 +227,12 @@ export default function Sidebar({ role }: SidebarProps) {
               <li key={item.name}>
                 <Link
                   href={hrefWithLocale}
+                  title={collapsed ? tNav(item.labelKey) : undefined}
                   className={`
-                    group flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150
+                    group flex items-center rounded-lg py-2.5 text-sm font-medium transition-all duration-150 ${collapsed ? 'justify-center px-2' : 'gap-x-3 px-3'}
                     ${active
-                      ? 'bg-green-50 text-green-700 shadow-sm'
-                      : 'text-gray-600 hover:text-green-700 hover:bg-gray-50'
+                      ? 'bg-green-50 text-green-700 shadow-sm dark:bg-green-900/30 dark:text-green-300'
+                      : 'text-gray-600 hover:text-green-700 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-green-300'
                     }
                   `}
                 >
@@ -226,8 +242,8 @@ export default function Sidebar({ role }: SidebarProps) {
                     }`}
                     aria-hidden="true"
                   />
-                  <span className="flex-1 truncate">{tNav(item.labelKey)}</span>
-                  {badgeCount !== null && badgeCount > 0 && (
+                  {!collapsed && <span className="flex-1 truncate">{tNav(item.labelKey)}</span>}
+                  {badgeCount !== null && badgeCount > 0 && !collapsed && (
                     <span className={`
                       inline-flex items-center justify-center min-w-[20px] h-5 px-1.5
                       text-xs font-semibold rounded-full
@@ -247,31 +263,33 @@ export default function Sidebar({ role }: SidebarProps) {
           {/* Profile link */}
           <Link
             href={profileHref}
+            title={collapsed ? displayName : undefined}
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 mb-1 transition-all duration-150 group
               ${pathname === profileHref
-                ? 'bg-green-50 text-green-700'
-                : 'text-gray-600 hover:text-green-700 hover:bg-gray-50'
+                ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                : 'text-gray-600 hover:text-green-700 hover:bg-gray-50 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-green-300'
               }`}
           >
             <UserAvatar user={user} size="sm" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">
+            {!collapsed && <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate dark:text-slate-100">
                 {displayName}
               </p>
               <p className="text-xs text-gray-400 truncate">
                 {secondaryText}
               </p>
-            </div>
-            <Cog6ToothIcon className="h-4 w-4 text-gray-300 group-hover:text-green-500 shrink-0" />
+            </div>}
+            {!collapsed && <Cog6ToothIcon className="h-4 w-4 text-gray-300 group-hover:text-green-500 shrink-0" />}
           </Link>
 
           {/* Sign out */}
           <button
             onClick={logout}
-            className="w-full flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
+            title={collapsed ? tNav('signOut') : undefined}
+            className={`w-full flex items-center rounded-lg py-2.5 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150 dark:text-slate-400 dark:hover:bg-red-950/30 dark:hover:text-red-300 ${collapsed ? 'justify-center px-2' : 'gap-x-3 px-3'}`}
           >
             <ArrowRightOnRectangleIcon className="h-5 w-5 text-gray-400 group-hover:text-red-500" />
-            {tNav('signOut')}
+            {!collapsed && tNav('signOut')}
           </button>
         </div>
       </nav>
