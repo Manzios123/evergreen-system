@@ -27,10 +27,10 @@ export const ACTIVITY_STATUSES = {
   
   // Survey periods
   export const SURVEY_PERIODS = {
-    pre_activity: { label: 'Pre-Activity', color: 'blue' },
-    post_activity: { label: 'Post-Activity', color: 'green' },
-    mid_pilot: { label: 'Mid-Pilot', color: 'yellow' },
-    end_pilot: { label: 'End-Pilot', color: 'purple' },
+    pre_activity: { label: 'Pre Survey', color: 'blue' },
+    post_activity: { label: 'Post Survey', color: 'green' },
+    mid_pilot: { label: 'Post Survey', color: 'yellow' },
+    end_pilot: { label: 'Post Survey', color: 'purple' },
   } as const;
   
   // User roles

@@ -217,7 +217,7 @@ export const exportsApi = {
     date_from?: string;
     date_to?: string;
     source_type?: 'student' | 'volunteer' | 'all';
-  }) => exportDownload(`/exports/survey-matrix`, filters),
+  }) => exportDownload(`/exports/survey-matrix.xlsx`, filters),
 
   exportActivitySurveyAnswers: (filters?: {
     pilot_id?: string;

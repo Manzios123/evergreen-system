@@ -51,6 +51,8 @@ const QUESTION_TYPES = [
   { value: 'number', label: 'Number' },
   { value: 'media', label: 'Media Upload' },
   { value: 'agree_disagree_unsure', label: 'Agree / Disagree / Unsure' },
+  { value: 'yes_no', label: 'Yes / No' },
+  { value: 'likert_agreement', label: 'Strongly Agree Scale' },
   { value: 'scale_1_5', label: 'Scale (1-5)' },
   { value: 'scale_1_10', label: 'Scale (1-10)' },
 ];
@@ -62,10 +64,8 @@ const SURVEY_TYPES = [
 ];
 
 const SURVEY_PERIODS = [
-  { value: 'pre_activity', label: 'Pre-Activity' },
-  { value: 'post_activity', label: 'Post-Activity' },
-  { value: 'mid_pilot', label: 'Mid-Pilot' },
-  { value: 'end_pilot', label: 'End of Pilot' },
+  { value: 'pre_activity', label: 'Pre Survey' },
+  { value: 'post_activity', label: 'Post Survey' },
 ];
 
 export default function EditSurveyTemplatePage() {

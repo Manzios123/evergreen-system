@@ -63,10 +63,10 @@ const getSurveyTypeDisplay = (type: string): string => {
 
 const getSurveyPeriodDisplay = (period: string): string => {
   const periodMap: Record<string, string> = {
-    pre_activity: 'Pre-Activity',
-    post_activity: 'Post-Activity',
-    mid_pilot: 'Mid-Pilot',
-    end_pilot: 'End of Pilot',
+    pre_activity: 'Pre Survey',
+    post_activity: 'Post Survey',
+    mid_pilot: 'Post Survey',
+    end_pilot: 'Post Survey',
   };
   return periodMap[period] || period;
 };

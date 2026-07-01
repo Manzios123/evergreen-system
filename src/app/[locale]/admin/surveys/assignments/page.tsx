@@ -77,6 +77,12 @@ function formatAssignmentLabel(value: string | null | undefined, fallback: strin
   return (value || fallback).replace(/_/g, ' ');
 }
 
+function formatSurveyPeriod(value: string | null | undefined) {
+  const normalized = (value || '').toLowerCase();
+  if (normalized.includes('pre')) return 'Pre Survey';
+  return 'Post Survey';
+}
+
 export default function AdminSurveyAssignmentsPage() {
   const params = useParams();
   const locale = (params?.locale as string) || 'en';
@@ -115,7 +121,7 @@ export default function AdminSurveyAssignmentsPage() {
             {assignment.survey_name}
           </p>
           <div className="flex items-center text-sm text-gray-500">
-            <span className="capitalize">{formatAssignmentLabel(assignment.survey_period, 'survey')}</span>
+            <span>{formatSurveyPeriod(assignment.survey_period)}</span>
             <span className="mx-2">•</span>
             <span className="capitalize">{formatAssignmentLabel(assignment.survey_type, 'survey')}</span>
             <span className="mx-2">•</span>
@@ -259,7 +265,7 @@ export default function AdminSurveyAssignmentsPage() {
     );
   }
 
-  const pendingAssignments = assignments.filter(a => a.status === 'pending');
+  const pendingAssignments = assignments.filter(a => ['assigned', 'pending', 'in_progress'].includes(a.status));
   const completedAssignments = assignments.filter(a => a.status === 'completed');
   const overdueAssignments = assignments.filter(a =>
     a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed'
@@ -300,7 +306,8 @@ export default function AdminSurveyAssignmentsPage() {
                 onChange={(e) => setFilters({...filters, status: e.target.value})}
               >
                 <option value="">All Status</option>
-                <option value="pending">Pending</option>
+                <option value="assigned">Assigned</option>
+                <option value="pending">Pending (legacy)</option>
                 <option value="completed">Completed</option>
                 <option value="overdue">Overdue</option>
                 <option value="locked">Locked</option>
@@ -359,7 +366,7 @@ export default function AdminSurveyAssignmentsPage() {
                 <ClockIcon className="h-6 w-6 text-blue-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Pending</p>
+                <p className="text-sm font-medium text-gray-500">Assigned</p>
                 <p className="text-2xl font-semibold text-gray-900">
                   {pendingAssignments?.length || 0}
                 </p>

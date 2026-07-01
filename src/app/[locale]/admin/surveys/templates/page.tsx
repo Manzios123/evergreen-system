@@ -51,6 +51,17 @@ function normalizeArray<T>(response: unknown): T[] {
   return [];
 }
 
+function getSurveyPeriodLabel(period: string | null | undefined) {
+  const normalized = (period || '').toLowerCase();
+  if (normalized.includes('pre')) return 'Pre Survey';
+  return 'Post Survey';
+}
+
+function periodMatchesFilter(period: string, selectedPeriod: string) {
+  if (selectedPeriod === 'all') return true;
+  const label = getSurveyPeriodLabel(period);
+  return selectedPeriod === 'pre' ? label === 'Pre Survey' : label === 'Post Survey';
+}
 export default function SurveyTemplatesPage() {
   const router = useRouter();
   const params = useParams();
@@ -89,7 +100,7 @@ export default function SurveyTemplatesPage() {
   // Filter templates based on selections
   const filteredTemplates = templates.filter(template => {
     if (selectedType !== 'all' && template.survey_type !== selectedType) return false;
-    if (selectedPeriod !== 'all' && template.survey_period !== selectedPeriod) return false;
+    if (!periodMatchesFilter(template.survey_period, selectedPeriod)) return false;
     return true;
   });
 
@@ -119,7 +130,7 @@ export default function SurveyTemplatesPage() {
           <div>
             <span className="capitalize">{template.survey_type.replace('_', ' ')}</span>
             <span className="text-xs text-gray-500 block capitalize">
-              {template.survey_period.replace('_', ' ')}
+              {getSurveyPeriodLabel(template.survey_period)}
             </span>
           </div>
         </div>
@@ -195,10 +206,8 @@ export default function SurveyTemplatesPage() {
 
   const periodOptions = [
     { value: 'all', label: 'All Periods' },
-    { value: 'pre_pilot', label: 'Pre Pilot' },
-    { value: 'post_pilot', label: 'Post Pilot' },
-    { value: 'mid_pilot', label: 'Mid Pilot' },
-    { value: 'end_pilot', label: 'End Pilot' },
+    { value: 'pre', label: 'Pre Survey' },
+    { value: 'post', label: 'Post Survey' },
   ];
 
   if (isLoading) {

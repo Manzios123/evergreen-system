@@ -150,7 +150,9 @@ export default function CoordinatorExportsPage() {
       }
 
       const timestamp = new Date().toISOString().slice(0, 10);
-      const filename = `${type}-export-${timestamp}.${format}`;
+      const filename = type === 'survey-matrix'
+        ? `survey-matrix-by-template-${timestamp}.xlsx`
+        : `${type}-export-${timestamp}.${format}`;
 
       if (result instanceof Blob) {
         downloadBlob(result, filename);
@@ -301,11 +303,10 @@ export default function CoordinatorExportsPage() {
     },
     {
       id: 'survey-matrix',
-      label: 'Survey Response Matrix CSV',
+      label: 'Survey Matrix Excel Workbook',
       icon: DocumentArrowDownIcon,
       color: 'bg-sky-100 text-sky-700',
-      description: 'English-only Excel review format. One row per survey submission, with questions as columns.',
-      csvOnly: true,
+      description: 'One Excel workbook with a Summary sheet and one sheet per survey template. Best for clean Excel review.',
     },
     {
       id: 'activity-survey-answers',

@@ -271,6 +271,57 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
           </div>
         );
 
+      case 'yes_no':
+        return (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-4">
+              {['yes', 'no'].map((option) => (
+                <label key={option} className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    name={`question-${question.id}`}
+                    value={option}
+                    checked={value === option}
+                    onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+                    className="h-4 w-4 text-blue-600"
+                    disabled={isSubmitting}
+                    required={question.is_required}
+                  />
+                  <span className="ml-2 capitalize">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'likert_agreement':
+        return (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                'strongly_disagree',
+                'disagree',
+                'neutral',
+                'agree',
+                'strongly_agree',
+              ].map((option) => (
+                <label key={option} className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    name={`question-${question.id}`}
+                    value={option}
+                    checked={value === option}
+                    onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
+                    className="h-4 w-4 text-blue-600"
+                    disabled={isSubmitting}
+                    required={question.is_required}
+                  />
+                  <span className="ml-2 capitalize">{option.replace(/_/g, ' ')}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
       case 'scale_1_10':
         return (
           <div className="space-y-3">

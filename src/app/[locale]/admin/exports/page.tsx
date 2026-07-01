@@ -208,8 +208,10 @@ export default function AdminExportsPage() {
           throw new Error(`Unsupported export type: ${type}`);
       }
 
-      const extension = format === 'csv' ? 'csv' : 'json';
-      const filename = `${type}-export-${timestamp}.${extension}`;
+      const extension = type === 'survey-matrix' ? 'xlsx' : (format === 'csv' ? 'csv' : 'json');
+      const filename = type === 'survey-matrix'
+        ? `survey-matrix-by-template-${timestamp}.xlsx`
+        : `${type}-export-${timestamp}.${extension}`;
 
       // Export API returns a Blob for both CSV and JSON so protected downloads keep Authorization headers.
       if (result instanceof Blob) {
@@ -408,11 +410,10 @@ export default function AdminExportsPage() {
     },
     {
       id: 'survey-matrix',
-      label: 'Survey Response Matrix CSV',
+      label: 'Survey Matrix Excel Workbook',
       icon: DocumentArrowDownIcon,
       color: 'bg-sky-100 text-sky-700',
-      description: 'English-only Excel review format. One row per survey submission, with questions as columns.',
-      csvOnly: true,
+      description: 'One Excel workbook with a Summary sheet and one sheet per survey template. Best for clean Excel review.',
     },
     {
       id: 'activity-survey-answers',

@@ -4,7 +4,7 @@
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
-import { useApiQuery } from '@/lib/hooks/use-api';
+import { useApiQuery, useQueryClient } from '@/lib/hooks/use-api';
 import { api } from '@/lib/api/api';
 import {
   ArrowLeftIcon,
@@ -54,6 +54,7 @@ function normalizeArray<T>(response: unknown): T[] {
 
 export default function CreateAssignmentPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const params = useParams();
   const locale = (params?.locale as string) || 'en';
   const [step, setStep] = useState(1);
@@ -63,7 +64,7 @@ export default function CreateAssignmentPage() {
     volunteer_id: '',
     survey_template_id: '',
     due_date: '',
-    survey_period: 'pre_activity', // aligned with template enum: pre_activity, post_activity, mid_pilot, end_pilot
+    survey_period: 'pre_activity', // Pre Survey or Post Survey
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,10 +163,13 @@ export default function CreateAssignmentPage() {
         };
       }
 
-      const response = await api.post(endpoint, payload);
-      
+      await api.post(endpoint, payload);
+      await queryClient.invalidateQueries({ queryKey: ['survey-assignments'] });
+      await queryClient.invalidateQueries({ queryKey: ['survey-assignments', 'admin'] });
+
       alert('Assignment created successfully!');
       router.push(`/${locale}/admin/surveys/assignments`);
+      router.refresh();
       
     } catch (err: any) {
       setError(err.message || 'Failed to create assignment');
@@ -226,7 +230,7 @@ export default function CreateAssignmentPage() {
                       onChange={handleChange}
                       className="h-4 w-4 text-blue-600"
                     />
-                    <span className="ml-2">Pre-Pilot Survey</span>
+                    <span className="ml-2">Pre Survey</span>
                   </label>
                   <label className="inline-flex items-center">
                     <input
@@ -237,7 +241,7 @@ export default function CreateAssignmentPage() {
                       onChange={handleChange}
                       className="h-4 w-4 text-blue-600"
                     />
-                    <span className="ml-2">Post-Pilot Survey</span>
+                    <span className="ml-2">Post Survey</span>
                   </label>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
@@ -312,7 +316,7 @@ export default function CreateAssignmentPage() {
                     <option value="">Select a template</option>
                     {templates.map(template => (
                       <option key={template.id} value={template.id}>
-                        {template.name} ({template.survey_period.replace('_', ' ')})
+                        {template.name} ({template.survey_period === 'pre_activity' || template.survey_period === 'pre_pilot' ? 'Pre Survey' : 'Post Survey'})
                       </option>
                     ))}
                   </select>
@@ -387,7 +391,7 @@ export default function CreateAssignmentPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Survey Period:</span>
-                  <span className="font-medium capitalize">{formData.survey_period.replace('_', ' ')}</span>
+                  <span className="font-medium capitalize">{formData.survey_period === 'pre_activity' || formData.survey_period === 'pre_pilot' ? 'Pre Survey' : 'Post Survey'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Pilot:</span>
@@ -487,8 +491,8 @@ export default function CreateAssignmentPage() {
         <div className="space-y-2 mt-2">
           <p><strong>Volunteer Surveys:</strong> Assigned to individual volunteers. They fill out the survey themselves.</p>
           <p><strong>Student Surveys:</strong> Assigned to entire pilots. Coordinators fill out aggregated results.</p>
-          <p><strong>Pre-Pilot Surveys:</strong> Usually assigned when volunteers join a pilot.</p>
-          <p><strong>Post-Pilot Surveys:</strong> Assigned after volunteers complete a pilot.</p>
+          <p><strong>Pre Surveys:</strong> Usually assigned when volunteers join a pilot.</p>
+          <p><strong>Post Surveys:</strong> Assigned after volunteers complete a pilot.</p>
         </div>
       </Alert>
     </div>

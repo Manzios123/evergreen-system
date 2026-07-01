@@ -39,6 +39,8 @@ const QUESTION_TYPES = [
   { value: 'number', label: 'Number' },
   { value: 'media', label: 'Media Upload' },
   { value: 'agree_disagree_unsure', label: 'Agree / Disagree / Unsure' },
+  { value: 'yes_no', label: 'Yes / No' },
+  { value: 'likert_agreement', label: 'Strongly Agree Scale' },
   { value: 'scale_1_5', label: 'Scale (1-5)' },
   { value: 'scale_1_10', label: 'Scale (1-10)' },
 ];
@@ -233,10 +235,8 @@ export default function CreateSurveyTemplatePage() {
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                     required
                   >
-                    <option value="pre_activity">Pre Activity</option>
-                    <option value="post_activity">Post Activity</option>
-                    <option value="mid_pilot">Mid Pilot</option>
-                    <option value="end_pilot">End Pilot</option>
+                    <option value="pre_activity">Pre Survey</option>
+                    <option value="post_activity">Post Survey</option>
                   </select>
                 </div>
 
@@ -367,7 +367,7 @@ export default function CreateSurveyTemplatePage() {
       <Alert type="info" title="Creating a Survey Template">
         <div className="space-y-2 mt-2">
           <p><strong>Survey Type:</strong> Choose who will fill out this survey (volunteer, student, or activity monitoring).</p>
-          <p><strong>Survey Period:</strong> Indicates when the survey is administered (pre-activity, post-activity, mid-pilot, end-pilot).</p>
+          <p><strong>Survey Period:</strong> Choose whether this is a Pre Survey or Post Survey.</p>
           <p><strong>Questions:</strong> Add at least one question. You can choose different question types.</p>
           <p><strong>Versioning:</strong> When you update a template later, the version will increment automatically.</p>
         </div>
