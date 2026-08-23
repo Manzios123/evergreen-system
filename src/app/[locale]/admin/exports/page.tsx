@@ -116,7 +116,7 @@ export default function AdminExportsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreatingExport, setIsCreatingExport] = useState(false);
   const [selectedExportType, setSelectedExportType] = useState<string>('');
-  const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json' | ''>('');
+  const [selectedFormat, setSelectedFormat] = useState<'csv' | 'json' | 'xlsx' | ''>('');
   const [exportFilters, setExportFilters] = useState<ExportFilters>(emptyExportFilters);
   const [draftExportFilters, setDraftExportFilters] = useState<ExportFilters>(emptyExportFilters);
 
@@ -155,7 +155,7 @@ export default function AdminExportsPage() {
   const schoolOptions = buildOptions(filterOptions?.schools || [], (school) => school.name);
   const userOptions = buildOptions(filterOptions?.volunteers || [], (user) => user.name);
 
-  const handleExport = async (type: string, format: 'csv' | 'json', options?: any) => {
+  const handleExport = async (type: string, format: 'csv' | 'json' | 'xlsx', options?: any) => {
     setIsCreatingExport(true);
     setSelectedExportType(type);
     setSelectedFormat(format);
@@ -169,24 +169,28 @@ export default function AdminExportsPage() {
       let result: Blob | any;
       const timestamp = new Date().toISOString().slice(0, 10);
 
+      // Only the 'all'/'full_backup' type below ever passes 'xlsx' - the rest of these
+      // endpoints only support csv/json, hence the narrowing cast.
+      const csvOrJsonFormat = format === 'xlsx' ? 'json' : format;
+
       switch (type) {
         case 'activities':
-          result = await exportsApi.exportActivities(params, format);
+          result = await exportsApi.exportActivities(params, csvOrJsonFormat);
           break;
         case 'surveys':
-          result = await exportsApi.exportSurveys(params, format);
+          result = await exportsApi.exportSurveys(params, csvOrJsonFormat);
           break;
         case 'users':
-          result = await exportsApi.exportUsers(params, format);
+          result = await exportsApi.exportUsers(params, csvOrJsonFormat);
           break;
         case 'schools':
-          result = await exportsApi.exportSchools(params, format);
+          result = await exportsApi.exportSchools(params, csvOrJsonFormat);
           break;
         case 'pilots':
-          result = await exportsApi.exportPilots(params, format);
+          result = await exportsApi.exportPilots(params, csvOrJsonFormat);
           break;
         case 'activity-templates':
-          result = await exportsApi.exportActivityTemplates(params, format);
+          result = await exportsApi.exportActivityTemplates(params, csvOrJsonFormat);
           break;
         case 'survey-answers':
           result = await exportsApi.exportSurveyAnswers(options);
@@ -202,16 +206,21 @@ export default function AdminExportsPage() {
           break;
         case 'full_backup':
         case 'all':
-          result = await exportsApi.exportAll(params, format);
+          result = format === 'xlsx'
+            ? await exportsApi.exportAllWorkbook(options)
+            : await exportsApi.exportAll(params, format);
           break;
         default:
           throw new Error(`Unsupported export type: ${type}`);
       }
 
-      const extension = type === 'survey-matrix' ? 'xlsx' : (format === 'csv' ? 'csv' : 'json');
+      const isXlsx = type === 'survey-matrix' || format === 'xlsx';
+      const extension = isXlsx ? 'xlsx' : (format === 'csv' ? 'csv' : 'json');
       const filename = type === 'survey-matrix'
         ? `survey-matrix-by-template-${timestamp}.xlsx`
-        : `${type}-export-${timestamp}.${extension}`;
+        : (type === 'all' && format === 'xlsx')
+          ? `full-backup-${timestamp}.xlsx`
+          : `${type}-export-${timestamp}.${extension}`;
 
       // Export API returns a Blob for both CSV and JSON so protected downloads keep Authorization headers.
       if (result instanceof Blob) {
@@ -251,9 +260,9 @@ export default function AdminExportsPage() {
     }
   };
 
-  const handleFullBackup = () => {
+  const handleFullBackup = (format: 'json' | 'csv' | 'xlsx') => {
     if (window.confirm('Full system backup will export all data. This may take a while. Continue?')) {
-      handleExport('all', 'json', {
+      handleExport('all', format, {
         compress: true,
       });
     }
@@ -638,14 +647,32 @@ export default function AdminExportsPage() {
                       Unavailable
                     </Button>
                   ) : exportTypeItem.id === 'all' ? (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleFullBackup}
-                      loading={isCreatingExport && selectedExportType === exportTypeItem.id}
-                    >
-                      Create Backup
-                    </Button>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => handleFullBackup('json')}
+                        loading={isCreatingExport && selectedExportType === exportTypeItem.id}
+                      >
+                        JSON
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => handleFullBackup('csv')}
+                        loading={isCreatingExport && selectedExportType === exportTypeItem.id}
+                      >
+                        CSV
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => handleFullBackup('xlsx')}
+                        loading={isCreatingExport && selectedExportType === exportTypeItem.id}
+                      >
+                        Excel
+                      </Button>
+                    </div>
                   ) : exportTypeItem.csvOnly ? (
                     <Button
                       variant="default"

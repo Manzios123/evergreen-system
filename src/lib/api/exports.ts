@@ -195,6 +195,13 @@ export const exportsApi = {
     return exportDownload(`/exports/all`, params);
   },
 
+  // Export all data as a single Excel workbook, one sheet per table (admin only)
+  exportAllWorkbook: (filters?: {
+    pilot_id?: string;
+    start_date?: string;
+    end_date?: string;
+  }) => exportDownload(`/exports/all.xlsx`, filters),
+
   exportSurveyAnswers: (filters?: {
     pilot_id?: string;
     survey_template_id?: string;
