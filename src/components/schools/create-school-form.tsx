@@ -131,26 +131,34 @@ export default function CreateSchoolForm() {
       }
 
       const schoolId = response.data.id;
-      
+
       // Filter out empty contacts and add them
-      const validContacts = contacts.filter(contact => 
+      const validContacts = contacts.filter(contact =>
         contact.name.trim() && contact.email.trim() && contact.role.trim()
       );
-      
+
+      let failedContactCount = 0;
       if (validContacts.length > 0) {
-        // Create contacts in parallel
-        await Promise.all(
-          validContacts.map(contact => 
+        // Create contacts in parallel. A failed contact shouldn't fail the whole
+        // operation (the school itself was already created), but it must be
+        // surfaced to the user instead of only logged - otherwise they have no
+        // way to know a contact they filled in didn't actually get saved.
+        const results = await Promise.all(
+          validContacts.map(contact =>
             schoolsApi.createContact(schoolId, contact).catch((err: any) => {
               console.warn('Failed to add contact:', err);
-              // Don't fail the whole operation if one contact fails
               return null;
             })
           )
         );
+        failedContactCount = results.filter((result) => result === null).length;
       }
-      
-      setSuccess('School created successfully! Redirecting...');
+
+      setSuccess(
+        failedContactCount > 0
+          ? `School created successfully! ${failedContactCount} of ${validContacts.length} contact(s) failed to save - add ${failedContactCount === 1 ? 'it' : 'them'} from the school's page. Redirecting...`
+          : 'School created successfully! Redirecting...'
+      );
       reset();
       setContacts([{ name: '', email: '', phone: '', role: 'Principal', is_primary: true }]);
       

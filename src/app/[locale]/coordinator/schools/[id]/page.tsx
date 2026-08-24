@@ -11,6 +11,7 @@ import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import ConfirmationDialog from '@/components/ui/confirmation-dialog';
+import ContactModal from '@/components/schools/ContactModal';
 import {
   Building,
   MapPin,
@@ -41,6 +42,8 @@ export default function SchoolDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<SchoolContact | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -98,18 +101,32 @@ export default function SchoolDetailsPage() {
     }
   };
 
+  const refreshContacts = async () => {
+    const contactsResponse = await schoolsApi.getSchoolContacts(id);
+    if (contactsResponse.success && contactsResponse.data) {
+      setContacts(contactsResponse.data);
+    }
+  };
+
   const handleDeleteContact = async (contactId: string) => {
     try {
       const response = await schoolsApi.deleteContact(contactId);
       if (response.success) {
-        const contactsResponse = await schoolsApi.getSchoolContacts(id);
-        if (contactsResponse.success && contactsResponse.data) {
-          setContacts(contactsResponse.data);
-        }
+        await refreshContacts();
       }
     } catch (err: any) {
       console.error('Failed to delete contact:', err);
     }
+  };
+
+  const handleAddContact = () => {
+    setEditingContact(null);
+    setShowContactModal(true);
+  };
+
+  const handleEditContact = (contact: SchoolContact) => {
+    setEditingContact(contact);
+    setShowContactModal(true);
   };
 
   if (isLoading) {
@@ -382,8 +399,7 @@ export default function SchoolDetailsPage() {
             <Button
               variant="outline"
               icon={<Plus className="h-4 w-4" />}
-              onClick={() => {/* TODO: Add contact modal */}
-              }
+              onClick={handleAddContact}
             >
               Add Contact
             </Button>
@@ -456,8 +472,7 @@ export default function SchoolDetailsPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => {/* TODO: Edit contact */}
-                            }
+                            onClick={() => handleEditContact(contact)}
                           >
                             Edit
                           </Button>
@@ -490,6 +505,15 @@ export default function SchoolDetailsPage() {
         cancelText="Cancel"
         type="danger"
         loading={isDeleting}
+      />
+
+      {/* Add/Edit Contact Modal */}
+      <ContactModal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        schoolId={id}
+        contact={editingContact}
+        onSuccess={refreshContacts}
       />
     </div>
   );
