@@ -1,12 +1,13 @@
 // src/lib/types/index.ts
 // CHANGE: Added profile_picture field to User interface
 
-export type ActivityStatus = 
-  | 'draft' 
-  | 'pending' 
-  | 'approved' 
-  | 'rejected' 
-  | 'completed' 
+export type ActivityStatus =
+  | 'draft'
+  | 'pending'
+  | 'in_edit'
+  | 'approved'
+  | 'rejected'
+  | 'completed'
   | 'cancelled';
 
 export type ActivityType = 

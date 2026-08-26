@@ -7,16 +7,37 @@ import Link from 'next/link';
 import { activitiesApi } from '@/lib/api/activities';
 import { ActivityStatus } from '@/lib/types';
 
+interface CoordinatorEditFormData {
+  status: ActivityStatus;
+  coordinator_feedback: string;
+  actual_date: string;
+  number_of_participants: string;
+  number_of_boys: string;
+  number_of_girls: string;
+  engagement_level: 'low' | 'medium' | 'high' | '';
+  volunteer_notes: string;
+  student_quotes: string;
+}
+
+const emptyForm: CoordinatorEditFormData = {
+  status: 'pending',
+  coordinator_feedback: '',
+  actual_date: '',
+  number_of_participants: '',
+  number_of_boys: '',
+  number_of_girls: '',
+  engagement_level: '',
+  volunteer_notes: '',
+  student_quotes: '',
+};
+
 export default function ActivityEditPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
   const locale = params.locale as string;
 
-  const [formData, setFormData] = useState({
-    status: 'pending' as ActivityStatus,
-    coordinator_feedback: '',
-  });
+  const [formData, setFormData] = useState<CoordinatorEditFormData>(emptyForm);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +52,27 @@ export default function ActivityEditPage() {
         if (!response.success) {
           throw new Error('Failed to fetch activity');
         }
-        const activity = response.data;
+        const activity = response.data as any;
         setActivityTitle(activity.title);
         setFormData({
           status: activity.status as ActivityStatus,
           coordinator_feedback: activity.coordinator_feedback || '',
+          actual_date: activity.actual_date ? String(activity.actual_date).slice(0, 10) : '',
+          number_of_participants:
+            activity.number_of_participants !== undefined && activity.number_of_participants !== null
+              ? String(activity.number_of_participants)
+              : '',
+          number_of_boys:
+            activity.number_of_boys !== undefined && activity.number_of_boys !== null
+              ? String(activity.number_of_boys)
+              : '',
+          number_of_girls:
+            activity.number_of_girls !== undefined && activity.number_of_girls !== null
+              ? String(activity.number_of_girls)
+              : '',
+          engagement_level: (activity.engagement_level as 'low' | 'medium' | 'high') || '',
+          volunteer_notes: activity.volunteer_notes || '',
+          student_quotes: activity.student_quotes || '',
         });
       } catch (err: any) {
         setError(err.message || 'Failed to load activity');
@@ -48,7 +85,7 @@ export default function ActivityEditPage() {
   }, [id]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -63,9 +100,22 @@ export default function ActivityEditPage() {
     setError(null);
 
     try {
+      const toNullableNumber = (value: string): number | null =>
+        value.trim() === '' ? null : Number(value);
+
       const response = await activitiesApi.update(id, {
         status: formData.status,
         coordinator_feedback: formData.coordinator_feedback,
+        actual_date: formData.actual_date || undefined,
+        number_of_participants:
+          formData.number_of_participants.trim() === ''
+            ? undefined
+            : Number(formData.number_of_participants),
+        number_of_boys: toNullableNumber(formData.number_of_boys),
+        number_of_girls: toNullableNumber(formData.number_of_girls),
+        engagement_level: formData.engagement_level || undefined,
+        volunteer_notes: formData.volunteer_notes,
+        student_quotes: formData.student_quotes,
       });
 
       if (!response.success) {
@@ -109,7 +159,7 @@ export default function ActivityEditPage() {
               Edit Activity: {activityTitle}
             </h1>
             <p className="text-sm text-gray-500 mb-6">
-              Update the status and provide feedback for this activity
+              As a coordinator, you can correct anything the facilitator submitted, not just the status and your feedback.
             </p>
 
             {success && (
@@ -159,6 +209,7 @@ export default function ActivityEditPage() {
                 >
                   <option value="draft">Draft</option>
                   <option value="pending">Pending</option>
+                  <option value="in_edit">Edits Requested</option>
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
                 </select>
@@ -172,7 +223,7 @@ export default function ActivityEditPage() {
                   <textarea
                     id="coordinator_feedback"
                     name="coordinator_feedback"
-                    rows={6}
+                    rows={4}
                     value={formData.coordinator_feedback}
                     onChange={handleChange}
                     className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border border-gray-300 rounded-md"
@@ -180,8 +231,127 @@ export default function ActivityEditPage() {
                   />
                 </div>
                 <p className="mt-1 text-sm text-gray-500">
-                  This feedback will be visible to the volunteer and other coordinators.
+                  This feedback will be visible to the facilitator.
                 </p>
+              </div>
+
+              <div className="border-t border-gray-200 pt-6">
+                <h2 className="text-base font-semibold text-gray-900 mb-4">
+                  Facilitator's Report (editable by coordinators)
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="actual_date" className="block text-sm font-medium text-gray-700">
+                      Actual Date
+                    </label>
+                    <input
+                      type="date"
+                      id="actual_date"
+                      name="actual_date"
+                      value={formData.actual_date}
+                      onChange={handleChange}
+                      className="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border border-gray-300 rounded-md py-2 px-3"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="engagement_level" className="block text-sm font-medium text-gray-700">
+                      Engagement Level
+                    </label>
+                    <select
+                      id="engagement_level"
+                      name="engagement_level"
+                      value={formData.engagement_level}
+                      onChange={handleChange}
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    >
+                      <option value="">Not set</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label htmlFor="number_of_participants" className="block text-sm font-medium text-gray-700">
+                      Total Participants
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      id="number_of_participants"
+                      name="number_of_participants"
+                      value={formData.number_of_participants}
+                      onChange={handleChange}
+                      className="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border border-gray-300 rounded-md py-2 px-3"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="number_of_boys" className="block text-sm font-medium text-gray-700">
+                      Boys
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      id="number_of_boys"
+                      name="number_of_boys"
+                      value={formData.number_of_boys}
+                      onChange={handleChange}
+                      className="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border border-gray-300 rounded-md py-2 px-3"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="number_of_girls" className="block text-sm font-medium text-gray-700">
+                      Girls
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      id="number_of_girls"
+                      name="number_of_girls"
+                      value={formData.number_of_girls}
+                      onChange={handleChange}
+                      className="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border border-gray-300 rounded-md py-2 px-3"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label htmlFor="volunteer_notes" className="block text-sm font-medium text-gray-700">
+                    Activity Report
+                  </label>
+                  <div className="mt-1">
+                    <textarea
+                      id="volunteer_notes"
+                      name="volunteer_notes"
+                      rows={6}
+                      value={formData.volunteer_notes}
+                      onChange={handleChange}
+                      className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border border-gray-300 rounded-md"
+                      placeholder="The facilitator's activity report..."
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label htmlFor="student_quotes" className="block text-sm font-medium text-gray-700">
+                    Student Quotes &amp; Feedback
+                  </label>
+                  <div className="mt-1">
+                    <textarea
+                      id="student_quotes"
+                      name="student_quotes"
+                      rows={4}
+                      value={formData.student_quotes}
+                      onChange={handleChange}
+                      className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border border-gray-300 rounded-md"
+                      placeholder="Quotes or feedback from students..."
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-4">
@@ -203,19 +373,21 @@ export default function ActivityEditPage() {
           </div>
         </div>
 
-        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
           <div className="flex">
             <div className="shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">Note for Coordinators</h3>
-              <div className="mt-2 text-sm text-yellow-700">
+              <h3 className="text-sm font-medium text-blue-800">Note for Coordinators</h3>
+              <div className="mt-2 text-sm text-blue-700">
                 <p>
-                  As a coordinator, you can only update the status and coordinator feedback fields.
-                  Other activity details (title, description, dates, etc.) must be updated by the original volunteer creator.
+                  You now have full rights to correct anything the facilitator reported here - dates, participant
+                  counts, engagement level, the activity report text, and student quotes - in addition to status and
+                  your own feedback. The activity's title, description, school, and pilot assignment are still managed
+                  elsewhere (activity setup), not on this page.
                 </p>
               </div>
             </div>

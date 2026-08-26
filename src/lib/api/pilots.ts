@@ -22,6 +22,12 @@ export const pilotsApi = {
   deletePilot: (id: string) =>
     api.delete<ApiResponse<void>>(`/pilots/${id}`),
 
+  // Clone pilot. If the source pilot is 'closed' (marked complete), the
+  // backend also MOVES its users and schools into the newly created pilot
+  // so staff only need to enter genuinely new people/schools.
+  clonePilot: (id: string, name?: string) =>
+    api.post<ApiResponse<Pilot> & { transferred: boolean; transferredUsers: number; transferredSchools: number; message: string }>(`/pilots/${id}/clone`, name ? { name } : {}),
+
   // Restore pilot
   restorePilot: (id: string) =>
     api.post<ApiResponse<Pilot>>(`/pilots/${id}/restore`),

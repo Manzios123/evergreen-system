@@ -1,4 +1,4 @@
-// app/[locale]/coordinator/surveys/assignment/[id]/page.tsx
+// app/[locale]/admin/surveys/assignment/[id]/page.tsx
 'use client';
 
 import { SurveyForm } from '@/components/surveys/survey-form';
@@ -69,12 +69,20 @@ interface SurveyAssignmentPageProps {
   };
 }
 
+// This is the admin counterpart to coordinator/surveys/assignment/[id]/page.tsx -
+// admins can't use that page directly (RoleLayout only lets 'facilitator' borrow
+// 'volunteer' pages, not 'admin'/'coordinator' borrow each other's), so this is a
+// parallel copy for the admin route. Was previously missing entirely - the
+// admin/surveys/page.tsx redirect used to point at
+// admin/surveys/assignments/[id] (plural), a pure assignment-management tool
+// with no actual SurveyForm, so an admin could never really fill out their own
+// auto-assigned feedback survey. See prompt/system-audit.md, Twelfth pass.
 export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
   const router = useRouter();
   const urlParams = useParams();
   const [surveyData, setSurveyData] = useState<any>(null);
   const [showSubmissionSuccess, setShowSubmissionSuccess] = useState(false);
-  
+
   const assignmentId = params?.id || (urlParams?.id as string);
 
   const { data: apiResponse, isLoading, error, refetch } = useApiQuery<AssignmentResponse>(
@@ -91,8 +99,8 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
   );
 
   // Once a staff/admin personal survey is completed, fetch the actual submitted
-  // answers so they can be reviewed and edited (see prompt/system-audit.md,
-  // Twelfth pass) instead of just showing a dead-end "already completed" message.
+  // answers so they can be reviewed and edited instead of just showing a
+  // dead-end "already completed" message.
   const isStaffSurveyCompleted = apiResponse?.assignment?.survey_type === 'volunteer' && apiResponse?.completed;
   const { data: myResponse, refetch: refetchMyResponse } = useApiQuery<{ id: string; submitted_at: string; responses: Record<string, any> }>(
     ['survey-response', assignmentId, 'volunteer'],
@@ -102,8 +110,6 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
 
   useEffect(() => {
     if (apiResponse) {
-      console.log('API Response received:', apiResponse);
-      
       const transformedData = {
         id: apiResponse.assignment?.id || assignmentId,
         title: apiResponse.assignment?.survey_name || 'Survey',
@@ -129,16 +135,15 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
 
   const handleComplete = () => {
     refetch();
-    
+
     if (apiResponse?.assignment?.survey_type === 'student') {
       setShowSubmissionSuccess(true);
       setTimeout(() => {
         setShowSubmissionSuccess(false);
       }, 5000);
     } else {
-      // ADMIN CHANGE: Redirect to admin surveys page instead of volunteer
       setTimeout(() => {
-        router.push('/coordinator/surveys');
+        router.push('/admin/surveys');
         router.refresh();
       }, 1500);
     }
@@ -153,7 +158,6 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
   }
 
   if (error) {
-    console.error('Error loading assignment:', error);
     return (
       <div className="max-w-3xl mx-auto">
         <Alert
@@ -162,8 +166,7 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
         >
           <p className="mt-2">The survey could not be loaded. It may have been completed or is no longer available.</p>
           <div className="mt-4">
-            {/* ADMIN CHANGE: Link to admin surveys page */}
-            <Link href="/coordinator/surveys" className="inline-flex items-center text-sm">
+            <Link href="/admin/surveys" className="inline-flex items-center text-sm">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
               Back to Surveys
             </Link>
@@ -182,8 +185,7 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
         >
           <p className="mt-2">This survey assignment could not be found. It may have been deleted or you may not have access.</p>
           <div className="mt-4">
-            {/* ADMIN CHANGE: Link to admin surveys page */}
-            <Link href="/coordinator/surveys" className="inline-flex items-center text-sm">
+            <Link href="/admin/surveys" className="inline-flex items-center text-sm">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
               Back to Surveys
             </Link>
@@ -224,7 +226,7 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
           </Card>
         )}
         <div className="flex justify-end">
-          <Button variant="outline" onClick={() => router.push('/coordinator/surveys')}>
+          <Button variant="outline" onClick={() => router.push('/admin/surveys')}>
             Back to Surveys
           </Button>
         </div>
@@ -242,8 +244,7 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
         >
           <p className="mt-2">This survey cannot be edited. It may have been submitted or is no longer active.</p>
           <div className="mt-4">
-            {/* ADMIN CHANGE: Link to admin surveys page */}
-            <Link href="/coordinator/surveys" className="inline-flex items-center text-sm">
+            <Link href="/admin/surveys" className="inline-flex items-center text-sm">
               <ArrowLeftIcon className="h-4 w-4 mr-2" />
               Back to Surveys
             </Link>
@@ -259,9 +260,8 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        {/* ADMIN CHANGE: Link to admin surveys page */}
         <Link
-          href="/coordinator/surveys"
+          href="/admin/surveys"
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -286,9 +286,9 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
               )}
             </div>
             <p className="mt-2 text-gray-600">
-              {assignment.survey_description || 
-                (isStaffSurvey 
-                  ? `Please complete this staff survey` 
+              {assignment.survey_description ||
+                (isStaffSurvey
+                  ? `Please complete this staff survey`
                   : `Please complete this ${assignment.survey_period.replace('_', ' ')} student survey`)}
             </p>
           </div>
@@ -331,7 +331,7 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
               </p>
             </div>
             <p className="mt-1 text-sm text-gray-900">
-              {apiResponse.questions?.length 
+              {apiResponse.questions?.length
                 ? `${Math.ceil(apiResponse.questions.length * 0.5)} minutes`
                 : '5-10 minutes'}
             </p>
@@ -395,7 +395,7 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
               {isStudentSurvey ? 'Submit Student Survey' : 'Complete Staff Survey'}
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              {isStudentSurvey 
+              {isStudentSurvey
                 ? 'Please collect responses from students and enter the aggregated results below.'
                 : 'Please answer all questions honestly. Your feedback as staff is valuable!'}
             </p>
@@ -438,8 +438,8 @@ export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPa
           )}
 
           {surveyData && apiResponse.questions && apiResponse.questions.length > 0 ? (
-            <SurveyForm 
-              survey={surveyData} 
+            <SurveyForm
+              survey={surveyData}
               onComplete={handleComplete}
               assignmentId={assignmentId}
               surveyType={assignment.survey_type}

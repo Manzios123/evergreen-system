@@ -53,7 +53,7 @@ interface ActivityApiResponse {
 }
 
 function isValidActivityStatus(status: string): status is ActivityStatus {
-  return ['draft', 'pending', 'approved', 'rejected', 'completed', 'cancelled'].includes(status);
+  return ['draft', 'pending', 'in_edit', 'approved', 'rejected', 'completed', 'cancelled'].includes(status);
 }
 
 export default function ActivityDetailPage({ params }: ActivityDetailPageProps) {
@@ -125,8 +125,8 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
     if (activity.status === 'draft') {
       // Always show the beautified submission form for draft activities
       setShowSubmissionForm(true);
-    } else if (activity.status === 'pending' || activity.status === 'rejected') {
-      // For pending or rejected activities, allow editing via the form
+    } else if (activity.status === 'pending' || activity.status === 'rejected' || activity.status === 'in_edit') {
+      // For pending, rejected, or edit-requested activities, allow editing via the form
       setShowSubmissionForm(true);
     }
   };
@@ -193,8 +193,9 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
     );
   }
 
-  const canEdit = activity.status === 'draft' || activity.status === 'rejected' || activity.status === 'pending';
+  const canEdit = activity.status === 'draft' || activity.status === 'rejected' || activity.status === 'pending' || activity.status === 'in_edit';
   const canSubmit = activity.status === 'draft' || activity.status === 'rejected';
+  const needsUpdate = activity.status === 'pending' || activity.status === 'rejected' || activity.status === 'in_edit';
 
   // Helper function to get engagement level as string
   const getEngagementLevel = (level?: string | number): string => {
@@ -267,9 +268,9 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
             </Button>
           )}
           
-          {(activity.status === 'pending' || activity.status === 'rejected') && (
-            <Button 
-              variant="secondary" 
+          {needsUpdate && (
+            <Button
+              variant="secondary"
               size="sm"
               onClick={() => setShowSubmissionForm(true)}
             >
@@ -314,7 +315,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Activity Information Card */}
-            <Card>
+            <Card className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Activity Information
               </h2>
@@ -396,7 +397,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
 
             {/* Volunteer Notes & Quotes Card */}
             {(activity.volunteer_notes || activity.student_quotes || activity.assignment_notes) && (
-              <Card>
+              <Card className="p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Notes & Details
                 </h2>
@@ -454,7 +455,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
 
             {/* Media Gallery */}
             {(mediaItems.length > 0 || isLoadingMedia || mediaError) && (
-              <Card>
+              <Card className="p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Activity Media
                 </h2>
@@ -498,7 +499,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
 
             {/* Submission Instructions */}
             {canSubmit && !activity.volunteer_notes && (
-              <Card className="bg-blue-50 border-blue-200">
+              <Card className="p-6 bg-blue-50 border-blue-200">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">
                   Ready to Complete Your Activity Report?
                 </h2>
@@ -559,7 +560,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Status Information */}
-            <Card>
+            <Card className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Status Information
               </h2>
@@ -598,7 +599,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
 
             {/* Coordinator Feedback */}
             {activity.coordinator_feedback && (
-              <Card className="bg-yellow-50 border-yellow-200">
+              <Card className="p-6 bg-yellow-50 border-yellow-200">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">
                   Coordinator Feedback
                 </h2>
@@ -612,7 +613,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
             )}
 
             {/* Next Steps */}
-            <Card>
+            <Card className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Next Steps
               </h2>
@@ -680,11 +681,27 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                     </div>
                   </div>
                 )}
+
+                {activity.status === 'in_edit' && (
+                  <div className="flex items-start">
+                    <div className="shrink-0">
+                      <div className="h-2 w-2 bg-purple-500 rounded-full mt-1.5" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        Edits requested
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Your coordinator asked for changes - check their feedback and update your report
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
 
             {/* Action Buttons */}
-            <Card>
+            <Card className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Actions
               </h2>
@@ -700,7 +717,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                   </Button>
                 )}
                 
-                {(activity.status === 'pending' || activity.status === 'rejected') && (
+                {needsUpdate && (
                   <Button
                     variant="secondary"
                     className="w-full justify-center"

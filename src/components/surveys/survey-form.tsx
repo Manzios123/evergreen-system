@@ -33,8 +33,12 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
-  // For student surveys, track aggregated responses
-  const [totalStudents, setTotalStudents] = useState<number>(0);
+  // Note: student surveys are one form per student (the backend always
+  // stores total_students = 1 per submission - see submit-response in
+  // survey-assignment.routes.ts) - there used to be a "Total Number of
+  // Students" question here asking for an aggregate count, but that assumed
+  // a form could represent multiple students at once, which isn't how this
+  // survey is actually used. Removed per explicit product decision.
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [mediaUploadStatus, setMediaUploadStatus] = useState<Record<string, 'uploading' | 'uploaded' | 'error'>>({});
 
@@ -79,15 +83,6 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
     setSuccessMessage(null);
 
     try {
-      // Additional validation for student surveys
-      if (surveyType === 'student') {
-        if (totalStudents <= 0 || totalStudents > 100) {
-          setError('Please enter a valid number of students (1-100).');
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
       // Validate required questions
       const requiredQuestions = questions.filter((q: any) => q.is_required);
       const missingRequired = requiredQuestions.filter((q: any) => {
@@ -115,9 +110,6 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
 
       // Prepare final responses
       let finalResponses = { ...responses };
-      if (surveyType === 'student' && totalStudents > 0) {
-        finalResponses.total_students = totalStudents;
-      }
 
       // Submit response
       const payload = {
@@ -134,7 +126,6 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       // For student surveys, reset the form and show success message
       if (surveyType === 'student') {
         // Clear form for next submission
-        setTotalStudents(0);
         const resetResponses: Record<string, any> = {};
         questions.forEach((question: any) => {
           resetResponses[question.id] = '';
@@ -441,30 +432,11 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       {surveyType === 'student' && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
           <h3 className="font-medium text-blue-900 mb-2">Student Survey Information</h3>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Total Number of Students
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="100"
-              value={totalStudents}
-              onChange={(e) => setTotalStudents(parseInt(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              required={surveyType === 'student'}
-              disabled={isSubmitting}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Enter the total number of students who participated in this activity.
-            </p>
-          </div>
           <div className="text-sm text-blue-700 bg-blue-100 p-3 rounded">
             <p className="font-medium mb-1">Instructions:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>For each question below, enter the aggregated results from all students.</li>
-              <li>You can submit multiple times as you collect more student responses.</li>
-              <li>Each submission helps build a more complete picture of student feedback.</li>
+              <li>Fill this out for one student's responses.</li>
+              <li>When you're done, submit and fill it out again for the next student.</li>
             </ul>
           </div>
         </div>

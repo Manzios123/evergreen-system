@@ -144,11 +144,13 @@ export default function Sidebar({ role, collapsed = false, onToggleCollapsed }: 
     volunteer: [
       { name: 'Dashboard', labelKey: 'dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
       { name: 'My Activities', labelKey: 'myActivities', href: '/volunteer/activities', icon: CalendarIcon },
+      { name: 'My Submissions', labelKey: 'mySubmissions', href: '/volunteer/surveys/submissions', icon: ClipboardDocumentListIcon },
       { name: 'Feedback', labelKey: 'feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
     ],
     facilitator: [
       { name: 'Dashboard', labelKey: 'dashboard', href: '/volunteer/dashboard', icon: HomeIcon, exact: true },
       { name: 'My Activities', labelKey: 'myActivities', href: '/volunteer/activities', icon: CalendarIcon },
+      { name: 'My Submissions', labelKey: 'mySubmissions', href: '/volunteer/surveys/submissions', icon: ClipboardDocumentListIcon },
       { name: 'Feedback', labelKey: 'feedback', href: '/volunteer/surveys/volunteer', icon: ChatBubbleLeftIcon, badge: 'pending' },
     ],
   };

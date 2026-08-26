@@ -275,8 +275,12 @@ export default function AdminSurveysPage() {
     setAdminSurveyLoading(true);
     try {
       const response = await api.post<AutoAssignResponse>('/survey-assignments/auto-assign-role-survey');
-      // MODIFIED: Redirect to admin assignment route instead of volunteer
-      window.location.href = `/${locale}/admin/surveys/assignments/${response.assignment_id}`;
+      // Was pointing at admin/surveys/assignments/[id] (plural) - a pure
+      // assignment-management tool with no actual survey form, so an admin could
+      // never really fill out their own feedback survey. admin/surveys/assignment
+      // (singular) is the real fill-out-the-survey page - see
+      // prompt/system-audit.md, Twelfth pass.
+      window.location.href = `/${locale}/admin/surveys/assignment/${response.assignment_id}`;
     } catch (err: any) {
       setError(err.message || 'Failed to load admin survey');
     } finally {

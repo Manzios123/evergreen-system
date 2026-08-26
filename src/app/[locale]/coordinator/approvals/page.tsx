@@ -167,13 +167,16 @@ export default function CoordinatorApprovalsPage() {
   );
 
   const rejectActivityMutation = useApiMutation(
-    (data: { id: string; feedback: string }) => 
-      api.post(`/approvals/${data.id}/reject`, { feedback: data.feedback })
+    // Backend reads `rejectionReason`, not `feedback` - this was silently failing every
+    // reject attempt with a 400 before this fix (see prompt/ui-ux-audit.md finding #1).
+    (data: { id: string; feedback: string }) =>
+      api.post(`/approvals/${data.id}/reject`, { rejectionReason: data.feedback })
   );
 
   const requestEditActivityMutation = useApiMutation(
-    (data: { id: string; feedback: string }) => 
-      api.post(`/approvals/${data.id}/request-edit`, { feedback: data.feedback })
+    // Backend reads `editNotes`, not `feedback` - same bug as reject, above.
+    (data: { id: string; feedback: string }) =>
+      api.post(`/approvals/${data.id}/request-edit`, { editNotes: data.feedback })
   );
 
   const handleApproval = useCallback(async (feedback?: string) => {

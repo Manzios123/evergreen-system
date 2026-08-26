@@ -37,11 +37,13 @@ const navigation = {
   volunteer: [
     { name: 'Dashboard', labelKey: 'dashboard', href: '/volunteer/dashboard' },
     { name: 'My Activities', labelKey: 'myActivities', href: '/volunteer/activities' },
+    { name: 'My Submissions', labelKey: 'mySubmissions', href: '/volunteer/surveys/submissions' },
     { name: 'Feedback', labelKey: 'feedback', href: '/volunteer/surveys/volunteer' },
   ],
   facilitator: [
     { name: 'Dashboard', labelKey: 'dashboard', href: '/volunteer/dashboard' },
     { name: 'My Activities', labelKey: 'myActivities', href: '/volunteer/activities' },
+    { name: 'My Submissions', labelKey: 'mySubmissions', href: '/volunteer/surveys/submissions' },
     { name: 'Feedback', labelKey: 'feedback', href: '/volunteer/surveys/volunteer' },
   ],
 };

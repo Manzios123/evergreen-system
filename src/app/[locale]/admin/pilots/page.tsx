@@ -109,19 +109,11 @@ export default function AdminPilotsPage() {
     }
   );
 
-  // Clone pilot mutation
+  // Clone pilot mutation - the backend handles everything (create the new
+  // pilot, and if the source is 'closed'/complete, move its users and
+  // schools into the new one) in a single call.
   const cloneMutation = useApiMutation(
-    (id: string) => pilotsApi.getPilot(id).then((response) => {
-      // Create a new pilot based on the existing one
-      const { id: _, created_at: __, updated_at: ___, ...pilotData } = response.data;
-      return pilotsApi.createPilot({
-        ...pilotData,
-        name: `${pilotData.name} (Copy)`,
-        status: 'active' as const,
-        created_at: '',
-        updated_at: ''
-      });
-    }),
+    (id: string) => pilotsApi.clonePilot(id),
     {
       invalidateQueries: [['pilots']],
     }
@@ -141,10 +133,11 @@ export default function AdminPilotsPage() {
 
   const handleClone = async (pilotId: string) => {
     try {
-      await cloneMutation.mutateAsync(pilotId);
-      alert('Pilot program cloned successfully');
+      const result: any = await cloneMutation.mutateAsync(pilotId);
+      alert(result?.message || 'Pilot program cloned successfully');
     } catch (error) {
       console.error('Failed to clone pilot:', error);
+      alert('Failed to clone pilot');
     }
   };
 
