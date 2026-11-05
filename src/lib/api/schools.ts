@@ -1,6 +1,36 @@
 // lib/api/schools.ts - UPDATED VERSION
-import { api } from './api';
+import { api, apiRequest } from './api';
 import { School, SchoolContact, ApiResponse, PaginationParams } from '@/lib/types';
+
+export interface SchoolDeletionPreview {
+  school: { id: string; name: string; archivedAt: string | null };
+  fingerprint: string;
+  counts: Record<string, number>;
+  files: { total: number; missing: number; bytes: number; names: string[] };
+  blockedReasons: string[];
+}
+export interface SchoolPurgeJob {
+  operationId: string; schoolId: string; schoolName: string; databaseDeleted: boolean;
+  cleanupPending: boolean; needsReview: boolean; recoveryUnavailable?: boolean;
+  counts: Record<string, number>;
+  files: { total: number; pending: number; removed: number; alreadyMissing: number; retainedShared: number; changed: number; failed: number };
+  failures: { name: string; message: string }[];
+}
+export interface SchoolPurgeConfirmation {
+  operationId: string; fingerprint: string; confirmName: string; reason: string; testDataConfirmed: boolean;
+}
+async function purgeResult<T>(request: Promise<{success: boolean; data: T; error?: string; hardDeleted?: boolean}>, requireDeleted = false): Promise<T> {
+  const response = await request;
+  if (!response?.success || !response.data || (requireDeleted && response.hardDeleted !== true)) throw new Error(response?.error || 'Deletion was not confirmed. Check the operation result before retrying.');
+  return response.data;
+}
+export const schoolPurgeApi = {
+  preview: (id: string) => purgeResult<SchoolDeletionPreview>(api.get(`/schools/${encodeURIComponent(id)}/deletion-preview`)),
+  purge: (id: string, body: SchoolPurgeConfirmation) => purgeResult<SchoolPurgeJob>(apiRequest(`/schools/${encodeURIComponent(id)}/permanent`, {method:'DELETE', body:JSON.stringify(body)}), true),
+  status: (operationId: string) => purgeResult<SchoolPurgeJob>(api.get(`/schools/purge-operations/${encodeURIComponent(operationId)}`)),
+  cleanup: (operationId: string) => purgeResult<SchoolPurgeJob>(api.post(`/schools/purge-operations/${encodeURIComponent(operationId)}/cleanup`)),
+  recent: () => purgeResult<SchoolPurgeJob[]>(api.get('/schools/purge-operations')),
+};
 
 // Helper function to normalize responses
 function normalizeResponse<T>(response: any): ApiResponse<T> {

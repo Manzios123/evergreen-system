@@ -11,6 +11,7 @@ import Alert from '@/components/ui/alert';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/use-api';
 import { School, SchoolContact } from '@/lib/types';
 import { schoolsApi } from '@/lib/api/schools';
+import SchoolPurgeDialog, { SchoolPurgeHistory } from '@/components/schools/SchoolPurgeDialog';
 import {
   BuildingOfficeIcon,
   MapPinIcon,
@@ -34,6 +35,9 @@ export default function AdminSchoolsPage() {
   const [activeFilter, setActiveFilter] = useState<string>('active');
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [purgeSchool, setPurgeSchool] = useState<School | null>(null);
+  const [purgedIds, setPurgedIds] = useState<string[]>([]);
+  const [purgeRefresh, setPurgeRefresh] = useState(0);
   const [primaryContacts, setPrimaryContacts] = useState<Record<string, SchoolContact | null>>({});
 
   const { user } = useAuth();
@@ -52,6 +56,7 @@ export default function AdminSchoolsPage() {
         isActive: activeFilter === 'all' ? undefined : activeFilter === 'active',
         limit: 100
       });
+      if (!response.success) throw new Error(response.message || 'Unable to load schools');
       
       // Transform the response to match the expected type
       return {
@@ -166,7 +171,7 @@ export default function AdminSchoolsPage() {
           ) : (
             <>
               <XCircleIcon className="h-4 w-4 text-gray-400 mr-1" />
-              <span className="text-sm text-gray-500">Inactive</span>
+              <span className="text-sm text-gray-500">Archived</span>
             </>
           )}
         </div>
@@ -198,10 +203,14 @@ export default function AdminSchoolsPage() {
             variant="destructive"
             icon={<TrashIcon className="h-4 w-4" />}
             onClick={() => {
-              setSelectedSchool(school);
-              setShowDeleteDialog(true);
+              if (!school.is_active) {
+                setPurgeSchool(school);
+              } else {
+                setSelectedSchool(school);
+                setShowDeleteDialog(true);
+              }
             }}
-            title="Delete school"
+            title={school.is_active ? 'Archive school' : 'Permanently delete test school'}
           />
         </div>
       ),
@@ -209,13 +218,13 @@ export default function AdminSchoolsPage() {
   ];
 
   const schools = useMemo(() => {
-    return schoolsResponse?.data || [];
-  }, [schoolsResponse]);
+    return (schoolsResponse?.data || []).filter(school => !purgedIds.includes(school.id));
+  }, [schoolsResponse, purgedIds]);
 
   // Status options - simplified to use actual schema
   const statusOptions = [
     { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
+    { value: 'inactive', label: 'Archived' },
     { value: 'all', label: 'All' },
   ];
 
@@ -365,8 +374,8 @@ export default function AdminSchoolsPage() {
         <div className="p-4">
           <div className="space-y-4">
             {/* Search Input */}
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
+            <div className="flex flex-wrap gap-2">
+              <div className="min-w-0 basis-64 flex-1 relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <BuildingOfficeIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
                 </div>
@@ -445,6 +454,11 @@ export default function AdminSchoolsPage() {
           }
         />
       )}
+
+      <SchoolPurgeHistory refreshKey={purgeRefresh}/>
+      {purgeSchool && <SchoolPurgeDialog key={purgeSchool.id} schoolId={purgeSchool.id}
+        onDeleted={id => { setPurgedIds(ids => [...new Set([...ids,id])]); }}
+        onClose={() => { setPurgeSchool(null); setPurgeRefresh(n => n+1); void refetch(); }}/>}
 
       {/* Delete Confirmation Dialog */}
       <ConfirmationDialog

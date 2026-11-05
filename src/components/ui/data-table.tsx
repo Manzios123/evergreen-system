@@ -170,15 +170,24 @@ export default function DataTable<T extends Record<string, any>>({
               return (
               <Fragment key={rowKey}>
               <tr
-                onClick={() => onRowClick?.(item)}
-                tabIndex={onRowClick ? 0 : undefined}
+                onClick={event => {
+                  // Controls keep their own action; selecting text should not collapse a row.
+                  if ((event.target as Element).closest('a, button, label, input, select, textarea, summary, [role="button"], [role="link"], [contenteditable="true"]')) return;
+                  const selection = window.getSelection();
+                  if (selection?.toString() && selection.anchorNode && event.currentTarget.contains(selection.anchorNode)) return;
+                  if (onRowClick) onRowClick(item);
+                  else setExpandedKey(expanded ? null : rowKey);
+                }}
+                tabIndex={0}
+                aria-expanded={onRowClick ? undefined : expanded}
                 onKeyDown={event => {
-                  if (onRowClick && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                  if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
                     event.preventDefault();
-                    onRowClick(item);
+                    if (onRowClick) onRowClick(item);
+                    else setExpandedKey(expanded ? null : rowKey);
                   }
                 }}
-                className={`${onRowClick ? 'hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer' : ''}`}
+                className="cursor-pointer hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-green-600 dark:hover:bg-slate-800"
               >
                 {visibleColumns.map((column, colIndex) => (
                   <td

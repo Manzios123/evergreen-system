@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
+import VideoThumbnail from '@/components/media/video-thumbnail';
 import Alert from '@/components/ui/alert';
 import EmptyState from '@/components/ui/empty-state';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
@@ -22,7 +23,6 @@ import {
   XMarkIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  VideoCameraIcon,
   DocumentIcon,
 } from '@heroicons/react/24/outline';
 
@@ -45,127 +45,6 @@ type MediaApiItem = {
 
 function normalizeMediaType(item: MediaApiItem): string {
   return (item.mediaType ?? item.media_type ?? 'photo').toString();
-}
-
-/**
- * Generate thumbnails for videos client-side (first usable frame).
- * Works when your backend does not provide thumbnailUrl/thumbnail_key.
- */
-function useVideoThumbnails() {
-  const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const [inFlight, setInFlight] = useState<Set<string>>(new Set());
-
-  const getThumb = async (id: string, url: string): Promise<string> => {
-    if (!id || !url) return '';
-    if (thumbs[id]) return thumbs[id];
-    if (inFlight.has(id)) return '';
-
-    setInFlight((prev) => new Set(prev).add(id));
-
-    const result = await new Promise<string>((resolve) => {
-      const video = document.createElement('video');
-      video.muted = true;
-      video.playsInline = true;
-      video.preload = 'metadata';
-
-      // If your media endpoint is same-origin (recommended), this is fine.
-      // If it becomes cross-origin, thumbnail capture may be blocked by CORS/tainting.
-      video.crossOrigin = 'anonymous';
-
-      const cleanup = () => {
-        try {
-          video.pause();
-          video.removeAttribute('src');
-          video.load();
-        } catch {
-          // ignore
-        }
-      };
-
-      const onError = () => {
-        cleanup();
-        resolve('');
-      };
-
-      const capture = () => {
-        try {
-          const w = video.videoWidth || 320;
-          const h = video.videoHeight || 180;
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('No canvas context');
-
-          ctx.drawImage(video, 0, 0, w, h);
-
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-          cleanup();
-          resolve(dataUrl);
-        } catch {
-          cleanup();
-          resolve('');
-        }
-      };
-
-      video.addEventListener('error', onError);
-
-      // Wait for metadata, then seek a tiny bit to avoid black first frame.
-      video.addEventListener('loadedmetadata', () => {
-        const target = Math.min(0.25, Math.max(0, (video.duration || 0) / 10));
-        // If duration is unknown, just try 0.1s
-        try {
-          video.currentTime = isFinite(target) ? target : 0.1;
-        } catch {
-          // Some browsers disallow seeking before data; fallback
-          // We'll capture on loadeddata
-        }
-      });
-
-      // Capture when data is available at current time.
-      video.addEventListener('seeked', capture);
-      video.addEventListener('loadeddata', () => {
-        // If seeking didn't happen, capture now.
-        if (video.currentTime === 0) {
-          try {
-            video.currentTime = 0.1;
-          } catch {
-            capture();
-          }
-        }
-      });
-
-      // If we set currentTime but seeked never fires, still capture after a moment
-      const fallback = window.setTimeout(() => capture(), 1200);
-
-      const originalCapture = capture;
-      const wrappedCapture = () => {
-        window.clearTimeout(fallback);
-        originalCapture();
-      };
-
-      // Replace capture function handlers to clear fallback timeout
-      video.removeEventListener('seeked', capture);
-      video.addEventListener('seeked', wrappedCapture);
-
-      // Start
-      video.src = url;
-    });
-
-    setInFlight((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-
-    if (result) {
-      setThumbs((prev) => ({ ...prev, [id]: result }));
-    }
-
-    return result;
-  };
-
-  return { thumbs, getThumb };
 }
 
 export default function ActivityReportPage() {
@@ -200,33 +79,6 @@ export default function ActivityReportPage() {
     const videos = mediaItems.filter((m) => normalizeMediaType(m) === 'video');
     const docs = mediaItems.filter((m) => normalizeMediaType(m) === 'document');
     return { photos: photos.length, videos: videos.length, docs: docs.length, total: mediaItems.length };
-  }, [mediaItems]);
-
-  const { thumbs, getThumb } = useVideoThumbnails();
-
-  // Proactively generate thumbnails for the first few videos (so the grid looks good fast)
-  useEffect(() => {
-    const videoItems = mediaItems
-      .filter((m) => normalizeMediaType(m) === 'video')
-      .filter((m) => !m.thumbnailUrl)
-      .slice(0, 6);
-
-    let cancelled = false;
-
-    (async () => {
-      for (const v of videoItems) {
-        if (cancelled) return;
-        if (!thumbs[v.id]) {
-          // Best-effort; ignore failures
-          await getThumb(v.id, v.url);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaItems]);
 
   const handlePrevious = () => {
@@ -316,7 +168,7 @@ export default function ActivityReportPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
                 <UserIcon className="h-4 w-4" />
-                Volunteer
+                Facilitator
               </h3>
               <p className="text-gray-900">
                 {activity.volunteer_name || (activity as any).volunteer?.full_name || activity.volunteer_id || '—'}
@@ -401,7 +253,7 @@ export default function ActivityReportPage() {
             <div className="pt-6 border-t space-y-6">
               {activity.volunteer_notes && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Volunteer Notes</h3>
+                  <h3 className="text-sm font-medium text-gray-900 mb-2">Facilitator Notes</h3>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-gray-700 whitespace-pre-wrap">{activity.volunteer_notes}</p>
                   </div>
@@ -464,22 +316,13 @@ export default function ActivityReportPage() {
           <EmptyState
             icon={<PhotoIcon className="h-12 w-12 text-gray-400" />}
             title="No media uploaded for this activity"
-            description="The volunteer didn't upload any photos or videos for this activity report."
+            description="No photos or videos have been uploaded for this activity report."
           />
         ) : (
           <Card className="p-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {mediaItems.map((item, index) => {
                 const type = normalizeMediaType(item);
-                const hasServerThumb = Boolean(item.thumbnailUrl);
-                const hasGeneratedThumb = Boolean(thumbs[item.id]);
-
-                const showThumbSrc = hasServerThumb
-                  ? item.thumbnailUrl!
-                  : hasGeneratedThumb
-                    ? thumbs[item.id]
-                    : '';
-
                 return (
                   <button
                     key={item.id}
@@ -488,40 +331,7 @@ export default function ActivityReportPage() {
                     title={item.caption || type}
                   >
                     {type === 'video' ? (
-                      <>
-                        {showThumbSrc ? (
-                          <img
-                            src={showThumbSrc}
-                            alt={item.caption || `Video ${index + 1}`}
-                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center bg-gray-900/30">
-                            <VideoCameraIcon className="h-10 w-10 text-white" />
-                          </div>
-                        )}
-
-                        {/* Trigger thumbnail generation if needed */}
-                        {!hasServerThumb && !hasGeneratedThumb && (
-                          <span className="absolute inset-0">
-                            {/*
-                              We use a tiny side-effect: attempt generation once when tile is painted.
-                              No UI blocking.
-                            */}
-                            {(() => {
-                              void getThumb(item.id, item.url);
-                              return null;
-                            })()}
-                          </span>
-                        )}
-
-                        {/* Play badge */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="rounded-full bg-black/50 p-2">
-                            <VideoCameraIcon className="h-6 w-6 text-white" />
-                          </div>
-                        </div>
-                      </>
+                      <VideoThumbnail url={item.url} thumbnailUrl={item.thumbnailUrl} alt={item.caption || `Video ${index + 1}`} />
                     ) : type === 'document' ? (
                       <div className="h-full w-full flex flex-col items-center justify-center p-3 text-center">
                         <div className="rounded-full bg-gray-200 p-2 mb-2">

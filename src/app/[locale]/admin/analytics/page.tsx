@@ -330,10 +330,7 @@ export default function AdminAnalyticsPage() {
   const kpis = overview.kpis;
   const filterOptions = overview.filters || emptyOverview.filters;
 
-  const maxTemplateAssignments = useMemo(
-    () => Math.max(1, ...templates.map((template) => template.assignments_count)),
-    [templates]
-  );
+
 
   const cleanQuestions = useMemo(() => (
     questions.filter((question) => {
@@ -505,11 +502,14 @@ export default function AdminAnalyticsPage() {
                           { key: 'completed', header: 'Completed', render: (template: TemplateAnalyticsRow) => <>{formatNumber(template.completed_count)}</> },
                           { key: 'pending', header: 'Pending', render: (template: TemplateAnalyticsRow) => <>{formatNumber(template.pending_count)}</> },
                           {
-                            key: 'completion', header: 'Completion', render: (template: TemplateAnalyticsRow) => <><div className="flex min-w-0 flex-wrap items-center gap-3">
-                              <ProgressBar value={template.assignments_count} max={maxTemplateAssignments} />
-                              <span className="w-14 text-right font-semibold text-gray-700">
-                                {formatPercent(template.completion_percentage)}
-                              </span>
+                            key: 'completion', header: 'Completion', render: (template: TemplateAnalyticsRow) => <><div className="min-w-0 space-y-2">
+                              <div role="progressbar" aria-label="Template completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.max(0, Number(template.completion_percentage) || 0))}>
+                                <ProgressBar value={Math.max(0, Number(template.completion_percentage) || 0)} max={100} />
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className="font-semibold text-gray-700">{formatPercent(template.completion_percentage)}</span>
+                                <span className="text-xs text-gray-500">{formatNumber(template.completed_count)} of {formatNumber(template.assignments_count)} completed</span>
+                              </div>
                             </div></>
                           },
                           { key: 'last', header: 'Last activity', render: (template: TemplateAnalyticsRow) => <>{formatDate(template.last_activity_at)}</> }

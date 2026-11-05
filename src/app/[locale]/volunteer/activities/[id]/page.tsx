@@ -1,6 +1,8 @@
 // app/[locale]/volunteer/activities/[id]/page.tsx
 'use client';
 
+import VideoThumbnail from '@/components/media/video-thumbnail';
+
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
@@ -477,7 +479,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                       >
                         <div className="aspect-square">
                           {item.mediaType === 'video' ? (
-                            <video src={item.url} className="h-full w-full object-cover" muted preload="metadata" />
+                            <VideoThumbnail url={item.url} thumbnailUrl={item.thumbnailUrl} alt={item.caption || item.filename} />
                           ) : (
                             <img src={item.thumbnailUrl || item.url} alt={item.caption || item.filename} className="h-full w-full object-cover" />
                           )}

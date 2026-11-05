@@ -179,14 +179,14 @@ export default function ActivityViewPage() {
                 </dd>
               </div>
               <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                <dt className="text-sm font-medium text-gray-500">Volunteer</dt>
+                <dt className="text-sm font-medium text-gray-500">Facilitator</dt>
                 <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                  {activity.volunteer_name || 'Not specified'}
+                  {activity.volunteer_name || activity.volunteer?.full_name || (activity.volunteer_id ? 'Name unavailable' : 'Unassigned')}
                 </dd>
               </div>
               {activity.volunteer_notes && (
                 <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Volunteer Notes</dt>
+                  <dt className="text-sm font-medium text-gray-500">Facilitator Notes</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                     {activity.volunteer_notes}
                   </dd>

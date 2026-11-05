@@ -65,7 +65,7 @@ export default function AdminActivitiesPage() {
     return activities.filter(activity => {
       const title = activity.title?.toLowerCase() || '';
       const description = activity.description?.toLowerCase() || '';
-      const volunteerName = activity.volunteer_name?.toLowerCase() || '';
+      const volunteerName = (activity.volunteer_name || activity.volunteer?.full_name || '').toLowerCase();
       const schoolName = activity.school_name?.toLowerCase() || '';
       const pilotName = activity.pilot_name?.toLowerCase() || '';
 
@@ -95,14 +95,14 @@ export default function AdminActivitiesPage() {
     },
     {
       key: 'volunteer',
-      header: 'Volunteer',
+      header: 'Facilitator',
       sortable: true,
       render: (activity) => (
         <div className="flex items-center">
           <UserIcon className="h-4 w-4 text-gray-400 mr-2" />
           <div>
             <p className="text-sm text-gray-900">
-              {activity.volunteer_name || activity.volunteer?.full_name || 'Unknown'}
+              {activity.volunteer_name || activity.volunteer?.full_name || (activity.volunteer_id ? 'Name unavailable' : 'Unassigned')}
             </p>
             {activity.volunteer?.email && (
               <p className="text-xs text-gray-500">{activity.volunteer.email}</p>

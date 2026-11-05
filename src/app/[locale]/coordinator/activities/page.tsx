@@ -107,11 +107,11 @@ export default function CoordinatorActivitiesPage() {
     },
     {
       key: 'volunteer',
-      header: 'Volunteer', // Changed from 'label' to 'header'
+      header: 'Facilitator', // Changed from 'label' to 'header'
       render: (activity: Activity) => (
         <div className="flex items-center">
           <UserIcon className="h-5 w-5 text-gray-400 mr-2" />
-          <span>{activity.volunteer?.full_name || 'Unassigned'}</span> {/* Changed from 'name' to 'full_name' */}
+          <span>{activity.volunteer_name || activity.volunteer?.full_name || (activity.volunteer_id ? 'Name unavailable' : 'Unassigned')}</span> {/* Changed from 'name' to 'full_name' */}
         </div>
       ),
     },
@@ -121,7 +121,7 @@ export default function CoordinatorActivitiesPage() {
       render: (activity: Activity) => (
         <div className="flex items-center">
           <BuildingOfficeIcon className="h-5 w-5 text-gray-400 mr-2" />
-          <span>{activity.school?.name}</span>
+          <span>{activity.school_name || activity.school?.name || 'School unavailable'}</span>
         </div>
       ),
     },
