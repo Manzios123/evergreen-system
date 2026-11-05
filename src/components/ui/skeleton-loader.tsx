@@ -10,8 +10,8 @@ interface SkeletonLoaderProps {
         <div className="space-y-8">
           {/* Header Skeleton */}
           <div className="space-y-4">
-            <div className="h-8 w-64 bg-gray-200 rounded animate-pulse"></div>
-            <div className="h-4 w-96 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-8 w-64 max-w-full bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-4 w-96 max-w-full bg-gray-200 rounded animate-pulse"></div>
           </div>
   
           {/* Stats Grid Skeleton */}

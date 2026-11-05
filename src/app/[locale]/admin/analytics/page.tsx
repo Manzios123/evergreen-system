@@ -28,6 +28,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import Button from '@/components/ui/button';
+import DataTable from '@/components/ui/data-table';
 import Alert from '@/components/ui/alert';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import {
@@ -491,44 +492,29 @@ export default function AdminAnalyticsPage() {
                 {templates.length === 0 ? (
                   <div className="px-6 py-8 text-sm text-gray-500">No template performance data yet.</div>
                 ) : (
-                  <div className="max-h-[360px] overflow-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="sticky top-0 z-10 bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Template</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Assignments</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Completed</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Pending</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Completion</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Last Activity</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
-                        {templates.map((template) => (
-                          <tr key={template.template_id}>
-                            <td className="px-4 py-3">
-                              <div className="max-w-64 truncate font-medium text-gray-900" title={template.template_name || 'Unknown template'}>{template.template_name || 'Unknown template'}</div>
+                  <div className="max-h-[360px] overflow-y-auto"><DataTable
+                        data={templates.map(template => ({ ...template, id: template.template_id }))}
+                        columns={[
+                          {
+                            key: 'template', header: 'Template', render: (template: TemplateAnalyticsRow) => <><div className="min-w-0 break-words font-medium text-gray-900" title={template.template_name || 'Unknown template'}>{template.template_name || 'Unknown template'}</div>
                               <div className="text-xs capitalize text-gray-500">
                                 {formatLabel(template.survey_type, 'survey')} / {formatLabel(template.survey_period, 'period')}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-gray-700">{formatNumber(template.assignments_count)}</td>
-                            <td className="px-4 py-3 text-gray-700">{formatNumber(template.completed_count)}</td>
-                            <td className="px-4 py-3 text-gray-700">{formatNumber(template.pending_count)}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex min-w-32 items-center gap-3">
-                                <ProgressBar value={template.assignments_count} max={maxTemplateAssignments} />
-                                <span className="w-14 text-right font-semibold text-gray-700">
-                                  {formatPercent(template.completion_percentage)}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">{formatDate(template.last_activity_at)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                              </div></>
+                          },
+                          { key: 'assigned', header: 'Assignments', render: (template: TemplateAnalyticsRow) => <>{formatNumber(template.assignments_count)}</> },
+                          { key: 'completed', header: 'Completed', render: (template: TemplateAnalyticsRow) => <>{formatNumber(template.completed_count)}</> },
+                          { key: 'pending', header: 'Pending', render: (template: TemplateAnalyticsRow) => <>{formatNumber(template.pending_count)}</> },
+                          {
+                            key: 'completion', header: 'Completion', render: (template: TemplateAnalyticsRow) => <><div className="flex min-w-0 flex-wrap items-center gap-3">
+                              <ProgressBar value={template.assignments_count} max={maxTemplateAssignments} />
+                              <span className="w-14 text-right font-semibold text-gray-700">
+                                {formatPercent(template.completion_percentage)}
+                              </span>
+                            </div></>
+                          },
+                          { key: 'last', header: 'Last activity', render: (template: TemplateAnalyticsRow) => <>{formatDate(template.last_activity_at)}</> }
+                        ]}
+                      /></div>
                 )}
               </CardContent>
             </Card>

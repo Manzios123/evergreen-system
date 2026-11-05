@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { schoolsApi } from '@/lib/api/schools';
 import { SchoolContact } from '@/lib/types';
 import Button from '@/components/ui/button';
@@ -16,10 +16,18 @@ interface ContactModalProps {
   onClose: () => void;
   schoolId: string;
   contact?: SchoolContact | null;
-  onSuccess: () => void;
+  onSuccess: (contact: SchoolContact) => void | Promise<void>;
 }
 
-export default function ContactModal({
+export default function ContactModal(props: ContactModalProps) {
+  // Mount a fresh editor for each opening or selected contact, without resetting
+  // unsaved input when the parent merely refreshes an equivalent contact object.
+  return props.isOpen ? (
+    <ContactEditor key={`${props.schoolId}:${props.contact?.id ?? 'new'}`} {...props} />
+  ) : null;
+}
+
+function ContactEditor({
   isOpen,
   onClose,
   schoolId,
@@ -38,6 +46,19 @@ export default function ContactModal({
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedContact, setSavedContact] = useState<SchoolContact | null>(null);
+  const savedContactRef = useRef<SchoolContact | null>(null);
+  const submitLock = useRef(false);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  const handleClose = () => {
+    if (!submitLock.current) onClose();
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -50,46 +71,60 @@ export default function ContactModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLock.current) return;
     
-    if (!formData.name.trim() || !formData.email.trim() || !formData.role.trim()) {
+    if (!savedContactRef.current && (!formData.name.trim() || !formData.email.trim() || !formData.role.trim())) {
       setError('Name, email, and role are required');
       return;
     }
 
+    submitLock.current = true;
     setIsSubmitting(true);
     setError(null);
 
     try {
-      if (isEditing && contact) {
-        await schoolsApi.updateContact(contact.id, formData);
-      } else {
-        await schoolsApi.createContact(schoolId, formData);
+      // Once saving is confirmed, retry only the refresh, never the mutation.
+      if (!savedContactRef.current) {
+        const response = isEditing && contact
+          ? await schoolsApi.updateContact(contact.id, formData)
+          : await schoolsApi.createContact(schoolId, formData);
+        if (!response.success || !response.data) {
+          throw new Error(response.message || 'Failed to save contact');
+        }
+        if (!mounted.current) return;
+        savedContactRef.current = response.data;
+        setSavedContact(response.data);
       }
-      
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      console.error('Failed to save contact:', err);
-      setError(err.message || 'Failed to save contact');
+      await onSuccess(savedContactRef.current);
+      if (mounted.current) onClose();
+    } catch (err: unknown) {
+      if (mounted.current) {
+        const message = err instanceof Error ? err.message : 'Please try again.';
+        setError(savedContactRef.current
+          ? `Contact saved, but the list could not be refreshed. Retry refresh or close. ${message}`
+          : `Contact was not saved. ${message}`);
+      }
     } finally {
-      setIsSubmitting(false);
+      submitLock.current = false;
+      if (mounted.current) setIsSubmitting(false);
     }
   };
 
   return (
     <Modal
       open={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={isEditing ? 'Edit Contact' : 'Add Contact'}
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-md bg-red-50 p-3">
+          <div role={savedContact ? 'status' : 'alert'} className="rounded-md bg-red-50 p-3">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
 
+        <fieldset disabled={isSubmitting || !!savedContact} className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
             Full Name *
@@ -186,21 +221,22 @@ export default function ContactModal({
           </label>
         </div>
 
+        </fieldset>
         <div className="pt-4 border-t border-gray-200">
           <div className="flex justify-end space-x-3">
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isSubmitting}
             >
-              Cancel
+              {savedContact ? 'Close' : 'Cancel'}
             </Button>
             <Button
               type="submit"
               loading={isSubmitting}
             >
-              {isEditing ? 'Update Contact' : 'Add Contact'}
+              {savedContact ? 'Retry refresh' : (isEditing ? 'Update Contact' : 'Add Contact')}
             </Button>
           </div>
         </div>

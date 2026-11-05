@@ -63,19 +63,13 @@ interface AssignmentResponse {
   };
 }
 
-interface SurveyAssignmentPageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
+export default function AdminSurveyAssignmentPage() {
   const router = useRouter();
-  const urlParams = useParams();
+  const urlParams = useParams<{ id: string }>();
   const [surveyData, setSurveyData] = useState<any>(null);
   const [showSubmissionSuccess, setShowSubmissionSuccess] = useState(false);
   
-  const assignmentId = params?.id || (urlParams?.id as string);
+  const assignmentId = urlParams.id;
 
   const { data: apiResponse, isLoading, error, refetch } = useApiQuery<AssignmentResponse>(
     ['survey-assignment', assignmentId],

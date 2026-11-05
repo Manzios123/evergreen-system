@@ -1,3 +1,6 @@
+'use client';
+
+import { useParams } from 'next/navigation';
 // app/[locale]/volunteer/surveys/[id]/responses/page.tsx
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
@@ -14,13 +17,8 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
-interface SurveyResponsesPageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function SurveyResponsesPage({ params }: SurveyResponsesPageProps) {
+export default function SurveyResponsesPage() {
+  const params = useParams<{ id: string }>();
   const { data: survey, isLoading, error } = useApiQuery<Survey>(
     ['survey', params.id, 'responses'],
     () => api.get<Survey>(`/surveys/${params.id}/responses`)

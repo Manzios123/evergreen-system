@@ -1,5 +1,7 @@
 // app/[locale]/volunteer/surveys/assignment/[id]/responses/page.tsx
-'use client'
+'use client';
+
+import { useParams } from 'next/navigation';
 
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -31,12 +33,6 @@ interface SurveyResponse {
   responses: Record<string, any>;
 }
 
-interface SurveyAssignmentPageProps {
-  params: {
-    id: string;
-  };
-}
-
 const AGREE_DISAGREE_OPTIONS = ['Agree', 'Disagree', 'Unsure'];
 
 function parseOptions(raw?: string | null): string[] {
@@ -49,7 +45,8 @@ function parseOptions(raw?: string | null): string[] {
   }
 }
 
-export default function SurveyResponsesPage({ params }: SurveyAssignmentPageProps) {
+export default function SurveyResponsesPage() {
+  const params = useParams<{ id: string }>();
   const [isEditing, setIsEditing] = useState(false);
   const [editedResponses, setEditedResponses] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);

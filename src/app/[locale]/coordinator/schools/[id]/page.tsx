@@ -8,6 +8,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { pilotsApi } from '@/lib/api/pilots';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
+import DataTable from '@/components/ui/data-table';
 import Alert from '@/components/ui/alert';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import ConfirmationDialog from '@/components/ui/confirmation-dialog';
@@ -38,6 +39,7 @@ export default function SchoolDetailsPage() {
   const [school, setSchool] = useState<School | null>(null);
   const [pilot, setPilot] = useState<Pilot | null>(null);
   const [contacts, setContacts] = useState<SchoolContact[]>([]);
+  const [contactError, setContactError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -72,6 +74,9 @@ export default function SchoolDetailsPage() {
       const contactsResponse = await schoolsApi.getSchoolContacts(id);
       if (contactsResponse.success && contactsResponse.data) {
         setContacts(contactsResponse.data);
+        setContactError(null);
+      } else {
+        setContactError(contactsResponse.message || 'Could not load contacts.');
       }
     } catch (err: any) {
       console.error('Failed to load school data:', err);
@@ -103,9 +108,25 @@ export default function SchoolDetailsPage() {
 
   const refreshContacts = async () => {
     const contactsResponse = await schoolsApi.getSchoolContacts(id);
-    if (contactsResponse.success && contactsResponse.data) {
-      setContacts(contactsResponse.data);
+    if (!contactsResponse.success || !contactsResponse.data) {
+      const message = contactsResponse.message || 'Could not refresh contacts.';
+      setContactError(message);
+      throw new Error(message);
     }
+    setContacts(contactsResponse.data);
+    setContactError(null);
+  };
+
+  const handleContactSaved = async (savedContact: SchoolContact) => {
+    // Keep a confirmed save visible even if the following refresh fails.
+    setContacts(previous => [
+      ...previous.filter(contact => contact.id !== savedContact.id).map(contact =>
+        savedContact.is_primary && contact.school_id === savedContact.school_id
+          ? { ...contact, is_primary: false }
+          : contact),
+      savedContact,
+    ].sort((a, b) => Number(b.is_primary) - Number(a.is_primary) || a.name.localeCompare(b.name)));
+    await refreshContacts();
   };
 
   const handleDeleteContact = async (contactId: string) => {
@@ -405,6 +426,17 @@ export default function SchoolDetailsPage() {
             </Button>
           </div>
 
+          {contactError && (
+            <div className="mb-4" role="alert">
+              <Alert type="warning" title="Contact list could not be refreshed">
+                <p>{contactError}</p>
+                <Button type="button" variant="outline" className="mt-2"
+                  onClick={() => { void refreshContacts().catch(() => {}); }}>
+                  Retry contacts
+                </Button>
+              </Alert>
+            </div>
+          )}
           {contacts.length === 0 ? (
             <div className="text-center py-8">
               <Mail className="h-12 w-12 text-gray-400 mx-auto" />
@@ -414,82 +446,54 @@ export default function SchoolDetailsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-300">
-                <thead>
-                  <tr>
-                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">
-                      Name
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Role
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Contact Info
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Primary
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {contacts.map((contact) => (
-                    <tr key={contact.id}>
-                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
-                        <div className="font-medium text-gray-900">{contact.name}</div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        {contact.role}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        <div className="space-y-1">
-                          <div className="flex items-center">
-                            <Mail className="h-3 w-3 mr-1 text-gray-400" />
-                            {contact.email}
-                          </div>
-                          {contact.phone && (
-                            <div className="flex items-center">
-                              <Phone className="h-3 w-3 mr-1 text-gray-400" />
-                              {contact.phone}
-                            </div>
-                          )}
+            <DataTable
+                data={contacts}
+                columns={[
+                  { key: 'name', header: 'Name', render: (contact: SchoolContact) => <><div className="font-medium text-gray-900">{contact.name}</div></> },
+                  { key: 'role', header: 'Role', render: (contact: SchoolContact) => <>{contact.role}</> },
+                  {
+                    key: 'contact', header: 'Contact info', render: (contact: SchoolContact) => <><div className="space-y-1">
+                      <div className="flex items-center">
+                        <Mail className="h-3 w-3 mr-1 text-gray-400" />
+                        {contact.email}
+                      </div>
+                      {contact.phone && (
+                        <div className="flex items-center">
+                          <Phone className="h-3 w-3 mr-1 text-gray-400" />
+                          {contact.phone}
                         </div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        {contact.is_primary ? (
-                          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                            Primary
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditContact(contact)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteContact(contact.id)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </div></>
+                  },
+                  {
+                    key: 'primary', header: 'Primary', render: (contact: SchoolContact) => <>{contact.is_primary ? (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                        Primary
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}</>
+                  },
+                  {
+                    key: 'actions', header: 'Actions', render: (contact: SchoolContact) => <><div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleEditContact(contact)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteContact(contact.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div></>
+                  }
+                ]}
+              />
           )}
         </div>
       </Card>
@@ -513,7 +517,7 @@ export default function SchoolDetailsPage() {
         onClose={() => setShowContactModal(false)}
         schoolId={id}
         contact={editingContact}
-        onSuccess={refreshContacts}
+        onSuccess={handleContactSaved}
       />
     </div>
   );

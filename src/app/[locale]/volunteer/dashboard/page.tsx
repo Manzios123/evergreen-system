@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation'; // Add this import
 import { dashboardApi } from '@/lib/api/dashboard';
 import { useAuth } from '@/components/providers/AuthProvider';
 import DashboardGreeting from '@/components/dashboard/dashboard-greeting';
+import PrimaryMetricCard from '@/components/dashboard/primary-metric-card';
 import StatsCard from '@/components/ui/stats-card';
 import ActivityCard from '@/components/activities/activity-card';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
@@ -52,7 +53,7 @@ export default function VolunteerDashboardPage() {
   const pendingCount = dashboard?.statistics?.activities?.pending_count ?? 0;
 
   return (
-    <div>
+    <div className="dashboard-surface">
       <div className="mb-8">
         <DashboardGreeting
           name={user?.full_name || user?.name}
@@ -67,33 +68,39 @@ export default function VolunteerDashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="mb-8 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="min-w-0 sm:col-span-2 lg:row-span-2">
+          <PrimaryMetricCard label="Your activity reports" value={dashboard?.statistics?.activities?.total_activities || 0}
+            description="Your assigned reports across their current statuses."
+            details={[{ label: 'Approved reports', value: dashboard?.statistics?.activities?.approved_count || 0 }, { label: 'Draft reports', value: dashboard?.statistics?.activities?.draft_count || 0 }]}
+            href={createLink('/volunteer/activities')} />
+        </div>
         <StatsCard
-          title="Total Activities"
-          value={dashboard?.statistics?.activities?.total_activities || 0}
+          title="Activity survey coverage"
+          value={`${dashboard?.statistics?.surveys?.completion_rate || 0}%`}
           icon="activity"
-          trend="up"
+          trend="none"
           color="green"
         />
         <StatsCard
           title="Pending Approval"
           value={pendingCount}
           icon="pending"
-          trend={pendingCount > 0 ? 'up' : 'none'}
+          trend="none"
           color="yellow"
         />
         <StatsCard
-          title="Upcoming"
+          title="Upcoming assignments"
           value={dashboard?.statistics?.activities?.upcoming_count || 0}
           icon="calendar"
-          trend="up"
+          trend="none"
           color="blue"
         />
         <StatsCard
-          title="Completed"
+          title="Approved past activities"
           value={dashboard?.statistics?.activities?.completed_count || 0}
           icon="check"
-          trend="up"
+          trend="none"
           color="green"
         />
       </div>

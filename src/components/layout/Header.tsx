@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { BellIcon, ChevronDownIcon, MagnifyingGlassIcon, MoonIcon, SunIcon } from '@heroicons/react/24/outline';
+import { BellIcon, ChevronDownIcon, MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 import { Bars3Icon } from '@heroicons/react/24/solid';
 import { notificationsApi, NotificationItem } from '@/lib/api/notifications';
 
@@ -281,20 +281,7 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
         <Bars3Icon className="h-6 w-6" aria-hidden="true" />
       </button>
 
-      {/* Search */}
-      <div className="flex-1 min-w-0">
-        <div className="relative max-w-sm">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-          </div>
-          <input
-            type="search"
-            name="search"
-            className="block w-full rounded-full border-0 bg-gray-50 py-1.5 pl-9 pr-3 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-green-500 text-sm dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700 dark:placeholder:text-slate-500"
-            placeholder="Search..."
-          />
-        </div>
-      </div>
+      <div className="flex-1 min-w-0" />
 
       {/* Right side: clock + bell + avatar */}
       <div className="flex items-center gap-x-3">
@@ -331,7 +318,7 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
           </button>
 
           {notificationsOpen && (
-            <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black/5">
+            <div className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black/5">
               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                 <div>
                   <h2 className="text-sm font-semibold text-gray-900">{tLayout('notifications')}</h2>

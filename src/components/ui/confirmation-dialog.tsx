@@ -33,7 +33,7 @@ export default function ConfirmationDialog({
     warning: {
       icon: ExclamationTriangleIcon,
       iconColor: 'text-yellow-400',
-      confirmColor: 'bg-yellow-600 hover:bg-yellow-700',
+      confirmColor: 'bg-yellow-700 hover:bg-yellow-800',
     },
     danger: {
       icon: ExclamationTriangleIcon,
@@ -61,7 +61,7 @@ export default function ConfirmationDialog({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+          <div className="fixed inset-0 bg-black/60 transition-opacity" />
         </Transition.Child>
 
         <div className="fixed inset-0 z-10 overflow-y-auto">
@@ -75,7 +75,7 @@ export default function ConfirmationDialog({
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+              <Dialog.Panel className="relative transform overflow-hidden rounded-xl bg-card text-card-foreground border border-border px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
                 <div className="sm:flex sm:items-start">
                   <div className={`mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconColor.replace('text-', 'bg-').replace('-400', '-100')} sm:mx-0 sm:h-10 sm:w-10`}>
                     <Icon className={`h-6 w-6 ${iconColor}`} aria-hidden="true" />

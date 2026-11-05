@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
+import DataTable from '@/components/ui/data-table';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
 import Alert from '@/components/ui/alert';
 import { api } from '@/lib/api/api';
@@ -781,108 +782,63 @@ export default function AdminSurveysPage() {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Template
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Pilot
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Period
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Submitted At
-                        </th>
-                        {activeTab === 'student' ? (
-                          <>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Volunteer
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Students
-                            </th>
-                          </>
-                        ) : (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Volunteer
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {responses.map((response) => (
-                        <tr key={response.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 align-top">
-                            <div className="max-w-xs truncate text-sm font-medium text-gray-900" title={response.template_name}>
-                              {response.template_name}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 align-top">
-                            <div className="max-w-xs truncate text-sm text-gray-900" title={response.pilot_name || response.pilot_id}>
-                              {response.pilot_name || response.pilot_id}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 align-top">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              {response.survey_period.replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 align-top">
-                            <div className="text-sm text-gray-900">
-                              {new Date(response.submitted_at).toLocaleDateString()}
-                            </div>
+                <DataTable
+                      data={responses}
+                      columns={[
+                        {
+                          key: 'template', header: 'Template', render: (response: SurveyResponse) => <><div className="min-w-0 break-words text-sm font-medium text-gray-900" title={response.template_name}>
+                            {response.template_name}
+                          </div></>
+                        },
+                        {
+                          key: 'pilot', header: 'Pilot', render: (response: SurveyResponse) => <><div className="min-w-0 break-words text-sm text-gray-900" title={response.pilot_name || response.pilot_id}>
+                            {response.pilot_name || response.pilot_id}
+                          </div></>
+                        },
+                        {
+                          key: 'period', header: 'Period', render: (response: SurveyResponse) => <><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            {response.survey_period.replace('_', ' ')}
+                          </span></>
+                        },
+                        {
+                          key: 'submitted', header: 'Submitted at', render: (response: SurveyResponse) => <><div className="text-sm text-gray-900">
+                            {new Date(response.submitted_at).toLocaleDateString()}
+                          </div>
                             <div className="text-xs text-gray-500">
                               {new Date(response.submitted_at).toLocaleTimeString()}
+                            </div></>
+                        },
+                        ...(activeTab === 'student' ? [{
+                          key: 'recorder', header: 'Volunteer', render: (response: SurveyResponse) => <><div className="min-w-0 break-words text-sm text-gray-900" title={response.submitted_by_name || 'Unknown'}>
+                            {response.submitted_by_name || 'Unknown'}
+                          </div>
+                            <div className="text-xs text-gray-500">
+                              Activity: {response.activity_id ? response.activity_id.substring(0, 8) + '...' : 'N/A'}
+                            </div></>
+                        },
+                        { key: 'students', header: 'Students', render: (response: SurveyResponse) => <>{response.total_students || 0}</> }] : [
+                          {
+                            key: 'volunteer', header: 'Volunteer', render: (response: SurveyResponse) => <><div className="min-w-0 break-words text-sm text-gray-900" title={response.volunteer_name || response.volunteer_email || 'Unknown'}>
+                              {response.volunteer_name || response.volunteer_email || 'Unknown'}
                             </div>
-                          </td>
-                          {activeTab === 'student' ? (
-                            <>
-                              <td className="px-6 py-4 align-top">
-                                <div className="max-w-xs truncate text-sm text-gray-900" title={response.submitted_by_name || 'Unknown'}>
-                                  {response.submitted_by_name || 'Unknown'}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  Activity: {response.activity_id ? response.activity_id.substring(0, 8) + '...' : 'N/A'}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 align-top text-sm text-gray-900">
-                                {response.total_students || 0}
-                              </td>
-                            </>
-                          ) : (
-                            <td className="px-6 py-4 align-top">
-                              <div className="max-w-xs truncate text-sm text-gray-900" title={response.volunteer_name || response.volunteer_email || 'Unknown'}>
-                                {response.volunteer_name || response.volunteer_email || 'Unknown'}
-                              </div>
                               {response.volunteer_email && (
                                 <div className="text-xs text-gray-500">
                                   {response.volunteer_email}
                                 </div>
-                              )}
-                            </td>
-                          )}
-                          <td className="px-6 py-4 align-top text-sm font-medium">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => viewResponse(response.id)}
-                            >
-                              <EyeIcon className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              )}</>
+                          }]),
+                        {
+                          key: 'actions', header: 'Actions', render: (response: SurveyResponse) => <><Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => viewResponse(response.id)}
+                          >
+                            <EyeIcon className="h-4 w-4 mr-1" />
+                            View
+                          </Button></>
+                        }
+                      ]}
+                    />
 
                 {/* Paginaton */}
                 {pagination.totalPages > 1 && (

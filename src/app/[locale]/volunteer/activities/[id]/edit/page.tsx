@@ -9,16 +9,11 @@ import { useApiQuery } from '@/lib/hooks/use-api';
 import { Activity } from '@/lib/types';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api/api'; // Added import
 
-interface ActivityEditPageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function ActivityEditPage({ params }: ActivityEditPageProps) {
+export default function ActivityEditPage() {
+  const params = useParams<{ id: string }>();
   const router = useRouter();
   
   const { data: activity, isLoading, error } = useApiQuery<Activity>(

@@ -19,7 +19,7 @@ interface CardContentProps {
 
 export function Card({ children, className = '' }: CardProps) {
   return (
-    <div className={`bg-white shadow-sm rounded-lg border border-gray-200 ${className}`}>
+    <div className={`min-w-0 bg-card text-card-foreground shadow-sm rounded-xl border border-border ${className}`}>
       {children}
     </div>
   );
@@ -27,10 +27,10 @@ export function Card({ children, className = '' }: CardProps) {
 
 export function CardHeader({ title, subtitle, action }: CardHeaderProps) {
   return (
-    <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+    <div className="px-6 py-4 border-b border-border flex flex-wrap gap-3 items-center justify-between">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+        <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
+        {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>

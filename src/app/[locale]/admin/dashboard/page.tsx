@@ -5,6 +5,8 @@ import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
 import { useAuth } from '@/components/providers/AuthProvider';
 import DashboardGreeting from '@/components/dashboard/dashboard-greeting';
+import PrimaryMetricCard from '@/components/dashboard/primary-metric-card';
+import DataTable from '@/components/ui/data-table';
 import StatusBadge from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/proggress';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
@@ -22,7 +24,6 @@ import {
   ClockIcon,
   ArrowTrendingUpIcon,
   ExclamationTriangleIcon,
-  CheckCircleIcon,
   AcademicCapIcon,
   ArrowRightIcon,
   PlusIcon,
@@ -233,7 +234,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-surface space-y-6">
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -275,145 +276,27 @@ export default function AdminDashboardPage() {
         </Alert>
       )}
 
-      {/* Stats Grid - Section A */}
+      {/* Reporting overview and supporting metrics */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Pilots Card */}
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Pilots</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {stats.activePilots}/{stats.totalPilots}
-                </p>
-                <div className="flex items-center mt-2">
-                  <div className="text-xs text-gray-500">
-                    {stats.activePilots} active
-                  </div>
-                </div>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <ChartBarIcon className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-          </Card>
-
-          {/* Users Card */}
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Users</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {stats.totalUsers}
-                </p>
-                <div className="flex items-center mt-2">
-                  <div className="text-xs text-gray-500">
-                    Across all roles
-                  </div>
-                </div>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                <UserGroupIcon className="h-5 w-5 text-green-600" />
-              </div>
-            </div>
-          </Card>
-
-          {/* Activities Card */}
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Activities</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {stats.totalActivities}
-                </p>
-                <div className="flex items-center mt-2">
-                  <div className="text-xs text-gray-500">
-                    {stats.approvedActivities} approved • {stats.upcomingActivities} upcoming
-                  </div>
-                </div>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                <CalendarIcon className="h-5 w-5 text-purple-600" />
-              </div>
-            </div>
-          </Card>
-
-          {/* Surveys Card */}
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Surveys</p>
-                <p className="text-2xl font-bold text-orange-600 mt-1">
-                  {stats.totalSurveys}
-                </p>
-                <div className="flex items-center mt-2">
-                  <div className="text-xs text-gray-500">
-                    Activity: {stats.activitySurveys} • Student: {stats.studentSurveys} • Volunteer: {stats.volunteerSurveys}
-                  </div>
-                </div>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
-                <DocumentTextIcon className="h-5 w-5 text-orange-600" />
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Additional Stats Row */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Schools</p>
-                <p className="text-2xl font-bold text-indigo-600 mt-1">
-                  {stats.totalSchools}
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                <BuildingOfficeIcon className="h-5 w-5 text-indigo-600" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Approved Activities</p>
-                <p className="text-2xl font-bold text-emerald-600 mt-1">
-                  {stats.approvedActivities}
-                </p>
-                <div className="flex items-center mt-2">
-                  <div className="text-xs text-gray-500">
-                    of {stats.totalActivities} total
-                  </div>
-                </div>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                <CheckCircleIcon className="h-5 w-5 text-emerald-600" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Upcoming Activities</p>
-                <p className="text-2xl font-bold text-amber-600 mt-1">
-                  {stats.upcomingActivities}
-                </p>
-                <div className="flex items-center mt-2">
-                  <div className="text-xs text-gray-500">
-                    Scheduled activities
-                  </div>
-                </div>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                <ClockIcon className="h-5 w-5 text-amber-600" />
-              </div>
-            </div>
-          </Card>
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="min-w-0 sm:col-span-2 lg:row-span-2">
+            <PrimaryMetricCard label="Activity reports" value={stats.totalActivities}
+              description="Assigned reports across all pilots, including drafts and every report status."
+              details={[{ label: 'Approved reports', value: stats.approvedActivities }, { label: 'Upcoming assignments', value: stats.upcomingActivities }]}
+              href={`/${locale}/admin/activities`} />
+          </div>
+          {[
+            { label: 'Registered users', value: stats.totalUsers, detail: 'All roles, including inactive accounts' },
+            { label: 'Pilot programmes', value: stats.totalPilots, detail: `${stats.activePilots} active` },
+            { label: 'Schools', value: stats.totalSchools, detail: 'Across all pilots' },
+            { label: 'Survey submissions', value: stats.totalSurveys, detail: 'Response records, not unique respondents' },
+          ].map(metric => (
+            <Card key={metric.label} className="min-w-0 p-5 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-sm text-gray-500 dark:text-slate-400">{metric.label}</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">{metric.value.toLocaleString('en')}</p>
+              <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-slate-400">{metric.detail}</p>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -436,64 +319,17 @@ export default function AdminDashboardPage() {
               </div>
 
               {dashboardData?.pilots?.summary && dashboardData.pilots.summary.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Pilot Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Users
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Activities
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Approved
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Schools
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {dashboardData.pilots.summary.map((pilot) => (
-                        <tr key={pilot.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {pilot.name}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                              pilot.status === 'active'
-                                ? 'bg-green-100 text-green-800'
-                                : pilot.status === 'completed'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {pilot.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {pilot.user_count}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {pilot.activity_count}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {pilot.approved_activities}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {pilot.school_count}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable<PilotSummary>
+                  columns={[
+                    { key: 'name', header: 'Pilot name' },
+                    { key: 'status', header: 'Status', render: pilot => <StatusBadge status={pilot.status} /> },
+                    { key: 'user_count', header: 'Users', align: 'right' },
+                    { key: 'activity_count', header: 'Activities', align: 'right' },
+                    { key: 'approved_activities', header: 'Approved', align: 'right' },
+                    { key: 'school_count', header: 'Schools', align: 'right' },
+                  ]}
+                  data={dashboardData.pilots.summary}
+                />
               ) : (
                 <EmptyState
                   icon={<ChartBarIcon className="h-12 w-12 text-gray-400" />}
@@ -616,7 +452,8 @@ export default function AdminDashboardPage() {
           {/* Users by Role - Section C */}
           <Card>
             <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Users by Role</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Users by Role</h2>
+              <p className="mb-4 text-xs leading-5 text-gray-500">Roles can overlap. Accounts without a role appear only in Registered users.</p>
 
               {dashboardData?.users?.distribution && dashboardData.users.distribution.length > 0 ? (
                 <div className="space-y-4">
@@ -633,7 +470,7 @@ export default function AdminDashboardPage() {
                       <div className="flex items-center">
                         <span className="text-sm font-medium text-gray-900 mr-2">{roleStat.user_count}</span>
                         <span className="text-xs text-gray-500">
-                          ({Math.round((roleStat.user_count / dashboardData.users.total) * 100)}%)
+                          ({dashboardData.users.total > 0 ? Math.round((roleStat.user_count / dashboardData.users.total) * 100) : 0}%)
                         </span>
                       </div>
                     </div>

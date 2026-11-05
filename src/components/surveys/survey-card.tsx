@@ -76,7 +76,7 @@ export default function SurveyCard({
     } else if (assignment.status === 'in_progress') {
       return (
         <Link href={`/volunteer/surveys/assignment/${assignment.id}`}>
-          <Button variant="default" size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+          <Button variant="default" size="sm" className="bg-yellow-700 hover:bg-yellow-800">
             Resume Survey
           </Button>
         </Link>
@@ -96,8 +96,8 @@ export default function SurveyCard({
     <Card className="hover:shadow-md transition-shadow">
       <div className="p-4">
         <div className="flex justify-between items-start mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="min-w-0 flex-1 break-words">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               {showType && assignment.assignment_type && (
                 <SurveyTypeBadge type={assignment.assignment_type} />
               )}
@@ -149,7 +149,7 @@ export default function SurveyCard({
           )}
         </div>
 
-        <div className="flex justify-between items-center pt-4 border-t">
+        <div className="flex flex-wrap gap-3 justify-between items-center pt-4 border-t border-border">
           <div className="text-sm text-gray-500">
             {isCompleted ? (
               isStudentSurvey ? (

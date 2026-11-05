@@ -62,6 +62,7 @@ export interface CoordinatorDashboard {
   };
   statistics: {
     pendingApprovals: number;
+    urgentApprovals?: number;
     activityStatus: Record<string, number>;
     volunteers: {
       total_volunteers: number;

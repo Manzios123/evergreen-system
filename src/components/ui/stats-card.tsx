@@ -25,29 +25,29 @@ import {
   
   const colorClasses = {
     green: {
-      bg: 'bg-green-500',
+      bg: 'bg-green-600',
       text: 'text-green-600',
-      lightBg: 'bg-green-50',
+      lightBg: 'bg-green-50 dark:bg-green-950',
     },
     blue: {
-      bg: 'bg-blue-500',
+      bg: 'bg-blue-600',
       text: 'text-blue-600',
-      lightBg: 'bg-blue-50',
+      lightBg: 'bg-blue-50 dark:bg-blue-950',
     },
     yellow: {
-      bg: 'bg-yellow-500',
+      bg: 'bg-yellow-700',
       text: 'text-yellow-600',
-      lightBg: 'bg-yellow-50',
+      lightBg: 'bg-yellow-50 dark:bg-yellow-950',
     },
     red: {
-      bg: 'bg-red-500',
+      bg: 'bg-red-600',
       text: 'text-red-600',
-      lightBg: 'bg-red-50',
+      lightBg: 'bg-red-50 dark:bg-red-950',
     },
     purple: {
-      bg: 'bg-purple-500',
+      bg: 'bg-purple-600',
       text: 'text-purple-600',
-      lightBg: 'bg-purple-50',
+      lightBg: 'bg-purple-50 dark:bg-purple-950',
     },
   };
   
@@ -63,23 +63,23 @@ import {
     const colors = colorClasses[color];
   
     return (
-      <div className={`overflow-hidden rounded-lg ${colors.lightBg} px-4 py-5 sm:p-6`}>
+      <div className={`min-w-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/10 ${colors.lightBg} px-4 py-5 sm:p-6`}>
         <div className="flex items-center">
           <div className={`flex-shrink-0 rounded-md ${colors.bg} p-3`}>
             <Icon className="h-6 w-6 text-white" aria-hidden="true" />
           </div>
           <div className="ml-5 w-0 flex-1">
             <dl>
-              <dt className="truncate text-sm font-medium text-gray-500">{title}</dt>
+              <dt className="break-words text-sm font-medium text-gray-600 dark:text-gray-300">{title}</dt>
               <dd>
-                <div className="text-lg font-semibold text-gray-900">{value}</div>
+                <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{value}</div>
               </dd>
             </dl>
           </div>
         </div>
         {description && (
           <div className="mt-4">
-            <div className="text-sm text-gray-500">{description}</div>
+            <div className="text-sm text-gray-600 dark:text-gray-300">{description}</div>
           </div>
         )}
         {trend !== 'none' && (

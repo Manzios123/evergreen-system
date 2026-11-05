@@ -21,9 +21,9 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <select
           ref={ref}
           className={`
-            block w-full rounded-md border shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500
+            block w-full rounded-md border bg-card text-card-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60 shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500
             py-2 pl-3 pr-10 text-sm
-            ${error ? 'border-red-300 text-red-900' : 'border-gray-300'}
+            ${error ? 'border-red-300 dark:border-red-500 text-red-900 dark:text-red-200' : 'border-input'}
             ${className}
           `}
           {...props}

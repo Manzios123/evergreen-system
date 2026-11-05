@@ -63,12 +63,6 @@ interface AssignmentResponse {
   };
 }
 
-interface SurveyAssignmentPageProps {
-  params: {
-    id: string;
-  };
-}
-
 // This is the admin counterpart to coordinator/surveys/assignment/[id]/page.tsx -
 // admins can't use that page directly (RoleLayout only lets 'facilitator' borrow
 // 'volunteer' pages, not 'admin'/'coordinator' borrow each other's), so this is a
@@ -77,13 +71,13 @@ interface SurveyAssignmentPageProps {
 // admin/surveys/assignments/[id] (plural), a pure assignment-management tool
 // with no actual SurveyForm, so an admin could never really fill out their own
 // auto-assigned feedback survey. See prompt/system-audit.md, Twelfth pass.
-export default function AdminSurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
+export default function AdminSurveyAssignmentPage() {
   const router = useRouter();
-  const urlParams = useParams();
+  const urlParams = useParams<{ id: string }>();
   const [surveyData, setSurveyData] = useState<any>(null);
   const [showSubmissionSuccess, setShowSubmissionSuccess] = useState(false);
 
-  const assignmentId = params?.id || (urlParams?.id as string);
+  const assignmentId = urlParams.id;
 
   const { data: apiResponse, isLoading, error, refetch } = useApiQuery<AssignmentResponse>(
     ['survey-assignment', assignmentId],

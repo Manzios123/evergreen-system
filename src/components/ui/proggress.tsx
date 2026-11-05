@@ -78,7 +78,8 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           cy="18"
           r={radius}
           fill="none"
-          stroke="#e5e7eb"
+          stroke="currentColor"
+          className="text-gray-200 dark:text-slate-700"
           strokeWidth={strokeWidth}
         />
         

@@ -3,6 +3,7 @@
 
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
+import DataTable from '@/components/ui/data-table';
 import SearchFilter from '@/components/ui/search-filter';
 import EmptyState from '@/components/ui/empty-state';
 import SkeletonLoader from '@/components/ui/skeleton-loader';
@@ -570,44 +571,15 @@ export default function AdminReportsPage() {
           <Card>
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">School Performance Details</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        School Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Student Submissions
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Volunteer Submissions
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total Submissions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredSchoolSubmissions.map((school) => (
-                      <tr key={school.school_id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {school.school_name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {school.student_submissions}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {school.volunteer_submissions}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                          {school.student_submissions + school.volunteer_submissions}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                data={filteredSchoolSubmissions.map(school => ({ ...school, id: school.school_id }))}
+                columns={[
+                  { key: 'school', header: 'School name', render: (school: (typeof filteredSchoolSubmissions)[number]) => <>{school.school_name}</> },
+                  { key: 'student', header: 'Student submissions', render: (school: (typeof filteredSchoolSubmissions)[number]) => <>{school.student_submissions}</> },
+                  { key: 'volunteer', header: 'Volunteer submissions', render: (school: (typeof filteredSchoolSubmissions)[number]) => <>{school.volunteer_submissions}</> },
+                  { key: 'total', header: 'Total submissions', render: (school: (typeof filteredSchoolSubmissions)[number]) => <>{school.student_submissions + school.volunteer_submissions}</> }
+                ]}
+              />
             </div>
           </Card>
         )}

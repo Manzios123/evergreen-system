@@ -22,7 +22,7 @@ import {
   ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 interface SurveyQuestion {
   id: string;
@@ -55,13 +55,8 @@ interface SurveyAssignment {
   response_id?: string;
 }
 
-interface SurveyAssignmentPageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function SurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
+export default function SurveyAssignmentPage() {
+  const params = useParams<{ id: string }>();
   const router = useRouter();
   const [isStarting, setIsStarting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);

@@ -12,11 +12,11 @@ interface ActivityCardProps {
 
 export default function ActivityCard({ activity, showActions = true, onAction }: ActivityCardProps) {
   return (
-    <div className="bg-white overflow-hidden shadow rounded-lg divide-y divide-gray-200">
+    <div className="min-w-0 bg-card text-card-foreground overflow-hidden shadow-sm rounded-xl border border-border divide-y divide-gray-200">
       <div className="px-4 py-5 sm:p-6">
         <div className="flex items-start justify-between">
           <div>
-            <div className="flex items-center">
+            <div className="flex flex-wrap gap-y-2 items-center">
               <h3 className="text-lg font-medium text-gray-900">{activity.title}</h3>
               <div className="ml-3">
                 <StatusBadge status={activity.status} size="sm" />
@@ -28,7 +28,7 @@ export default function ActivityCard({ activity, showActions = true, onAction }:
           </div>
         </div>
         
-        <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex items-center text-sm text-gray-500">
             <CalendarIcon className="shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
             <span>{new Date(activity.scheduled_date).toLocaleDateString()}</span>
@@ -58,7 +58,7 @@ export default function ActivityCard({ activity, showActions = true, onAction }:
       
       {showActions && (
         <div className="px-4 py-4 sm:px-6">
-          <div className="flex space-x-3">
+          <div className="flex flex-wrap gap-3">
             <Link
               href={`/en/volunteer/activities/${activity.id}`}
               className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
@@ -69,7 +69,7 @@ export default function ActivityCard({ activity, showActions = true, onAction }:
             {activity.status === 'draft' && (
               <button
                 onClick={() => onAction?.('submit')}
-                className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                className="inline-flex items-center rounded-md bg-green-700 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
               >
                 Submit for Approval
               </button>
@@ -78,7 +78,7 @@ export default function ActivityCard({ activity, showActions = true, onAction }:
             {activity.status === 'pending' && (
               <button
                 onClick={() => onAction?.('edit')}
-                className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
               >
                 Make Edits
               </button>

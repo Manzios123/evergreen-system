@@ -63,20 +63,14 @@ interface AssignmentResponse {
   };
 }
 
-interface SurveyAssignmentPageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function SurveyAssignmentPage({ params }: SurveyAssignmentPageProps) {
+export default function SurveyAssignmentPage() {
   const router = useRouter();
-  const urlParams = useParams();
+  const urlParams = useParams<{ id: string }>();
   const [surveyData, setSurveyData] = useState<any>(null);
   const [showSubmissionSuccess, setShowSubmissionSuccess] = useState(false);
   
-  // Use params from props or from useParams hook (client-side)
-  const assignmentId = params?.id || (urlParams?.id as string);
+  // Read the dynamic route ID through the client router.
+  const assignmentId = urlParams.id;
 
   // FIX: Use the dynamic assignmentId with proper null checking
   const { data: apiResponse, isLoading, error, refetch } = useApiQuery<AssignmentResponse>(

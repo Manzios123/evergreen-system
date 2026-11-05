@@ -12,14 +12,13 @@ import EmptyState from '@/components/ui/empty-state';
 import { useApiQuery } from '@/lib/hooks/use-api';
 import { useAuth } from '@/components/providers/AuthProvider';
 import DashboardGreeting from '@/components/dashboard/dashboard-greeting';
+import PrimaryMetricCard from '@/components/dashboard/primary-metric-card';
 import { Activity, User, School, Survey } from '@/lib/types';
 import {
   Calendar,
   Users,
   Building,
-  FileText,
   Image as PhotoIcon,
-  Clock,
   TrendingUp,
   CheckCircle,
   AlertTriangle,
@@ -55,11 +54,8 @@ export default function CoordinatorDashboardPage() {
     };
     statistics: {
       pendingApprovals: number;
-      activityStatus: {
-        approved: number;
-        draft: number;
-        rejected: number;
-      };
+      urgentApprovals?: number;
+      activityStatus: Record<string, number>;
       volunteers: {
         total_volunteers: number;
         active_volunteers: number;
@@ -78,7 +74,7 @@ export default function CoordinatorDashboardPage() {
         };
       };
     };
-    recentPendingActivities: Activity[];
+    recentPendingActivities: (Activity & { volunteer_name?: string })[];
     alerts: Array<{
       type: string;
       message: string;
@@ -95,10 +91,8 @@ export default function CoordinatorDashboardPage() {
     const { statistics } = dashboardData;
 
     // Calculate total activities from activityStatus
-    const totalActivities = 
-      (statistics.activityStatus?.approved || 0) + 
-      (statistics.activityStatus?.draft || 0) + 
-      (statistics.activityStatus?.rejected || 0);
+    const totalActivities = Object.values(statistics.activityStatus || {})
+      .reduce((total, count) => total + count, 0);
 
     // Calculate completion rate
     const completionRate = statistics.surveys?.activitySurveys?.completion_rate || 0;
@@ -119,7 +113,7 @@ export default function CoordinatorDashboardPage() {
       pendingSurveys,
       surveyCompletionRate: completionRate,
       completionRate,
-      urgentApprovals: 0, // Calculate if you have date data
+      urgentApprovals: statistics.urgentApprovals || 0,
     };
   }, [dashboardData]);
 
@@ -159,7 +153,7 @@ export default function CoordinatorDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-surface space-y-6">
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -203,80 +197,27 @@ export default function CoordinatorDashboardPage() {
         </div>
       )}
 
-      {/* Stats Grid */}
+      {/* Reporting overview and supporting metrics */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Activities</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {stats.totalActivities}
-                </p>
-                <div className="flex items-center mt-2">
-                  <Progress value={stats.completionRate} className="flex-1 mr-2" />
-                  <span className="text-xs text-gray-500">{stats.completionRate}% complete</span>
-                </div>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <Calendar className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Pending Approvals</p>
-                <p className="text-2xl font-bold text-yellow-600 mt-1">
-                  {stats.pendingApprovals}
-                </p>
-                {stats.urgentApprovals > 0 && (
-                  <div className="flex items-center mt-2">
-                    <AlertTriangle className="h-4 w-4 text-red-500 mr-1" />
-                    <span className="text-xs text-red-600">{stats.urgentApprovals} urgent</span>
-                  </div>
-                )}
-              </div>
-              <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-yellow-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Volunteers</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {stats.totalVolunteers}
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  {stats.activeVolunteers} active
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                <Users className="h-5 w-5 text-green-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Surveys</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {stats.pendingSurveys} pending
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  {stats.surveyCompletionRate}% completion rate
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-purple-600" />
-              </div>
-            </div>
-          </Card>
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="min-w-0 sm:col-span-2 lg:row-span-2">
+            <PrimaryMetricCard label="Activity reports" value={stats.totalActivities}
+              description={`${dashboardData?.pilot.name || 'Assigned pilot'} · Every report status is included.`}
+              details={[{ label: 'Approved reports', value: stats.completedActivities }, { label: 'Draft reports', value: stats.draftActivities }]}
+              href={`/${locale}/coordinator/activities`} />
+          </div>
+          {[
+            { label: 'Awaiting review', value: stats.pendingApprovals, detail: `${stats.urgentApprovals} pending reports assigned over 7 days ago` },
+            { label: 'Volunteers', value: stats.totalVolunteers, detail: `${stats.activeVolunteers} with activity records in this pilot` },
+            { label: 'Awaiting edits', value: (dashboardData?.statistics.activityStatus.in_edit || 0) + (dashboardData?.statistics.activityStatus.returned || 0), detail: 'Returned work is separate from the review queue' },
+            { label: 'Activity surveys remaining', value: stats.pendingSurveys, detail: `${stats.surveyCompletionRate}% of approved activities surveyed` },
+          ].map(metric => (
+            <Card key={metric.label} className="min-w-0 p-5 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-sm text-gray-500 dark:text-slate-400">{metric.label}</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">{metric.value.toLocaleString('en')}</p>
+              <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-slate-400">{metric.detail}</p>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -352,17 +293,17 @@ export default function CoordinatorDashboardPage() {
                       key={activity.id}
                       className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="font-medium text-gray-900 truncate">{activity.title}</p>
                           <span className="ml-2 text-xs font-medium text-yellow-800 bg-yellow-100 px-2 py-1 rounded">
                             Awaiting Review
                           </span>
                         </div>
-                        {activity.volunteer && (
+                        {(activity.volunteer_name || activity.volunteer?.full_name) && (
                           <div className="flex items-center mt-1 text-sm text-gray-500">
                             <Users className="h-3 w-3 mr-1" />
-                            <span>{activity.volunteer?.full_name}</span>
+                            <span>{activity.volunteer_name || activity.volunteer?.full_name}</span>
                           </div>
                         )}
                       </div>
