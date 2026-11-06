@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useMediaSource } from './protected-media';
 import { PlayIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 
 function captureFrame(url: string, signal: AbortSignal): Promise<string> {
@@ -67,13 +68,15 @@ interface VideoThumbnailProps {
 }
 
 function Thumbnail({ url, thumbnailUrl, alt, className = '' }: VideoThumbnailProps) {
+  const protectedUrl = useMediaSource(url);
+  const protectedPoster = useMediaSource(thumbnailUrl);
   const ref = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
   const [frame, setFrame] = useState('');
   const [finished, setFinished] = useState(false);
   // Legacy API responses use the original video URL when no thumbnail exists.
-  const poster = thumbnailUrl && thumbnailUrl.split('#')[0] !== url.split('#')[0] ? thumbnailUrl : '';
+  const poster = thumbnailUrl && thumbnailUrl.split('#')[0] !== url.split('#')[0] ? protectedPoster || '' : '';
 
   useEffect(() => {
     const element = ref.current;
@@ -90,13 +93,13 @@ function Thumbnail({ url, thumbnailUrl, alt, className = '' }: VideoThumbnailPro
   }, []);
 
   useEffect(() => {
-    if (!visible || (poster && !posterFailed)) return;
+    if (!visible || !protectedUrl || (poster && !posterFailed)) return;
     const controller = new AbortController();
-    void captureFrame(url, controller.signal).then(result => {
+    void captureFrame(protectedUrl, controller.signal).then(result => {
       if (!controller.signal.aborted) { setFrame(result); setFinished(true); }
     });
     return () => controller.abort();
-  }, [url, visible, poster, posterFailed]);
+  }, [protectedUrl, visible, poster, posterFailed]);
 
   const src = poster && !posterFailed ? poster : frame;
   return (

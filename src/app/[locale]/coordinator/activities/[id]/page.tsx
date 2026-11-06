@@ -1,6 +1,7 @@
 // app/[locale]/coordinator/activities/[id]/page.tsx
 'use client';
 
+import { ProtectedImage, ProtectedVideo, ProtectedMediaLink } from '@/components/media/protected-media';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -273,7 +274,7 @@ export default function ActivityViewPage() {
                   <div key={item.id} className="border rounded-lg overflow-hidden">
                     {item.mediaType === 'photo' ? (
                       <div className="relative aspect-square">
-                        <img
+                        <ProtectedImage
                           src={item.url}
                           alt={item.caption || item.filename || 'Activity photo'}
                           className="w-full h-full object-cover"
@@ -281,7 +282,7 @@ export default function ActivityViewPage() {
                       </div>
                     ) : item.mediaType === 'video' ? (
                       <div className="relative aspect-square">
-                        <video
+                        <ProtectedVideo
                           src={item.url}
                           controls
                           className="w-full h-full object-cover"
@@ -289,14 +290,14 @@ export default function ActivityViewPage() {
                       </div>
                     ) : (
                       <div className="p-4">
-                        <a
+                        <ProtectedMediaLink
                           href={item.url}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
                         >
                           Open document
-                        </a>
+                        </ProtectedMediaLink>
                         <p className="mt-2 text-sm text-gray-600 truncate">
                           {item.caption || item.filename}
                         </p>

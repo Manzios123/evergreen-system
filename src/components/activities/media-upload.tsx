@@ -1,6 +1,7 @@
 // components/activities/media-upload.tsx - UPDATED VERSION
 'use client';
 
+import { ProtectedImage, ProtectedVideo } from '@/components/media/protected-media';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Button from '@/components/ui/button';
@@ -440,7 +441,7 @@ export function MediaUpload({
                   {/* Media Preview */}
                   <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 relative">
                     {item.mediaType === 'photo' ? (
-                      <img
+                      <ProtectedImage
                         src={item.thumbnailUrl}
                         alt={item.caption || item.filename}
                         className="w-full h-full object-cover"
@@ -450,7 +451,7 @@ export function MediaUpload({
                       />
                     ) : (
                       <div className="relative w-full h-full">
-                        <video
+                        <ProtectedVideo
                           ref={el => {
                             videoRefs.current[item.id] = el;
                           }}

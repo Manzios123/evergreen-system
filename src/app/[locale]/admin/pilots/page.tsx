@@ -24,6 +24,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { pilotsApi } from '@/lib/api/pilots';
 
 // Define extended Pilot type with stats
@@ -81,6 +82,9 @@ function PilotStatusBadge({ status, showIcon = false, size = 'md' }: PilotStatus
 }
 
 export default function AdminPilotsPage() {
+  const params = useParams();
+  const locale = typeof params.locale === 'string' ? params.locale : 'en';
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedPilot, setSelectedPilot] = useState<PilotWithStats | null>(null);
@@ -109,9 +113,7 @@ export default function AdminPilotsPage() {
     }
   );
 
-  // Clone pilot mutation - the backend handles everything (create the new
-  // pilot, and if the source is 'closed'/complete, move its users and
-  // schools into the new one) in a single call.
+  // Duplicate basic configuration into a draft; preserve source memberships and history.
   const cloneMutation = useApiMutation(
     (id: string) => pilotsApi.clonePilot(id),
     {
@@ -134,7 +136,7 @@ export default function AdminPilotsPage() {
   const handleClone = async (pilotId: string) => {
     try {
       const result: any = await cloneMutation.mutateAsync(pilotId);
-      alert(result?.message || 'Pilot program cloned successfully');
+      alert(result?.message || 'Draft created. Review its dates before activation.');
     } catch (error) {
       console.error('Failed to clone pilot:', error);
       alert('Failed to clone pilot');
@@ -234,7 +236,7 @@ export default function AdminPilotsPage() {
             className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none hover:bg-gray-100 hover:text-gray-900 focus-visible:ring-gray-500 h-8 px-3"
           >
             <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
-            {cloneMutation.status === 'pending' ? 'Cloning...' : 'Clone'}
+            {cloneMutation.status === 'pending' ? 'Creating draft...' : 'Duplicate as draft'}
           </button>
           <button
             onClick={() => {
@@ -343,6 +345,8 @@ export default function AdminPilotsPage() {
             Manage all pilot programs in the system
           </p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <Link href={`/${locale}/admin/pilots/overview?view=current`} className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-accent">Overview and history</Link>
         <Link
           href="/admin/pilots/new"
           className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-green-600 text-white hover:bg-green-700 focus-visible:ring-green-500 h-10 px-4 py-2"
@@ -350,6 +354,7 @@ export default function AdminPilotsPage() {
           <PlusIcon className="h-5 w-5 mr-2" />
           Create Pilot
         </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}

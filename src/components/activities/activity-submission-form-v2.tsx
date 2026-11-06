@@ -288,8 +288,7 @@ export function ActivitySubmissionFormV2({
       };
       
       return activitiesApi.update(activity.id, updateData)
-        .then(() => activitiesApi.submit(activity.id))
-        .catch(() => activitiesApi.submit(activity.id));
+        .then(() => activitiesApi.submit(activity.id));
     },
     {
       mutationKey: ['submit-activity-approval', activity.id],
@@ -613,10 +612,7 @@ export function ActivitySubmissionFormV2({
               {(saveDraftMutation.error || submitForApprovalMutation.error) && (
                 <div className="mb-4">
                   <Alert type="error">
-                    {submissionType === 'save' 
-                      ? 'Failed to save draft. Please try again.'
-                      : 'Failed to submit for approval. Please try again.'
-                    }
+                    {(submissionType === 'save' ? saveDraftMutation.error?.message : submitForApprovalMutation.error?.message) || 'Unable to confirm the report change. Reload and check its status before retrying.'}
                   </Alert>
                 </div>
               )}

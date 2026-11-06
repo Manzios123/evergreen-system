@@ -1,11 +1,14 @@
 // components/surveys/survey-form.tsx - UPDATED WITH MULTI-SUBMIT SUPPORT
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Button from '@/components/ui/button';
 import Alert from '@/components/ui/alert';
 import { api } from '@/lib/api/api';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
+import { useApiQuery } from '@/lib/hooks/use-api';
+import { useQueryClient } from '@tanstack/react-query';
 
 const SURVEY_MEDIA_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const SURVEY_MEDIA_ACCEPT = SURVEY_MEDIA_ALLOWED_TYPES.join(',');
@@ -26,8 +29,21 @@ interface SurveyMediaAnswer {
   media_url: string;
 }
 
-export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: SurveyFormProps) {
+function SurveyFormContent({ survey, onComplete, assignmentId, surveyType }: SurveyFormProps) {
   const router = useRouter();
+  const {user}=useAuth();
+  const actor=user?.id;
+  const queryClient=useQueryClient();
+  const busy=useRef(false);
+  const mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+  const [schoolId,setSchoolId]=useState('');
+  const options=useApiQuery<{pilot_id:string;school_required:boolean;schools:{id:string;name:string}[]}>(
+    ['survey-submission-options',actor,assignmentId],()=>api.get(`/survey-assignments/${encodeURIComponent(assignmentId)}/submission-options`),
+    {enabled:Boolean(actor&&assignmentId),placeholderData:undefined,staleTime:0,refetchOnMount:'always'});
+  useEffect(()=>{if(options.data?.schools.length===1)setSchoolId(options.data.schools[0].id);},[options.data]);
+  useEffect(()=>()=>{if(actor)queryClient.removeQueries({queryKey:['survey-submission-options',actor,assignmentId]});},[actor,assignmentId,queryClient]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,13 +59,6 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
   const [mediaUploadStatus, setMediaUploadStatus] = useState<Record<string, 'uploading' | 'uploaded' | 'error'>>({});
 
   useEffect(() => {
-    console.log('SurveyForm received:', { 
-      survey, 
-      assignmentId, 
-      surveyType,
-      hasQuestions: survey?.template?.questions?.length || survey?.questions?.length 
-    });
-    
     const questions = getQuestions();
     if (questions.length > 0 && !isInitialized) {
       const initialResponses: Record<string, any> = {};
@@ -78,6 +87,11 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if(busy.current)return;
+    if(!options.data||options.isFetching||options.error){setError('Reload the survey setup before submitting.');return;}
+    if((options.data.school_required||options.data.schools.length>1)&&!schoolId){setError('Select the school for this response.');return;}
+    busy.current=true;
+    const submittingToken=localStorage.getItem('token');
     setIsSubmitting(true);
     setError(null);
     setSuccessMessage(null);
@@ -92,18 +106,21 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       
       if (missingRequired.length > 0) {
         setError(`Please answer all required questions: ${missingRequired.map((q: any, index: number) => questions.indexOf(q) + 1).join(', ')}`);
+        busy.current=false;
         setIsSubmitting(false);
         return;
       }
 
       if (Object.values(mediaUploadStatus).includes('uploading')) {
         setError('Please wait for media uploads to finish before submitting.');
+        busy.current=false;
         setIsSubmitting(false);
         return;
       }
 
       if (Object.values(mediaUploadStatus).includes('error')) {
         setError('Please replace any media files that failed to upload before submitting.');
+        busy.current=false;
         setIsSubmitting(false);
         return;
       }
@@ -114,15 +131,15 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       // Submit response
       const payload = {
         assignment_id: assignmentId,
-        responses: finalResponses
+        responses: finalResponses,
+        ...(schoolId?{school_id:schoolId}:{})
       };
 
-      console.log('Submitting survey payload:', payload);
 
-      const result = await api.post('/survey-assignments/submit-response', payload);
-      
-      console.log('Survey submitted successfully:', result);
-      
+
+      await api.post('/survey-assignments/submit-response', payload);
+      if(!mounted.current||localStorage.getItem('token')!==submittingToken)return;
+
       // For student surveys, reset the form and show success message
       if (surveyType === 'student') {
         // Clear form for next submission
@@ -166,6 +183,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       
       setError(errorMessage);
     } finally {
+      busy.current=false;
       setIsSubmitting(false);
     }
   };
@@ -227,7 +245,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                   checked={value === 'agree'}
                   onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
                   className="h-4 w-4 text-blue-600"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data}
                   required={question.is_required}
                 />
                 <span className="ml-2">Agree (Ndabyemera)</span>
@@ -240,7 +258,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                   checked={value === 'disagree'}
                   onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
                   className="h-4 w-4 text-blue-600"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data}
                   required={question.is_required}
                 />
                 <span className="ml-2">Disagree (Simbyemera)</span>
@@ -253,7 +271,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                   checked={value === 'unsure'}
                   onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
                   className="h-4 w-4 text-blue-600"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data}
                   required={question.is_required}
                 />
                 <span className="ml-2">Unsure (Simbizi neza)</span>
@@ -275,7 +293,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                     checked={value === option}
                     onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
                     className="h-4 w-4 text-blue-600"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data}
                     required={question.is_required}
                   />
                   <span className="ml-2 capitalize">{option}</span>
@@ -304,7 +322,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                     checked={value === option}
                     onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
                     className="h-4 w-4 text-blue-600"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data}
                     required={question.is_required}
                   />
                   <span className="ml-2 capitalize">{option.replace(/_/g, ' ')}</span>
@@ -330,7 +348,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
                     checked={value === num}
                     onChange={(e) => setResponses({...responses, [question.id]: parseInt(e.target.value)})}
                     className="h-4 w-4 text-blue-600"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data}
                     required={question.is_required}
                   />
                   <span className="text-xs mt-1">{num}</span>
@@ -375,7 +393,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
               onChange={(e) => setResponses({...responses, [question.id]: e.target.value})}
               className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter your response here..."
-              disabled={isSubmitting}
+              disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data}
               required={question.is_required}
               rows={4}
             />
@@ -410,6 +428,9 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {options.isLoading||options.isFetching?<p role="status">Checking survey setup…</p>:options.error?<Alert type="error" title="Survey setup unavailable">{options.error.message}<Button type="button" variant="outline" onClick={()=>void options.refetch()}>Reload setup</Button></Alert>:null}
+      {options.data?.school_required&&!options.data.schools.length&&<Alert type="warning" title="School assignment required">No eligible school is linked to your account in the active pilot. Ask a coordinator or administrator to review your assignment.</Alert>}
+      {options.data&&options.data.schools.length>0&&<div><label htmlFor="response-school" className="block text-sm font-medium">School for this response</label><select id="response-school" className="mt-2 min-h-11 w-full rounded-md border border-input bg-background px-3 text-base" value={schoolId} onChange={event=>setSchoolId(event.target.value)} disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data} required={options.data.school_required||options.data.schools.length>1}><option value="">Choose a school…</option>{options.data.schools.map(school=><option key={school.id} value={school.id}>{school.name}</option>)}</select></div>}
       {error && (
         <Alert
           type="error"
@@ -474,7 +495,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
             type="button"
             variant="outline"
             onClick={() => router.push('/volunteer/surveys/volunteer')}
-            disabled={isSubmitting}
+            disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data}
             className="px-6"
           >
             Cancel
@@ -482,7 +503,7 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
           <Button
             type="submit"
             variant="default"
-            disabled={isSubmitting}
+            disabled={isSubmitting||options.isFetching||Boolean(options.error)||!options.data||Boolean(options.data.school_required&&!options.data.schools.length)}
             className="px-8 min-w-32"
           >
             {isSubmitting ? (
@@ -500,4 +521,9 @@ export function SurveyForm({ survey, onComplete, assignmentId, surveyType }: Sur
       </div>
     </form>
   );
+}
+
+export function SurveyForm(props: SurveyFormProps) {
+  const {user}=useAuth();
+  return <SurveyFormContent key={`${user?.id||''}:${props.assignmentId}`} {...props}/>;
 }

@@ -27,7 +27,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api/api';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useAuth } from '@/contexts/auth-context';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Helper function to normalize API responses to arrays
 function toArray<T>(value: unknown): T[] {
@@ -130,11 +132,19 @@ function Checkbox({ label, checked, onChange, className = '' }: CheckboxProps) {
 
 export default function AssignActivityPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const actor=user?.id;
+  const mounted=useRef(true);
+  const busy=useRef(false);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;}},[]);
+  useEffect(()=>()=>{if(actor){queryClient.removeQueries({queryKey:['assignment-options',actor]});queryClient.removeQueries({queryKey:['assignment-facilitators',actor]});}},[actor,queryClient]);
   const params = useParams();
   const locale = params.locale as string;
   
   const [selectedVolunteers, setSelectedVolunteers] = useState<string[]>([]);
   const [assignToAll, setAssignToAll] = useState(false);
+  const [assignmentError,setAssignmentError]=useState('');
   const [batchResults, setBatchResults] = useState<BatchAssignmentResult[]>([]);
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
   const [currentBatchIndex, setCurrentBatchIndex] = useState(0);
@@ -160,27 +170,25 @@ export default function AssignActivityPage() {
   const schoolId = watch('school_id');
   const scheduledDate = watch('scheduled_date');
   
-  // Fetch data for dropdowns
-  const { data: templatesResponse, isLoading: templatesLoading } = useApiQuery<unknown>(
-    ['activity-templates'],
-    () => api.get('/activity-templates')
+  const options = useApiQuery<{success:boolean;data:{state:'ready'|'setup_required'|'no_active';pilot:{id:string;name:string;start_date:string;end_date:string}|null;schools:School[];templates:ActivityTemplate[]}}>(
+    ['assignment-options',actor],()=>api.get('/activities/assignment-options'),
+    {enabled:Boolean(actor),placeholderData:undefined,staleTime:0,refetchOnMount:'always'}
   );
-
-  // Fetch facilitators for the selected school's pilot. The API field remains volunteer_id for now.
-  const { data: usersResponse, isLoading: volunteersLoading } = useApiQuery<unknown>(
-    ['facilitators', schoolId],
-    () => api.get(`/users?role=facilitator&school_id=${encodeURIComponent(schoolId)}`),
-    { enabled: Boolean(schoolId) }
+  const pilot=options.data?.data.pilot;
+  const templatesLoading=options.isLoading||options.isFetching;
+  const schoolsLoading=templatesLoading;
+  const templatesArr=options.data?.data.templates||[];
+  const schoolsArr=options.data?.data.schools||[];
+  const {data:usersResponse,isLoading:usersLoading,isFetching:usersFetching,error:usersError}=useApiQuery<unknown>(
+    ['assignment-facilitators',actor,pilot?.id,schoolId],
+    ()=>api.get('/users',{role:'facilitator',school_id:schoolId,pilot_id:pilot?.id}),
+    {enabled:Boolean(actor&&pilot&&schoolId),placeholderData:undefined,staleTime:0,refetchOnMount:'always'}
   );
-
-  const { data: schoolsResponse, isLoading: schoolsLoading } = useApiQuery<unknown>(
-    ['schools'],
-    () => api.get('/schools')
-  );
-
-  // Normalize API responses to arrays
-  const templatesArr = useMemo(() => toArray<ActivityTemplate>(templatesResponse), [templatesResponse]);
-  const schoolsArr = useMemo(() => toArray<School>(schoolsResponse), [schoolsResponse]);
+  const volunteersLoading=Boolean(schoolId)&&(usersLoading||usersFetching);
+  useEffect(()=>{
+    setValue('school_id','');setValue('activity_template_id','');setValue('scheduled_date','');
+    setValue('volunteer_id','');setValue('volunteer_ids',[]);setSelectedVolunteers([]);setAssignToAll(false);setBatchResults([]);
+  },[actor,pilot?.id,setValue]);
 
   // Normalize volunteers response - extract users array from response
   const volunteersArr = useMemo(() => {
@@ -197,13 +205,13 @@ export default function AssignActivityPage() {
 
   // The backend already scopes this list by selected school -> pilot -> user_pilots.
   const filteredVolunteers = useMemo(() => {
-    if (!schoolId) return [];
+    if (!schoolId || volunteersLoading || usersError) return [];
     return volunteersArr || [];
-  }, [volunteersArr, schoolId]);
+  }, [volunteersArr, schoolId, volunteersLoading, usersError]);
 
   // Update selected facilitators when school changes
   useEffect(() => {
-    if (schoolId) {
+    {
       setSelectedVolunteers([]);
       setAssignToAll(false);
       setValue('volunteer_ids', []);
@@ -213,6 +221,7 @@ export default function AssignActivityPage() {
 
   // Handle assign to all toggle
   const handleAssignToAllToggle = (checked: boolean) => {
+    if(busy.current)return;
     setAssignToAll(checked);
     if (checked && filteredVolunteers.length > 0) {
       const allVolunteerIds = filteredVolunteers.map(v => v.id);
@@ -227,6 +236,7 @@ export default function AssignActivityPage() {
 
   // Handle individual facilitator selection
   const handleVolunteerToggle = (volunteerId: string) => {
+    if(busy.current)return;
     let newSelectedVolunteers;
     
     if (selectedVolunteers.includes(volunteerId)) {
@@ -245,7 +255,7 @@ export default function AssignActivityPage() {
 
   // Single assignment mutation
   const singleAssignMutation = useApiMutation(
-    (data: AssignActivityFormData) => api.post('/activities/assign', data)
+    (data: AssignActivityFormData) => api.post('/activities/assign', {...data,pilot_id:pilot?.id})
   );
 
   // Batch assignment function
@@ -255,8 +265,10 @@ export default function AssignActivityPage() {
     setIsBatchAssigning(true);
     setBatchResults([]);
     const results: BatchAssignmentResult[] = [];
+    const batchToken=localStorage.getItem('token');
     
     for (let i = 0; i < selectedVolunteers.length; i++) {
+      if(!mounted.current||localStorage.getItem('token')!==batchToken)break;
       const volunteerId = selectedVolunteers[i];
       const volunteer = volunteersArr.find(v => v.id === volunteerId);
       
@@ -265,6 +277,7 @@ export default function AssignActivityPage() {
       try {
         const payload = {
           ...formData,
+          pilot_id:pilot?.id,
           volunteer_id: volunteerId,
           volunteer_ids: undefined, // Remove array for single assignment; legacy API field name
           number_of_participants: numberOfParticipants,
@@ -293,6 +306,7 @@ export default function AssignActivityPage() {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
+    if(!mounted.current)return;
     setBatchResults(results);
     setIsBatchAssigning(false);
     setCurrentBatchIndex(0);
@@ -304,8 +318,7 @@ export default function AssignActivityPage() {
     if (allSuccess) {
       // Redirect if all successful
       setTimeout(() => {
-        router.push(`/${locale}/coordinator/activities`);
-        router.refresh();
+        if(mounted.current){router.push(`/${locale}/coordinator/activities`);router.refresh();}
       }, 2000);
     } else if (someSuccess) {
       // Show results summary
@@ -314,6 +327,10 @@ export default function AssignActivityPage() {
   };
 
   const onSubmit = async (data: AssignActivityFormData) => {
+    if(busy.current||!pilot||options.isFetching||usersError||volunteersLoading)return;
+    const requested=selectedVolunteers.length?selectedVolunteers:[data.volunteer_id];
+    if(!requested.every(id=>filteredVolunteers.some(person=>person.id===id))){alert('Facilitator eligibility changed. Reload the list.');return;}
+
     // Validate at least one facilitator is selected
     if (!selectedVolunteers.length && !data.volunteer_id) {
       alert('Please select at least one facilitator');
@@ -333,20 +350,25 @@ export default function AssignActivityPage() {
       number_of_girls: numberOfGirls,
     };
     
+    setAssignmentError('');
+    busy.current=true;
+    try {
     // Single facilitator assignment through the legacy volunteer_id field
     if (data.volunteer_id && !selectedVolunteers.length) {
       try {
         await singleAssignMutation.mutateAsync(formData);
+        if(!mounted.current)return;
         router.push(`/${locale}/coordinator/activities`);
         router.refresh();
       } catch (error) {
-        console.error('Failed to assign activity:', error);
+        setAssignmentError(error instanceof Error?error.message:'Assignment could not be confirmed. Check existing activities before retrying.');
       }
     } 
     // Batch assignment
     else if (selectedVolunteers.length > 0) {
       await batchAssignActivities(formData);
     }
+    } finally {busy.current=false;}
   };
 
   // Get selected template details
@@ -374,6 +396,10 @@ export default function AssignActivityPage() {
 
   const isLoading = templatesLoading || volunteersLoading || schoolsLoading;
 
+  if(options.isLoading||options.isFetching)return <p role="status" className="p-4">Loading active pilot assignment optionsâ€¦</p>;
+  if(options.error)return <Alert type="error" title="Assignment unavailable"><p>{options.error.message}</p><Button variant="outline" className="mt-3" onClick={()=>void options.refetch()}>Reload options</Button></Alert>;
+  if(!pilot||options.data?.data.state!=='ready')return <Alert type="warning" title="Assignment setup required"><p>{pilot?`${pilot.name} needs schools and activity templates before assignments can be created.`:'No active pilot is configured. Closed-pilot history remains available.'}</p><Button variant="outline" className="mt-3" onClick={()=>void options.refetch()}>Reload options</Button></Alert>;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
@@ -391,6 +417,9 @@ export default function AssignActivityPage() {
         </p>
       </div>
 
+      <Card className="p-4"><p className="font-medium">Active pilot: {pilot.name}</p><p className="mt-1 text-sm text-muted-foreground">{pilot.start_date} â€“ {pilot.end_date}</p></Card>
+      {assignmentError && <Alert type="error" title="Assignment not confirmed">{assignmentError}</Alert>}
+      {usersError && <Alert type="error" title="Facilitators unavailable">{usersError.message}</Alert>}
       {/* Debug Info - Remove in production */}
       <div className="hidden">
         <p>Facilitators count: {volunteersArr.length}</p>
@@ -492,7 +521,7 @@ export default function AssignActivityPage() {
                     options={templateOptions}
                     error={errors.activity_template_id?.message}
                     required
-                    disabled={isLoading}
+                    disabled={isLoading||isBatchAssigning||isSubmitting}
                   />
 
                   {selectedTemplate && (
@@ -546,6 +575,8 @@ export default function AssignActivityPage() {
                     label="Activity Date *"
                     type="date"
                     {...register('scheduled_date')}
+                    min={pilot.start_date}
+                    max={pilot.end_date}
                     error={errors.scheduled_date?.message}
                     leftIcon={<Calendar className="h-5 w-5 text-gray-400" />}
                     className="pl-10"
@@ -559,7 +590,7 @@ export default function AssignActivityPage() {
                     options={schoolOptions}
                     error={errors.school_id?.message}
                     required
-                    disabled={isLoading}
+                    disabled={isLoading||isBatchAssigning||isSubmitting}
                     onChange={(e) => {
                       setValue('school_id', e.target.value);
                       trigger('school_id');
@@ -823,7 +854,7 @@ export default function AssignActivityPage() {
                         !watch('scheduled_date') ||
                         (!selectedVolunteers.length && !watch('volunteer_id')) ||
                         isSubmitting ||
-                        isBatchAssigning
+                        isBatchAssigning || volunteersLoading || Boolean(usersError)
                       }
                     >
                       {selectedVolunteers.length > 1 

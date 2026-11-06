@@ -1,5 +1,6 @@
 'use client';
 
+import { ProtectedImage, ProtectedVideo, ProtectedMediaLink } from '@/components/media/protected-media';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -345,7 +346,7 @@ export default function ActivityReportPage() {
                         </p>
                       </div>
                     ) : (
-                      <img
+                      <ProtectedImage
                         src={item.url}
                         alt={item.caption || `Photo ${index + 1}`}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105"
@@ -390,7 +391,7 @@ export default function ActivityReportPage() {
 
           <div className="max-w-4xl w-full max-h-[80vh]">
             {normalizeMediaType(mediaItems[selectedIndex]) === 'video' ? (
-              <video
+              <ProtectedVideo
                 src={mediaItems[selectedIndex].url}
                 controls
                 autoPlay
@@ -399,20 +400,20 @@ export default function ActivityReportPage() {
             ) : normalizeMediaType(mediaItems[selectedIndex]) === 'document' ? (
               <div className="bg-white rounded p-6">
                 <p className="text-gray-900 font-medium mb-2">Document</p>
-                <a
+                <ProtectedMediaLink
                   href={mediaItems[selectedIndex].url}
                   target="_blank"
                   rel="noreferrer"
                   className="text-blue-600 hover:underline"
                 >
                   Open document in new tab
-                </a>
+                </ProtectedMediaLink>
                 {mediaItems[selectedIndex].caption && (
                   <p className="mt-3 text-gray-700 whitespace-pre-wrap">{mediaItems[selectedIndex].caption}</p>
                 )}
               </div>
             ) : (
-              <img
+              <ProtectedImage
                 src={mediaItems[selectedIndex].url}
                 alt={mediaItems[selectedIndex].caption || `Media ${selectedIndex + 1}`}
                 className="max-h-[80vh] w-full object-contain"

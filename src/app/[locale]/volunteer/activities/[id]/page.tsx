@@ -1,6 +1,7 @@
 // app/[locale]/volunteer/activities/[id]/page.tsx
 'use client';
 
+import { ProtectedImage, ProtectedMediaLink } from '@/components/media/protected-media';
 import VideoThumbnail from '@/components/media/video-thumbnail';
 
 import { useState, useEffect } from 'react';
@@ -470,7 +471,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                 {!isLoadingMedia && !mediaError && mediaItems.length > 0 && (
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                     {mediaItems.map((item) => (
-                      <a
+                      <ProtectedMediaLink
                         key={item.id}
                         href={item.url}
                         target="_blank"
@@ -481,7 +482,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                           {item.mediaType === 'video' ? (
                             <VideoThumbnail url={item.url} thumbnailUrl={item.thumbnailUrl} alt={item.caption || item.filename} />
                           ) : (
-                            <img src={item.thumbnailUrl || item.url} alt={item.caption || item.filename} className="h-full w-full object-cover" />
+                            <ProtectedImage src={item.thumbnailUrl || item.url} alt={item.caption || item.filename} className="h-full w-full object-cover" />
                           )}
                         </div>
                         <div className="flex items-center gap-2 p-2 text-xs text-gray-600">
@@ -492,7 +493,7 @@ export default function ActivityDetailPage({ params }: ActivityDetailPageProps) 
                           )}
                           <span className="truncate">{item.caption || item.filename}</span>
                         </div>
-                      </a>
+                      </ProtectedMediaLink>
                     ))}
                   </div>
                 )}

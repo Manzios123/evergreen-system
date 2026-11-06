@@ -22,6 +22,7 @@ export default function PilotDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const locale = typeof params.locale === 'string' ? params.locale : 'en';
   const [retryCount, setRetryCount] = useState(0);
 
   const {
@@ -134,7 +135,10 @@ export default function PilotDetailPage() {
           <div className="h-6 w-px bg-gray-300 hidden sm:block" />
           <h1 className="text-2xl font-bold text-gray-900">Pilot Details</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href={`/${locale}/admin/pilots/overview?view=history&pilot_id=${encodeURIComponent(id)}`} className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-accent">
+            Read pilot history
+          </Link>
           <Link href={`/admin/pilots/${id}/edit`}>
             <Button variant="default" className="inline-flex items-center gap-2">
               <PencilIcon className="h-4 w-4" />

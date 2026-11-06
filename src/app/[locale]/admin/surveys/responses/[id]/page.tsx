@@ -1,5 +1,6 @@
 'use client';
 
+import { ProtectedMediaLink } from '@/components/media/protected-media';
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import Button from '@/components/ui/button';
@@ -92,14 +93,14 @@ export default function SurveyResponseDetailPage() {
       if (!mediaUrl) return fileName;
 
       return (
-        <a
+        <ProtectedMediaLink
           href={mediaUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-700 underline hover:text-blue-900"
         >
           {fileName}
-        </a>
+        </ProtectedMediaLink>
       );
     }
 
