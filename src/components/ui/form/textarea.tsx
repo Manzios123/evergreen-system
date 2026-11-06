@@ -22,7 +22,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           rows={3}
           className={`
             block w-full rounded-md border bg-card text-card-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60 shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500
-            py-2 px-3 text-sm
+            min-h-24 py-2 px-3 text-base sm:text-sm
             ${error ? 'border-red-300 dark:border-red-500 text-red-900 dark:text-red-200' : 'border-input'}
             ${className}
           `}

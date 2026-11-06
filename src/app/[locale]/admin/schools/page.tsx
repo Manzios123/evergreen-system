@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
+import StatsCard from '@/components/ui/stats-card';
 import Button from '@/components/ui/button';
 import DataTable from '@/components/ui/data-table';
 import SearchFilter from '@/components/ui/search-filter';
@@ -15,7 +16,6 @@ import SchoolPurgeDialog, { SchoolPurgeHistory } from '@/components/schools/Scho
 import {
   BuildingOfficeIcon,
   MapPinIcon,
-  UsersIcon,
   CalendarIcon,
   PlusIcon,
   PencilIcon,
@@ -26,7 +26,7 @@ import {
   PhoneIcon,
   EnvelopeIcon,
 } from '@heroicons/react/24/outline';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/providers/AuthProvider'; // Fixed import path
 
@@ -39,6 +39,8 @@ export default function AdminSchoolsPage() {
   const [purgedIds, setPurgedIds] = useState<string[]>([]);
   const [purgeRefresh, setPurgeRefresh] = useState(0);
   const [primaryContacts, setPrimaryContacts] = useState<Record<string, SchoolContact | null>>({});
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const contactCache = useRef(new Map<string, {value: SchoolContact | null; at: number}>());
 
   const { user } = useAuth();
 
@@ -63,7 +65,8 @@ export default function AdminSchoolsPage() {
         data: response.data || [],
         count: response.data?.length || 0
       };
-    }
+    },
+    { placeholderData: previous => previous }
   );
 
   // Delete school mutation
@@ -73,22 +76,31 @@ export default function AdminSchoolsPage() {
 
   // Fetch primary contacts for each school
   useEffect(() => {
+    let cancelled = false;
     const fetchContacts = async () => {
       if (!schoolsResponse?.data) return;
-      
+      setContactsLoading(true);
       const contacts: Record<string, SchoolContact | null> = {};
-      for (const school of schoolsResponse.data) {
-        try {
-          const primaryContact = await schoolsApi.getPrimaryContact(school.id);
-          contacts[school.id] = primaryContact;
-        } catch (error) {
-          contacts[school.id] = null;
+      const activeSchools = schoolsResponse.data.filter(school => school.is_active);
+      let next = 0;
+      const worker = async () => {
+        while (!cancelled && next < activeSchools.length) {
+          const school = activeSchools[next++];
+          const cached = contactCache.current.get(school.id);
+          if (cached && Date.now() - cached.at < 30000) { contacts[school.id] = cached.value; continue; }
+          try {
+            const value = await schoolsApi.getPrimaryContact(school.id);
+            if (!cancelled) contactCache.current.set(school.id, {value, at: Date.now()});
+            contacts[school.id] = value;
+          } catch { contacts[school.id] = null; }
         }
-      }
-      setPrimaryContacts(contacts);
+      };
+      await Promise.all(Array.from({length: Math.min(4, activeSchools.length)}, worker));
+      if (!cancelled) { setPrimaryContacts(contacts); setContactsLoading(false); }
     };
 
-    fetchContacts();
+    void fetchContacts();
+    return () => { cancelled = true; };
   }, [schoolsResponse]);
 
   const handleDelete = async () => {
@@ -111,7 +123,7 @@ export default function AdminSchoolsPage() {
       sortable: true,
       render: (school: School) => (
         <div className="flex items-start">
-          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3 shrink-0">
+          <div className="mr-3 hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 sm:flex">
             <BuildingOfficeIcon className="h-5 w-5 text-blue-600" />
           </div>
           <div className="min-w-0 flex-1">
@@ -136,6 +148,8 @@ export default function AdminSchoolsPage() {
       header: 'Primary Contact',
       render: (school: School) => {
         const contact = primaryContacts[school.id];
+        if (!school.is_active) return <span className="text-sm text-muted-foreground">Archived school</span>;
+        if (contactsLoading && !contact) return <span className="text-sm text-muted-foreground">Loading…</span>;
         if (!contact) {
           return <span className="text-sm text-gray-400">No contact</span>;
         }
@@ -265,7 +279,7 @@ export default function AdminSchoolsPage() {
           </div>
           <div className="h-10 bg-gray-200 rounded w-36 animate-pulse"></div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="h-32 bg-gray-200 rounded animate-pulse"></div>
           ))}
@@ -315,57 +329,13 @@ export default function AdminSchoolsPage() {
         </Link>
       </div>
 
-      {/* Stats Cards */}
+      {/* Compact metrics share the same hierarchy as the role dashboards. */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Schools</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {stats.totalSchools}
-                </p>
-              </div>
-              <BuildingOfficeIcon className="h-8 w-8 text-gray-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Active Schools</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {stats.activeSchools}
-                </p>
-              </div>
-              <CheckCircleIcon className="h-8 w-8 text-green-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">With Contacts</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {stats.schoolsWithContacts}
-                </p>
-              </div>
-              <UsersIcon className="h-8 w-8 text-blue-300" />
-            </div>
-          </Card>
-          
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Top Province</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">
-                  {stats.topProvince}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{stats.topProvinceName}</p>
-              </div>
-              <MapPinIcon className="h-8 w-8 text-purple-300" />
-            </div>
-          </Card>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatsCard title="Schools shown" value={stats.totalSchools} icon="school" color="blue"/>
+          <StatsCard title="Active schools" value={stats.activeSchools} icon="check" color="green"/>
+          <StatsCard title="Active with contacts" value={contactsLoading ? '…' : stats.schoolsWithContacts} icon="users" color="blue"/>
+          <StatsCard title="Largest province group" value={stats.topProvince} description={stats.topProvinceName} icon="school" color="purple"/>
         </div>
       )}
 
@@ -375,7 +345,7 @@ export default function AdminSchoolsPage() {
           <div className="space-y-4">
             {/* Search Input */}
             <div className="flex flex-wrap gap-2">
-              <div className="min-w-0 basis-64 flex-1 relative">
+              <div className="relative min-w-0 basis-full flex-1 sm:basis-64">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <BuildingOfficeIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
                 </div>
@@ -383,7 +353,8 @@ export default function AdminSchoolsPage() {
                   type="search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search schools by name, address, province, or district..."
+                  aria-label="Search schools"
+                  placeholder="Search schools…"
                   className="block w-full rounded-md border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-green-500 focus:ring-green-500"
                 />
               </div>

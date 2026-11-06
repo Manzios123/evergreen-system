@@ -4,12 +4,16 @@ import {
     CheckCircleIcon,
     ClockIcon,
     DocumentTextIcon,
+    UsersIcon,
+    BuildingLibraryIcon,
+    FlagIcon,
+    ClipboardDocumentListIcon,
   } from '@heroicons/react/24/outline';
   
   interface StatsCardProps {
     title: string;
     value: number | string;
-    icon: 'activity' | 'pending' | 'calendar' | 'check' | 'document';
+    icon: 'activity' | 'pending' | 'calendar' | 'check' | 'document' | 'users' | 'school' | 'pilot' | 'survey';
     trend?: 'up' | 'down' | 'none';
     color: 'green' | 'blue' | 'yellow' | 'red' | 'purple';
     description?: string;
@@ -21,6 +25,10 @@ import {
     calendar: CalendarDaysIcon,
     check: CheckCircleIcon,
     document: DocumentTextIcon,
+    users: UsersIcon,
+    school: BuildingLibraryIcon,
+    pilot: FlagIcon,
+    survey: ClipboardDocumentListIcon,
   };
   
   const colorClasses = {
@@ -63,23 +71,17 @@ import {
     const colors = colorClasses[color];
   
     return (
-      <div className={`min-w-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/10 ${colors.lightBg} px-4 py-5 sm:p-6`}>
-        <div className="flex items-center">
-          <div className={`flex-shrink-0 rounded-md ${colors.bg} p-3`}>
-            <Icon className="h-6 w-6 text-white" aria-hidden="true" />
-          </div>
-          <div className="ml-5 w-0 flex-1">
-            <dl>
-              <dt className="break-words text-sm font-medium text-gray-600 dark:text-gray-300">{title}</dt>
-              <dd>
-                <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{value}</div>
-              </dd>
-            </dl>
-          </div>
-        </div>
+      <div data-ui="metric-card" className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 text-card-foreground sm:p-5">
+        <dl className="min-w-0">
+          <dt className="min-h-10 break-words text-sm font-medium leading-5 text-muted-foreground">{title}</dt>
+          <dd className="mt-2 flex min-w-0 items-center justify-between gap-2">
+            <span className="min-w-0 break-words text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{typeof value === 'number' ? value.toLocaleString('en') : value}</span>
+            <Icon className={`h-5 w-5 shrink-0 ${colors.text}`} aria-hidden="true" />
+          </dd>
+        </dl>
         {description && (
-          <div className="mt-4">
-            <div className="text-sm text-gray-600 dark:text-gray-300">{description}</div>
+          <div className="mt-3">
+            <div className="text-sm leading-5 text-muted-foreground">{description}</div>
           </div>
         )}
         {trend !== 'none' && (

@@ -202,7 +202,7 @@ export default function DataTable<T extends Record<string, any>>({
                 <td className="w-12 px-1 py-2">
                   <button type="button" aria-expanded={expanded} aria-controls={detailsId}
                     aria-label={`${expanded ? 'Hide' : 'Show'} details for row ${rowIndex + 1}`}
-                    className="flex h-11 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 dark:text-slate-300 dark:hover:bg-slate-800"
                     onClick={event => { event.stopPropagation(); setExpandedKey(expanded ? null : rowKey); }}>
                     <ChevronDownIcon aria-hidden="true" className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                   </button>

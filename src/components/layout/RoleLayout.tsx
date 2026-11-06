@@ -20,6 +20,7 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
   const { user, isLoading } = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem('evergreen-theme');
@@ -76,7 +77,7 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-950 dark:text-gray-100">
-      <MobileNav />
+      <MobileNav open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <div className={`hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-72'}`}>
         <Sidebar
           role={user.role === 'facilitator' && role === 'volunteer' ? 'facilitator' : role}
@@ -85,13 +86,14 @@ export default function RoleLayout({ children, role }: RoleLayoutProps) {
         />
       </div>
       
-      <div className={sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'}>
+      <div className={`min-w-0 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'}`}>
         <Header
           theme={theme}
           onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+          onOpenMobileNav={() => setMobileNavOpen(true)}
         />
         
-        <main className="py-8">
+        <main className="min-w-0 py-5 sm:py-8">
           <div className="px-4 sm:px-6 lg:px-8">
             {children}
           </div>

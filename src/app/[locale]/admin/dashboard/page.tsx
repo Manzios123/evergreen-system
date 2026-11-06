@@ -6,6 +6,7 @@ import Button from '@/components/ui/button';
 import { useAuth } from '@/components/providers/AuthProvider';
 import DashboardGreeting from '@/components/dashboard/dashboard-greeting';
 import PrimaryMetricCard from '@/components/dashboard/primary-metric-card';
+import StatsCard from '@/components/ui/stats-card';
 import DataTable from '@/components/ui/data-table';
 import StatusBadge from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/proggress';
@@ -244,7 +245,7 @@ export default function AdminDashboardPage() {
           </p>
         </div>
         <div className="flex space-x-3">
-          <Link href="/admin/reports">
+          <Link href={`/${locale}/admin/reports`}>
             <Button
               variant="outline"
               icon={<ChartBarIcon className="h-4 w-4" />}
@@ -252,7 +253,7 @@ export default function AdminDashboardPage() {
               View Reports
             </Button>
           </Link>
-          <Link href="/admin/users/new">
+          <Link href={`/${locale}/admin/users/new`}>
             <Button
               variant="default"
               icon={<PlusIcon className="h-4 w-4" />}
@@ -278,24 +279,20 @@ export default function AdminDashboardPage() {
 
       {/* Reporting overview and supporting metrics */}
       {stats && (
-        <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="min-w-0 sm:col-span-2 lg:row-span-2">
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <div className="col-span-2 min-w-0 lg:row-span-2">
             <PrimaryMetricCard label="Activity reports" value={stats.totalActivities}
               description="Assigned reports across all pilots, including drafts and every report status."
               details={[{ label: 'Approved reports', value: stats.approvedActivities }, { label: 'Upcoming assignments', value: stats.upcomingActivities }]}
               href={`/${locale}/admin/activities`} />
           </div>
           {[
-            { label: 'Registered users', value: stats.totalUsers, detail: 'All roles, including inactive accounts' },
-            { label: 'Pilot programmes', value: stats.totalPilots, detail: `${stats.activePilots} active` },
-            { label: 'Schools', value: stats.totalSchools, detail: 'Across all pilots' },
-            { label: 'Survey submissions', value: stats.totalSurveys, detail: 'Response records, not unique respondents' },
+            { label: 'Registered users', value: stats.totalUsers, icon: 'users' as const, detail: 'Includes inactive accounts' },
+            { label: 'Pilot programmes', value: stats.totalPilots, icon: 'pilot' as const, detail: `${stats.activePilots} active` },
+            { label: 'Schools', value: stats.totalSchools, icon: 'school' as const, detail: 'Across all pilots' },
+            { label: 'Survey submissions', value: stats.totalSurveys, icon: 'survey' as const, detail: 'Response records' },
           ].map(metric => (
-            <Card key={metric.label} className="min-w-0 p-5 dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-sm text-gray-500 dark:text-slate-400">{metric.label}</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">{metric.value.toLocaleString('en')}</p>
-              <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-slate-400">{metric.detail}</p>
-            </Card>
+            <StatsCard key={metric.label} title={metric.label} value={metric.value} icon={metric.icon} color="green" description={metric.detail}/>
           ))}
         </div>
       )}
@@ -307,10 +304,10 @@ export default function AdminDashboardPage() {
           {/* Pilots Table - Section B */}
           <Card>
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold text-gray-900">Pilot Programs</h2>
                 <Link
-                  href="/admin/pilots"
+                  href={`/${locale}/admin/pilots`}
                   className="text-sm font-medium text-green-600 hover:text-green-500 flex items-center"
                 >
                   View all
@@ -343,11 +340,11 @@ export default function AdminDashboardPage() {
           {/* Recent Activity - Section D */}
           <Card>
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Recent System Activity</h2>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="min-w-0 text-lg font-semibold text-gray-900">Recent System Activity</h2>
                 <Link
-                  href="/admin/activities"
-                  className="text-sm font-medium text-green-600 hover:text-green-500 flex items-center"
+                  href={`/${locale}/admin/activities`}
+                  className="flex min-h-11 shrink-0 items-center text-sm font-medium text-green-600 hover:text-green-500"
                 >
                   View all
                   <ArrowRightIcon className="h-4 w-4 ml-1" />
@@ -362,16 +359,16 @@ export default function AdminDashboardPage() {
                     .map((activity, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="min-w-0 rounded-lg bg-gray-50 p-3 transition-colors hover:bg-gray-100"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center">
-                          <p className="font-medium text-gray-900 truncate">{activity.entity_name}</p>
-                          <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 capitalize">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-start gap-2">
+                          <p className="min-w-0 basis-full break-words font-medium text-gray-900 sm:flex-1 sm:basis-auto">{activity.entity_name}</p>
+                          <span className="inline-flex max-w-full shrink-0 items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 capitalize">
                             {activity.type.replace('_', ' ')}
                           </span>
                         </div>
-                        <div className="flex items-center mt-1 text-sm text-gray-500">
+                        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
                           <UserGroupIcon className="h-3 w-3 mr-1" />
                           <span className="truncate">{activity.user_name}</span>
                           <span className="mx-2">•</span>
@@ -400,7 +397,7 @@ export default function AdminDashboardPage() {
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Admin Actions</h2>
               <div className="space-y-3">
-                <Link href="/admin/users/new" className="block">
+                <Link href={`/${locale}/admin/users/new`} className="block">
                   <Button
                     variant="outline"
                     className="w-full justify-start"
@@ -409,7 +406,7 @@ export default function AdminDashboardPage() {
                     Add New User
                   </Button>
                 </Link>
-                <Link href="/admin/pilots/new" className="block">
+                <Link href={`/${locale}/admin/pilots/new`} className="block">
                   <Button
                     variant="outline"
                     className="w-full justify-start"
@@ -418,7 +415,7 @@ export default function AdminDashboardPage() {
                     Create Pilot Program
                   </Button>
                 </Link>
-                <Link href="/admin/schools/new" className="block">
+                <Link href={`/${locale}/admin/schools/new`} className="block">
                   <Button
                     variant="outline"
                     className="w-full justify-start"
@@ -436,7 +433,7 @@ export default function AdminDashboardPage() {
                     Create Template
                   </Button>
                 </Link>
-                <Link href="/admin/exports" className="block">
+                <Link href={`/${locale}/admin/exports`} className="block">
                   <Button
                     variant="outline"
                     className="w-full justify-start"

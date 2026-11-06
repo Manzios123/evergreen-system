@@ -149,3 +149,17 @@ html.dark {
 
 /* Mobile bottom nav padding */
 @media (max-width: 768px) { body { padding-bottom: 4rem; } }
+
+/* Mobile controls stay readable and tappable, including older native forms. */
+@media (max-width: 639px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]), select, textarea {
+    font-size: 1rem;
+    min-height: 2.75rem;
+    max-width: 100%;
+  }
+  button, [role=button] { min-height: 2.75rem; min-width: 2.75rem; }
+  [data-ui=card] > .p-6 { padding: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

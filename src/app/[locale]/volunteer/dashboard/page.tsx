@@ -68,8 +68,8 @@ export default function VolunteerDashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="mb-8 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="min-w-0 sm:col-span-2 lg:row-span-2">
+      <div className="mb-8 grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="col-span-2 min-w-0 lg:row-span-2">
           <PrimaryMetricCard label="Your activity reports" value={dashboard?.statistics?.activities?.total_activities || 0}
             description="Your assigned reports across their current statuses."
             details={[{ label: 'Approved reports', value: dashboard?.statistics?.activities?.approved_count || 0 }, { label: 'Draft reports', value: dashboard?.statistics?.activities?.draft_count || 0 }]}

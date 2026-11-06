@@ -10,7 +10,9 @@ import {
   CalendarIcon,
   DocumentTextIcon,
   UserGroupIcon,
-  ChartBarIcon,
+  FlagIcon,
+  DocumentChartBarIcon,
+  ChartPieIcon,
   ArrowRightOnRectangleIcon,
   PlusCircleIcon,
   ChatBubbleLeftIcon,
@@ -121,14 +123,14 @@ export default function Sidebar({ role, collapsed = false, onToggleCollapsed }: 
     admin: [
       { name: 'Dashboard', labelKey: 'dashboard', href: '/admin/dashboard', icon: HomeIcon, exact: true },
       { name: 'Users', labelKey: 'users', href: '/admin/users', icon: UsersIcon },
-      { name: 'Pilots', labelKey: 'pilots', href: '/admin/pilots', icon: ChartBarIcon },
+      { name: 'Pilots', labelKey: 'pilots', href: '/admin/pilots', icon: FlagIcon },
       { name: 'Schools', labelKey: 'schools', href: '/admin/schools', icon: BuildingLibraryIcon },
       { name: 'Activities', labelKey: 'activities', href: '/admin/activities', icon: CalendarIcon },
       { name: 'Surveys', labelKey: 'surveys', href: '/admin/surveys', icon: ClipboardDocumentListIcon },
       { name: 'Media', labelKey: 'media', href: '/admin/media', icon: PhotoIcon },
       { name: 'Exports', labelKey: 'exports', href: '/admin/exports', icon: ArrowDownTrayIcon },
-      { name: 'Reports', labelKey: 'reports', href: '/admin/reports', icon: ChartBarIcon },
-      { name: 'Analytics', labelKey: 'analytics', href: '/admin/analytics', icon: ChartBarIcon },
+      { name: 'Reports', labelKey: 'reports', href: '/admin/reports', icon: DocumentChartBarIcon },
+      { name: 'Analytics', labelKey: 'analytics', href: '/admin/analytics', icon: ChartPieIcon },
     ],
     coordinator: [
       { name: 'Dashboard', labelKey: 'dashboard', href: '/coordinator/dashboard', icon: HomeIcon, exact: true },
@@ -183,10 +185,11 @@ export default function Sidebar({ role, collapsed = false, onToggleCollapsed }: 
         <div className="flex items-center gap-3">
           <div className="relative h-9 w-9 shrink-0">
             <Image
-              src="/evergreen.png"
+              src="/evergreen-mark.png"
               alt="Evergreen"
               fill
-              className="object-contain"
+              sizes="36px"
+              className="object-contain dark:brightness-150"
               priority
             />
           </div>

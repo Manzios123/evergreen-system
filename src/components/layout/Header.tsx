@@ -1,7 +1,7 @@
 // components/layout/Header.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -20,9 +20,19 @@ function LiveClock() {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    setNow(new Date());
-    const interval = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(interval);
+    const desktop = window.matchMedia('(min-width: 1280px)');
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const update = () => {
+      if (interval) clearInterval(interval);
+      interval = undefined;
+      if (desktop.matches) {
+        setNow(new Date());
+        interval = setInterval(() => setNow(new Date()), 1000);
+      }
+    };
+    update();
+    desktop.addEventListener('change', update);
+    return () => { if (interval) clearInterval(interval); desktop.removeEventListener('change', update); };
   }, []);
 
   if (!now) return null;
@@ -39,7 +49,7 @@ function LiveClock() {
   const display12 = (hours % 12 || 12).toString().padStart(2, '0');
 
   return (
-    <div className="hidden lg:flex items-center gap-3 select-none">
+    <div className="hidden xl:flex items-center gap-3 select-none">
       {/* Date pill */}
       <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-full px-3 py-1.5">
         <span className="text-xs font-medium text-gray-500">{day},</span>
@@ -73,15 +83,8 @@ function LiveClock() {
 }
 
 function BlinkingColon() {
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const interval = setInterval(() => setVisible(v => !v), 500);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <span className={`text-sm font-bold text-green-600 transition-opacity duration-100 ${visible ? 'opacity-100' : 'opacity-20'}`}>
+    <span className="text-sm font-bold text-green-600">
       :
     </span>
   );
@@ -173,9 +176,10 @@ function LanguageSwitcher() {
 interface HeaderProps {
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
+  onOpenMobileNav?: () => void;
 }
 
-export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) {
+export default function Header({ theme = 'light', onToggleTheme, onOpenMobileNav }: HeaderProps) {
   const { user, logout } = useAuth();
   const params = useParams();
   const locale = params?.locale as string || 'en';
@@ -185,6 +189,8 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
   const tLayout = useTranslations('layout');
   const role = user?.role || 'volunteer';
   const profileHref = `/${locale}/${role}/profile`;
@@ -227,6 +233,23 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
       loadNotifications();
     }
   }, [notificationsOpen]);
+
+  useEffect(() => {
+    if (!notificationsOpen && !profileMenuOpen) return;
+    const outside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!notificationsRef.current?.contains(target)) setNotificationsOpen(false);
+      if (!profileRef.current?.contains(target)) setProfileMenuOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      (notificationsOpen ? notificationsRef : profileRef).current?.querySelector('button')?.focus();
+      setNotificationsOpen(false); setProfileMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+  }, [notificationsOpen, profileMenuOpen]);
 
   const notificationHref = (notification: NotificationItem) => {
     const uiRole = role === 'facilitator' ? 'volunteer' : role;
@@ -271,27 +294,28 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
   };
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-x-4 bg-white/95 backdrop-blur-sm px-4 py-3 border-b border-gray-100 shadow-sm sm:px-6 dark:border-slate-800 dark:bg-slate-950/90">
+    <header className="sticky top-0 z-40 flex min-h-16 items-center gap-x-2 border-b border-border bg-card px-3 py-2 text-card-foreground shadow-sm sm:gap-x-4 sm:px-6">
       {/* Mobile menu button */}
       <button
         type="button"
-        className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
+        onClick={onOpenMobileNav}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 lg:hidden"
       >
         <span className="sr-only">Open sidebar</span>
         <Bars3Icon className="h-6 w-6" aria-hidden="true" />
       </button>
 
-      <div className="flex-1 min-w-0" />
+      <div className="min-w-0 flex-1"><span className="font-semibold lg:hidden">Evergreen</span></div>
 
       {/* Right side: clock + bell + avatar */}
-      <div className="flex items-center gap-x-3">
+      <div className="flex shrink-0 items-center gap-x-1 sm:gap-x-3">
         {/* Live clock */}
         <LiveClock />
 
         <button
           type="button"
           onClick={onToggleTheme}
-          className="rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 dark:hover:bg-slate-900 dark:hover:text-slate-200"
+          className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-green-500"
           title={theme === 'dark' ? 'Use light theme' : 'Use dark theme'}
         >
           <span className="sr-only">{theme === 'dark' ? 'Use light theme' : 'Use dark theme'}</span>
@@ -299,14 +323,15 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
         </button>
 
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative" ref={notificationsRef}>
           <button
             type="button"
             onClick={() => {
               setNotificationsOpen((open) => !open);
               setProfileMenuOpen(false);
             }}
-            className="relative rounded-full p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+            aria-expanded={notificationsOpen}
+            className="relative flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             <span className="sr-only">View notifications</span>
             <BellIcon className="h-5 w-5" aria-hidden="true" />
@@ -318,7 +343,7 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
           </button>
 
           {notificationsOpen && (
-            <div className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black/5">
+            <div className="fixed inset-x-3 top-16 z-50 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80">
               <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
                 <div>
                   <h2 className="text-sm font-semibold text-gray-900">{tLayout('notifications')}</h2>
@@ -334,7 +359,7 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
                 </button>
               </div>
 
-              <div className="max-h-96 overflow-y-auto">
+              <div className="max-h-[min(24rem,calc(100dvh-9rem))] overflow-y-auto">
                 {notificationsLoading && (
                   <div className="space-y-3 p-4">
                     {[1, 2, 3].map((item) => (
@@ -381,17 +406,19 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
         </div>
 
         {/* User avatar + name */}
-        <div className="relative hidden lg:block">
+        <div className="relative" ref={profileRef}>
           <button
             type="button"
             onClick={() => {
               setProfileMenuOpen((open) => !open);
               setNotificationsOpen(false);
             }}
-            className="flex items-center gap-x-2.5 rounded-full pl-1 pr-3 py-1 hover:bg-gray-50 transition-colors group"
+            aria-label={displayName}
+            aria-expanded={profileMenuOpen}
+            className="group flex min-h-11 min-w-11 items-center justify-center gap-x-2.5 rounded-full p-1 hover:bg-accent lg:pr-3"
           >
             <UserAvatar user={user} />
-            <div className="min-w-0 text-left">
+            <div className="hidden min-w-0 text-left lg:block">
               <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
                 {displayName}
               </p>
@@ -399,7 +426,7 @@ export default function Header({ theme = 'light', onToggleTheme }: HeaderProps) 
                 {role}
               </p>
             </div>
-            <ChevronDownIcon className="h-4 w-4 text-gray-400" />
+            <ChevronDownIcon className="hidden h-4 w-4 text-gray-400 lg:block" />
           </button>
 
           {profileMenuOpen && (

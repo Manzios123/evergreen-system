@@ -45,7 +45,7 @@ export default function Modal({
         </Transition.Child>
 
         <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+          <div className="flex min-h-full items-center justify-center p-3 text-left sm:p-6">
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
@@ -56,12 +56,12 @@ export default function Modal({
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
               <Dialog.Panel
-                className={`relative transform overflow-hidden rounded-xl bg-card text-card-foreground border border-border px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full ${sizeClasses[size]} sm:p-6`}
+                className={`relative max-h-[calc(100dvh-1.5rem)] w-full min-w-0 transform overflow-y-auto rounded-xl border border-border bg-card p-4 text-left text-card-foreground shadow-xl transition-all ${sizeClasses[size]} sm:p-6`}
               >
-                <div className="absolute right-0 top-0 hidden pr-4 pt-4 sm:block">
+                <div className="absolute right-2 top-2 sm:right-3 sm:top-3">
                   <button
                     type="button"
-                    className="rounded-md bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                    className="flex h-11 w-11 items-center justify-center rounded-md bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                     onClick={onClose}
                   >
                     <span className="sr-only">Close</span>
@@ -69,10 +69,10 @@ export default function Modal({
                   </button>
                 </div>
                 <div className="sm:flex sm:items-start">
-                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                  <div className="w-full min-w-0 text-left">
                     <Dialog.Title
                       as="h3"
-                      className="text-lg font-semibold leading-6 text-gray-900 mb-4"
+                      className="mb-4 min-h-11 pr-12 text-lg font-semibold leading-6 text-card-foreground [overflow-wrap:anywhere]"
                     >
                       {title}
                     </Dialog.Title>
@@ -80,7 +80,7 @@ export default function Modal({
                   </div>
                 </div>
                 {footer && (
-                  <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                  <div className="mt-5 flex flex-col gap-2 [&>button]:w-full sm:mt-4 sm:flex-row-reverse sm:[&>button]:w-auto">
                     {footer}
                   </div>
                 )}

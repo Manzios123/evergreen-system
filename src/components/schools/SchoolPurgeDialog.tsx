@@ -90,9 +90,9 @@ export default function SchoolPurgeDialog({schoolId,onClose,onDeleted}: {schoolI
         </>}
       </>}
       {operationId && !job?.databaseDeleted && <p className="break-all text-xs text-muted-foreground">Keep this deletion reference: {operationId}. Check its result before retrying.</p>}
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
         <Button variant="outline" disabled={busy} onClick={onClose}>{job?.databaseDeleted?'Done':'Cancel'}</Button>
-        {!job?.databaseDeleted && !uncertain && <Button variant="outline" disabled={busy} onClick={()=>setReload(n=>n+1)}>Reload preview</Button>}
+        {!job?.databaseDeleted && !uncertain && <Button variant="outline" disabled={busy} onClick={()=>{attempt.current=null;setOperationId('');setReload(n=>n+1);}}>Reload preview</Button>}
         {uncertain && !job?.databaseDeleted && <Button variant="outline" disabled={busy} onClick={()=>run('status')}>Check deletion result</Button>}
         {job?.databaseDeleted && job.cleanupPending && !job.recoveryUnavailable && <Button disabled={busy} onClick={()=>run('cleanup')}>{busy?'Cleaning files…':'Retry file cleanup'}</Button>}
         {!job?.databaseDeleted && <Button variant="destructive" disabled={busy||(!uncertain&&!canDelete)} onClick={()=>run('delete')}>{busy?'Working…':uncertain?'Retry same deletion':'Delete all listed test data'}</Button>}

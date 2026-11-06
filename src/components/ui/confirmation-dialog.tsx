@@ -65,7 +65,7 @@ export default function ConfirmationDialog({
         </Transition.Child>
 
         <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+          <div className="flex min-h-full items-center justify-center p-3 text-left sm:p-6">
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
@@ -75,12 +75,12 @@ export default function ConfirmationDialog({
               leaveFrom="opacity-100 translate-y-0 sm:scale-100"
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
-              <Dialog.Panel className="relative transform overflow-hidden rounded-xl bg-card text-card-foreground border border-border px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
-                <div className="sm:flex sm:items-start">
-                  <div className={`mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconColor.replace('text-', 'bg-').replace('-400', '-100')} sm:mx-0 sm:h-10 sm:w-10`}>
+              <Dialog.Panel className="relative max-h-[calc(100dvh-1.5rem)] w-full max-w-lg transform overflow-y-auto rounded-xl border border-border bg-card p-4 text-left text-card-foreground shadow-xl transition-all sm:p-6">
+                <div className="flex items-start gap-3">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconColor.replace('text-', 'bg-').replace('-400', '-100')}`}>
                     <Icon className={`h-6 w-6 ${iconColor}`} aria-hidden="true" />
                   </div>
-                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                  <div className="min-w-0 text-left">
                     <Dialog.Title as="h3" className="text-base font-semibold leading-6 text-gray-900">
                       {title}
                     </Dialog.Title>
@@ -89,11 +89,11 @@ export default function ConfirmationDialog({
                     </div>
                   </div>
                 </div>
-                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <div className="mt-5 flex flex-col gap-2 sm:mt-4 sm:flex-row-reverse">
                   <Button
                     onClick={onConfirm}
                     loading={loading}
-                    className={`${confirmColor} sm:ml-3 sm:w-auto`}
+                    className={`${confirmColor} w-full sm:w-auto`}
                   >
                     {confirmText}
                   </Button>
@@ -101,7 +101,7 @@ export default function ConfirmationDialog({
                     variant="outline"
                     onClick={onClose}
                     disabled={loading}
-                    className="mt-3 sm:mt-0 sm:w-auto"
+                    className="w-full sm:w-auto"
                   >
                     {cancelText}
                   </Button>

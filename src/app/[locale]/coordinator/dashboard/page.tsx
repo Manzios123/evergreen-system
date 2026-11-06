@@ -199,8 +199,8 @@ export default function CoordinatorDashboardPage() {
 
       {/* Reporting overview and supporting metrics */}
       {stats && (
-        <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="min-w-0 sm:col-span-2 lg:row-span-2">
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <div className="col-span-2 min-w-0 lg:row-span-2">
             <PrimaryMetricCard label="Activity reports" value={stats.totalActivities}
               description={`${dashboardData?.pilot.name || 'Assigned pilot'} · Every report status is included.`}
               details={[{ label: 'Approved reports', value: stats.completedActivities }, { label: 'Draft reports', value: stats.draftActivities }]}
@@ -291,12 +291,12 @@ export default function CoordinatorDashboardPage() {
                   {dashboardData.recentPendingActivities.slice(0, 5).map((activity) => (
                     <div
                       key={activity.id}
-                      className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
+                      className="flex min-w-0 flex-col items-start justify-between gap-3 rounded-lg bg-yellow-50 p-3 transition-colors hover:bg-yellow-100 sm:flex-row sm:items-center"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-gray-900 truncate">{activity.title}</p>
-                          <span className="ml-2 text-xs font-medium text-yellow-800 bg-yellow-100 px-2 py-1 rounded">
+                          <p className="min-w-0 basis-full break-words font-medium text-gray-900">{activity.title}</p>
+                          <span className="rounded bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800">
                             Awaiting Review
                           </span>
                         </div>

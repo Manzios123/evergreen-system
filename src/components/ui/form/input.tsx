@@ -31,7 +31,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               block w-full rounded-md border bg-card text-card-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60 shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500
               ${leftIcon ? 'pl-10' : 'pl-3'}
               ${rightIcon ? 'pr-10' : 'pr-3'}
-              py-2 text-sm
+              min-h-11 py-2 text-base sm:text-sm
               ${error ? 'border-red-300 dark:border-red-500 text-red-900 dark:text-red-200 placeholder-red-300' : 'border-input'}
               ${className}
             `}

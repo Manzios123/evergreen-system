@@ -1,9 +1,9 @@
 // components/layout/mobile-nav.tsx
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, Bars3Icon } from '@heroicons/react/24/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { usePathname, useParams } from 'next/navigation';
@@ -87,8 +87,7 @@ function UserAvatar({ user }: { user: any }) {
   );
 }
 
-export default function MobileNav() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+export default function MobileNav({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const params = useParams();
@@ -105,17 +104,8 @@ export default function MobileNav() {
 
   return (
     <>
-      <button
-        type="button"
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 text-gray-700 bg-white rounded-lg shadow-md border border-gray-100"
-        onClick={() => setSidebarOpen(true)}
-      >
-        <span className="sr-only">Open sidebar</span>
-        <Bars3Icon className="h-5 w-5" aria-hidden="true" />
-      </button>
-
-      <Transition.Root show={sidebarOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
+      <Transition.Root show={open} as={Fragment}>
+        <Dialog as="div" className="relative z-50 lg:hidden" onClose={onClose}>
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
@@ -138,25 +128,27 @@ export default function MobileNav() {
               leaveFrom="translate-x-0"
               leaveTo="-translate-x-full"
             >
-              <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
-                <div className="flex grow flex-col gap-y-4 overflow-y-auto bg-white px-5 pb-4">
+              <Dialog.Panel className="relative mr-8 flex w-full max-w-xs flex-1">
+                <div className="flex min-w-0 grow flex-col gap-y-4 overflow-y-auto bg-card px-4 pb-4 text-card-foreground">
                   {/* Header with logo and close */}
                   <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100">
                     <div className="flex items-center gap-3">
                       <div className="relative h-8 w-8 shrink-0">
                         <Image
-                          src="/evergreen.png"
+                          src="/evergreen-mark.png"
                           alt="Evergreen"
                           fill
-                          className="object-contain"
+                          sizes="32px"
+                          className="object-contain dark:brightness-150"
                         />
                       </div>
                       <span className="text-lg font-bold tracking-tight text-gray-900">Evergreen</span>
                     </div>
                     <button
                       type="button"
-                      className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
-                      onClick={() => setSidebarOpen(false)}
+                      aria-label="Close sidebar"
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"
+                      onClick={onClose}
                     >
                       <XMarkIcon className="h-5 w-5" />
                     </button>
@@ -186,7 +178,7 @@ export default function MobileNav() {
                                   ? 'bg-green-50 text-green-700'
                                   : 'text-gray-600 hover:text-green-700 hover:bg-gray-50'
                                 }`}
-                              onClick={() => setSidebarOpen(false)}
+                              onClick={onClose}
                             >
                               {tNav(item.labelKey)}
                             </Link>
@@ -200,7 +192,7 @@ export default function MobileNav() {
                       <Link
                         href={profileHref}
                         className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-gray-50 transition-all"
-                        onClick={() => setSidebarOpen(false)}
+                        onClick={onClose}
                       >
                         <UserAvatar user={user} />
                         <div className="flex-1 min-w-0">
@@ -210,7 +202,7 @@ export default function MobileNav() {
                       </Link>
 
                       <button
-                        onClick={() => { logout(); setSidebarOpen(false); }}
+                        onClick={() => { logout(); onClose(); }}
                         className="w-full flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
                       >
                         {tNav('signOut')}
